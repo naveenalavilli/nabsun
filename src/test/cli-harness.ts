@@ -26,6 +26,7 @@ import {
   resolveLauncher,
   withHostInstructions,
 } from '../main/ai/providers/cli';
+import { inlineCspHash } from '../main/internalPages';
 import type { ModelMessage } from '../main/ai/provider';
 import { parseLoginOutput } from '../main/integrations/cliAccounts';
 
@@ -311,6 +312,17 @@ function checkHostInstructions() {
   );
 }
 
+/** Internal-page CSP hashes must not depend on checkout line endings. */
+function checkInternalPageCspHashing() {
+  const lf = '\n  body {\n    color: red;\n  }\n';
+  const crlf = lf.replace(/\n/g, '\r\n');
+  check(
+    'internal pages: CSP hashes normalise CRLF to LF',
+    inlineCspHash(crlf) === inlineCspHash(lf),
+    `${inlineCspHash(crlf)} !== ${inlineCspHash(lf)}`,
+  );
+}
+
 /**
  * Whether a native binary for this CLI exists anywhere under the npm install,
  * found by walking the tree rather than by asking the code under test —
@@ -425,6 +437,7 @@ async function main() {
   checkCodexArgs();
   checkConversationPrompt();
   checkHostInstructions();
+  checkInternalPageCspHashing();
   checkResolutionWithoutPath();
 
   for (const [label, binName] of [
@@ -518,6 +531,5 @@ async function main() {
 }
 
 void main();
-
 
 
