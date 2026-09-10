@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'" />
+    <title>Nabsun</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topchrome">
+        <div id="tabstrip">
+          <div id="tabs" role="tablist" aria-label="Open tabs"></div>
+          <button id="new-tab" class="icon-btn" title="New tab (Ctrl+T)" aria-label="New tab">+</button>
+          <div class="drag-spacer"></div>
+          <div id="window-controls">
+            <button id="win-min" class="win-btn" aria-label="Minimize">&#xE921;</button>
+            <button id="win-max" class="win-btn" aria-label="Maximize">&#xE922;</button>
+            <button id="win-close" class="win-btn danger" aria-label="Close">&#xE8BB;</button>
+          </div>
+        </div>
+
+        <div id="toolbar">
+          <button id="nav-back" class="icon-btn" title="Back" aria-label="Back">‹</button>
+          <button id="nav-forward" class="icon-btn" title="Forward" aria-label="Forward">›</button>
+          <button id="nav-reload" class="icon-btn" title="Reload (Ctrl+R)" aria-label="Reload">⟳</button>
+
+          <button id="omnibox" title="Search or enter address (Ctrl+L)">
+            <span id="omnibox-scheme" class="scheme"></span>
+            <span id="omnibox-text">Search or enter address</span>
+          </button>
+
+          <button id="bookmark" class="icon-btn" title="Bookmark this page" aria-label="Bookmark">☆</button>
+          <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
+          <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
+          <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
+          <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
+          <button id="sidebar-toggle" class="icon-btn" title="Toggle AI sidebar (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
+        </div>
+      </header>
+
+      <div id="bookmarks-bar" role="toolbar" aria-label="Bookmarks bar"></div>
+
+      <div id="password-bar" hidden>
+        <span class="pw-icon">🔑</span>
+        <span id="pw-message"></span>
+        <div class="grow"></div>
+        <button id="pw-save" class="primary">Save</button>
+        <button id="pw-never" class="ghost">Not now</button>
+      </div>
+
+      <div id="findbar" hidden>
+        <input id="find-input" type="text" placeholder="Find in page" aria-label="Find in page" />
+        <span id="find-count" class="muted"></span>
+        <button id="find-prev" class="icon-btn" aria-label="Previous match">↑</button>
+        <button id="find-next" class="icon-btn" aria-label="Next match">↓</button>
+        <button id="find-close" class="icon-btn" aria-label="Close find bar">✕</button>
+      </div>
+
+      <main id="body">
+        <!-- The Chromium page view is layered over this region by the main process. -->
+        <div id="content-placeholder"></div>
+
+        <div id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize assistant panel"></div>
+
+        <aside id="sidebar" aria-label="AI assistant">
+          <div id="sidebar-head">
+            <div class="row">
+              <strong id="sidebar-title">Assistant</strong>
+              <span id="model-badge" class="badge"></span>
+              <div class="grow"></div>
+              <button id="bookmarks-btn" class="icon-btn" title="Bookmarks (Ctrl+Shift+O)" aria-label="Bookmarks">★</button>
+              <button id="passwords-btn" class="icon-btn" title="Saved passwords" aria-label="Saved passwords">🔑</button>
+              <button id="history-btn" class="icon-btn" title="Chat history" aria-label="Chat history">🕘</button>
+              <button id="new-chat" class="icon-btn" title="New chat" aria-label="New chat">✎</button>
+              <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+            </div>
+          </div>
+
+          <div id="sidebar-views">
+            <section id="view-chat" class="view active">
+              <div id="transcript" aria-live="polite"></div>
+              <div id="composer">
+                <div id="composer-chips">
+                  <label class="chip">
+                    <input type="checkbox" id="attach-page" checked />
+                    <span>Include page</span>
+                  </label>
+                  <label class="chip" title="Let the assistant click and type without asking each time">
+                    <input type="checkbox" id="autopilot" />
+                    <span>Autopilot</span>
+                  </label>
+                  <div class="grow"></div>
+                  <span id="step-badge" class="muted"></span>
+                </div>
+                <div class="composer-row">
+                  <textarea id="prompt" rows="1" placeholder="Ask about this page, or tell me what to do…" aria-label="Message the assistant"></textarea>
+                  <button id="send" class="primary" aria-label="Send">Send</button>
+                  <button id="stop" class="danger" hidden aria-label="Stop">Stop</button>
+                </div>
+              </div>
+            </section>
+
+            <section id="view-history" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Chats</strong>
+              </div>
+              <div id="session-list"></div>
+            </section>
+
+            <section id="view-downloads" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Downloads</strong>
+                <div class="grow"></div>
+                <button id="dl-folder" class="link">Open folder</button>
+                <button id="dl-clear" class="link">Clear</button>
+              </div>
+              <div id="download-list"></div>
+            </section>
+
+            <section id="view-bookmarks" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Bookmarks</strong>
+                <div class="grow"></div>
+                <button id="bm-bar-toggle" class="link">Show bar</button>
+              </div>
+              <div id="bookmarks-body"></div>
+            </section>
+
+            <section id="view-passwords" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Saved passwords</strong>
+              </div>
+              <div id="passwords-body"></div>
+            </section>
+
+            <section id="view-extensions" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Extensions</strong>
+              </div>
+              <div id="extensions-body"></div>
+            </section>
+
+            <section id="view-settings" class="view">
+              <div class="view-head">
+                <button class="link back-to-chat">← Back</button>
+                <strong>Settings</strong>
+              </div>
+              <div id="settings-body"></div>
+            </section>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

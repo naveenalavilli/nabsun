@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+build/icon.png
+*.log
+.DS_Store
+
+# Embedded inference engine and model weights (~1.1 GB).
+# Fetched by `npm run fetch:model`; bundled into the installer at package time.
+vendor/
