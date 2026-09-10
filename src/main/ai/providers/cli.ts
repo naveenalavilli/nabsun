@@ -33,25 +33,149 @@ export function resolveBin(name: string): string | null {
 
 const binCache = new Map<string, { path: string | null; at: number }>();
 
+/**
+ * Drops the resolution caches. A testing seam: the harness proves the
+ * install-directory fallback by resolving with an empty PATH, and a cached hit
+ * from the previous lookup would answer before the fallback ever ran.
+ */
+export function clearBinCache() {
+  binCache.clear();
+  launcherCache.clear();
+  pathDirsCache = null;
+}
+
 function searchPath(name: string): string | null {
   const finder = process.platform === 'win32' ? 'where.exe' : 'which';
   try {
     const res = spawnSync(finder, [name], { encoding: 'utf8' });
-    if (res.status !== 0 || !res.stdout) return null;
-    const candidates = res.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (process.platform === 'win32') {
-      // .exe first, then the .cmd shim; .ps1 cannot be spawned at all.
-      return (
-        candidates.find((c) => /\.exe$/i.test(c)) ??
-        candidates.find((c) => /\.(cmd|bat)$/i.test(c)) ??
-        candidates.find((c) => !/\.ps1$/i.test(c)) ??
-        null
-      );
+    if (res.status === 0 && res.stdout) {
+      const candidates = res.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const picked = process.platform === 'win32' ? preferSpawnable(candidates) : candidates[0];
+      if (picked) return picked;
     }
-    return candidates[0] ?? null;
   } catch {
-    return null;
+    // Fall through to the directory scan.
   }
+  return searchInstallDirs(name);
+}
+
+/** .exe first, then the .cmd shim; .ps1 cannot be spawned at all. */
+function preferSpawnable(candidates: string[]): string | null {
+  return (
+    candidates.find((c) => /\.exe$/i.test(c)) ??
+    candidates.find((c) => /\.(cmd|bat)$/i.test(c)) ??
+    candidates.find((c) => !/\.ps1$/i.test(c)) ??
+    null
+  );
+}
+
+/**
+ * Looks for a CLI where its installer actually put it.
+ *
+ * `where`/`which` sees only the PATH this process inherited, and for a GUI
+ * application that PATH is routinely out of date. Installing a CLI with npm
+ * appends npm's global bin directory to the *persisted* PATH, but every process
+ * already running keeps the environment it started with — the shell, the file
+ * manager, the editor the browser was launched from. The tool then resolves in
+ * a new terminal and not in here, and the settings panel reports a CLI the user
+ * can plainly run as not installed.
+ *
+ * On macOS the same gap is permanent rather than transient: an app launched
+ * from Finder never reads a login shell's profile, so a Homebrew- or
+ * npm-installed CLI is invisible to it however long ago it was installed.
+ *
+ * This is a fallback, not a replacement: PATH still wins when it has an answer,
+ * so a deliberately shadowed binary keeps working. Scanning costs no process
+ * spawn, and `resolveBin` caches the outcome either way.
+ */
+function searchInstallDirs(name: string): string | null {
+  const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat'] : [''];
+  for (const dir of installDirs()) {
+    for (const ext of exts) {
+      const full = path.join(dir, `${name}${ext}`);
+      try {
+        if (fs.statSync(full).isFile()) return full;
+      } catch {
+        // Not here. Keep looking.
+      }
+    }
+  }
+  return null;
+}
+
+/** Where npm, Homebrew and the native installers place their binaries. */
+function installDirs(): string[] {
+  const home = os.homedir();
+
+  if (process.platform !== 'win32') {
+    return [
+      '/opt/homebrew/bin', // Homebrew on Apple silicon
+      '/usr/local/bin', // Homebrew on Intel, and most manual installs
+      path.join(home, '.local', 'bin'), // Claude Code's native installer
+      path.join(home, '.npm-global', 'bin'),
+      path.join(home, '.bun', 'bin'),
+      path.join(home, '.deno', 'bin'),
+      '/usr/bin',
+    ];
+  }
+
+  const dirs: string[] = [];
+  // npm's global prefix on Windows *is* the bin directory, not a parent of one.
+  if (process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, 'npm'));
+  if (process.env.LOCALAPPDATA) {
+    dirs.push(path.join(process.env.LOCALAPPDATA, 'npm'));
+    dirs.push(path.join(process.env.LOCALAPPDATA, 'pnpm'));
+  }
+  dirs.push(path.join(home, '.local', 'bin'), path.join(home, '.bun', 'bin'));
+  // Then whatever the user actually configured — a custom `npm config set
+  // prefix` lands nowhere in the list above.
+  dirs.push(...persistedPathDirs());
+  return dirs;
+}
+
+/**
+ * The PATH as Windows has it stored, rather than as this process inherited it.
+ *
+ * That difference is the whole point: after an npm global install the registry
+ * holds the new entry and the inherited environment does not, and nothing
+ * short of a restart reconciles them for an already-running process.
+ *
+ * Re-read at most every 30 seconds. It is two `reg.exe` spawns, and the
+ * settings panel asks for CLI status often enough that doing it per call would
+ * be noticeable — but a user who installs a CLI with the browser open should
+ * not have to wait long for it to appear.
+ */
+function persistedPathDirs(): string[] {
+  if (pathDirsCache && Date.now() - pathDirsCache.at < 30_000) return pathDirsCache.dirs;
+
+  const dirs: string[] = [];
+  for (const key of [
+    'HKCU\Environment',
+    'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+  ]) {
+    try {
+      const res = spawnSync('reg.exe', ['query', key, '/v', 'Path'], { encoding: 'utf8' });
+      if (res.status !== 0 || !res.stdout) continue;
+      const value = /^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/im.exec(res.stdout)?.[1];
+      if (!value) continue;
+      for (const entry of value.split(';')) {
+        const expanded = expandWinVars(entry.trim());
+        if (expanded) dirs.push(expanded);
+      }
+    } catch {
+      // No registry access. The fixed list above still applies.
+    }
+  }
+
+  pathDirsCache = { dirs, at: Date.now() };
+  return dirs;
+}
+
+let pathDirsCache: { dirs: string[]; at: number } | null = null;
+
+/** REG_EXPAND_SZ values arrive with their %VARS% unexpanded. */
+function expandWinVars(value: string): string {
+  return value.replace(/%([^%]+)%/g, (whole, name: string) => process.env[name] ?? whole);
 }
 
 /** A concrete command line that can be spawned without a shell. */

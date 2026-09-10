@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildCodexArgs,
+  clearBinCache,
   conversationPrompt,
   parseCodexLine,
   resolveBin,
@@ -341,12 +342,90 @@ function shipsNativeBinary(binName: string): boolean {
   return walk(path.join(path.dirname(shim), 'node_modules'), 0);
 }
 
+/**
+ * Whether npm has installed this CLI, decided by looking on disk rather than by
+ * asking the resolver.
+ *
+ * The oracle has to be independent or the test cannot fail. When resolution is
+ * broken it reports nothing installed, so a test that took its list of
+ * candidates from `resolveBin` would skip itself in precisely the case it
+ * exists to catch - which is how the suite reported both CLIs as absent on a
+ * machine that had both.
+ */
+function npmInstalled(bin: string): string | null {
+  const home = os.homedir();
+  const candidates =
+    process.platform === 'win32'
+      ? [
+          path.join(process.env.APPDATA ?? '', 'npm', `${bin}.cmd`),
+          path.join(process.env.APPDATA ?? '', 'npm', `${bin}.exe`),
+        ]
+      : [
+          '/usr/local/bin',
+          '/opt/homebrew/bin',
+          path.join(home, '.npm-global', 'bin'),
+          path.join(home, '.local', 'bin'),
+        ].map((dir) => path.join(dir, bin));
+
+  return (
+    candidates.find((c) => {
+      try {
+        return fs.statSync(c).isFile();
+      } catch {
+        return false;
+      }
+    }) ?? null
+  );
+}
+
+/**
+ * A CLI installed by npm must be found even when this process never inherited
+ * npm's bin directory on its PATH.
+ *
+ * This is the shape of the original bug rather than a hypothetical: `npm i -g`
+ * appends its global bin directory to the persisted PATH, but a process that
+ * was already running - and anything it launches, including this browser -
+ * keeps the environment it started with. `where`/`which` then finds nothing,
+ * and the settings panel reports a CLI the user can plainly run as missing.
+ *
+ * PATH is emptied for the duration so the shell lookup cannot succeed by
+ * accident, which is the only way to prove the fallback rather than the path
+ * that was already working.
+ */
+function checkResolutionWithoutPath() {
+  const realPath = process.env.PATH;
+  const installed = ['codex', 'claude'].filter((bin) => npmInstalled(bin));
+
+  if (installed.length === 0) {
+    skip('resolution survives a PATH that never saw npm', 'neither CLI is installed by npm here');
+    return;
+  }
+
+  process.env.PATH = '';
+  try {
+    for (const bin of installed) {
+      // A cached hit from the lookup above would answer before the fallback ran.
+      clearBinCache();
+      const found = resolveBin(bin);
+      check(
+        `${bin}: still found when PATH is empty`,
+        Boolean(found && fs.existsSync(found)),
+        found ?? 'not found',
+      );
+    }
+  } finally {
+    process.env.PATH = realPath;
+    clearBinCache();
+  }
+}
+
 async function main() {
   checkLoginParsing();
   checkCodexParsing();
   checkCodexArgs();
   checkConversationPrompt();
   checkHostInstructions();
+  checkResolutionWithoutPath();
 
   for (const [label, binName] of [
     ['Codex', 'codex'],
