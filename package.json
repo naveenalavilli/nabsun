@@ -1,0 +1,44 @@
+{
+  "name": "nabsun",
+  "productName": "Nabsun",
+  "version": "0.1.0",
+  "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
+  "main": "dist/main/index.js",
+  "author": "Naveen Kumar Alavilli",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch --run",
+    "start": "npm run build && node scripts/electron-run.mjs",
+    "setup": "node node_modules/electron/install.js",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run build && npm run verify:cli && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
+    "verify:browse": "node scripts/electron-run.mjs dist/test/browsing-harness.js",
+    "verify:cli": "node dist/test/cli-harness.js",
+    "verify:page": "node scripts/electron-run.mjs scripts/verify-bridge.cjs",
+    "verify:agent": "node scripts/electron-run.mjs dist/test/agent-harness.js",
+    "verify:mcp": "node dist/test/bridge-harness.js",
+    "icon": "node scripts/make-icon.mjs",
+    "dist": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder",
+    "dist:win": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --win",
+    "dist:mac": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --mac",
+    "dist:linux": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --linux",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "fetch:model": "node scripts/fetch-local-model.mjs",
+    "verify:local": "node dist/test/local-harness.js",
+    "check:payload": "node scripts/check-release-payload.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "openai": "^6.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3"
+  }
+}

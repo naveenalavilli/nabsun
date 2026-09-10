@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bridge Fixture</title>
+  </head>
+  <body>
+    <h1>Sign in</h1>
+    <p>A fixture exercising the element shapes the bridge has to handle.</p>
+
+    <form id="f">
+      <label for="email">Email address</label>
+      <input id="email" name="email" type="text" placeholder="you@example.com" />
+
+      <label><input id="agree" type="checkbox" /> I agree to the terms</label>
+
+      <label for="plan">Plan</label>
+      <select id="plan">
+        <option value="free">Free</option>
+        <option value="pro">Pro</option>
+      </select>
+
+      <button id="submit" type="button">Create account</button>
+    </form>
+
+    <!-- An icon-only control: the bridge must name it from the nested svg title. -->
+    <button id="icon" aria-label="Dismiss notice">
+      <svg width="12" height="12"><title>Dismiss</title></svg>
+    </button>
+
+    <a href="/pricing">See pricing</a>
+
+    <div id="hidden-box" style="display:none">
+      <button id="never">Should never appear in a snapshot</button>
+    </div>
+
+    <div id="result"></div>
+
+    <ul id="rows">
+      <li class="row"><h3>Alpha</h3><a href="/a">open A</a></li>
+      <li class="row"><h3>Beta</h3><a href="/b">open B</a></li>
+    </ul>
+
+    <script>
+      // A controlled-input pattern: the app tracks its own state and only
+      // trusts real input events, which is what breaks naive .value setters.
+      let tracked = '';
+      document.getElementById('email').addEventListener('input', (e) => {
+        tracked = e.target.value;
+      });
+      document.getElementById('submit').addEventListener('click', () => {
+        document.getElementById('result').textContent =
+          'submitted:' + tracked + '|agree=' + document.getElementById('agree').checked +
+          '|plan=' + document.getElementById('plan').value;
+      });
+    </script>
+  </body>
+</html>

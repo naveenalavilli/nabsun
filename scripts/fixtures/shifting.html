@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shifting Fixture</title>
+  </head>
+  <body>
+    <h1>Reordering and credentials</h1>
+
+    <!--
+      Reproduces the case where a ref survives but no longer means what it did.
+      Snapshot 1 names these in order; reorder() swaps them, so an index-based
+      handle from snapshot 1 would resolve to the other button after snapshot 2
+      and click it without complaint.
+    -->
+    <div id="actions">
+      <button id="safe" type="button">Save draft</button>
+      <button id="destructive" type="button">Delete everything</button>
+    </div>
+
+    <form id="login">
+      <label for="user">Username</label>
+      <input id="user" name="user" type="text" />
+
+      <label for="pw">Password</label>
+      <input id="pw" name="pw" type="password" value="hunter2-from-attribute" />
+
+      <label for="otp">One-time code</label>
+      <input id="otp" name="otp" type="text" autocomplete="one-time-code" value="123456" />
+
+      <!-- A credential in a textarea: same secret, different serialisation
+           branch, which is exactly how the first redaction pass missed it. -->
+      <label for="recovery">Recovery codes</label>
+      <textarea id="recovery" autocomplete="one-time-code">FAKE_TEXTAREA_CODE</textarea>
+    </form>
+
+    <div id="clicked">none</div>
+
+    <script>
+      for (const id of ['safe', 'destructive']) {
+        document.getElementById(id).addEventListener('click', () => {
+          document.getElementById('clicked').textContent = id;
+        });
+      }
+      // Put the destructive button where the safe one was.
+      window.reorder = () => {
+        const box = document.getElementById('actions');
+        box.insertBefore(document.getElementById('destructive'), document.getElementById('safe'));
+      };
+    </script>
+  </body>
+</html>

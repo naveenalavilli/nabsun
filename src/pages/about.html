@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en" data-theme="{{THEME}}">
+  <head>
+    <meta charset="utf-8" />
+    <title>About Nabsun</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg-raised: #f4f5f8;
+        --bg-input: #ffffff;
+        --border: #e2e4ea;
+        --border-strong: #c6cad3;
+        --text: #1c1f26;
+        --text-dim: #596072;
+        --text-faint: #878e9e;
+        --accent: #5b3fd6;
+        --accent-soft: #6d4fe0;
+        --accent-tint: #5b3fd626;
+        --hero: #ece9fb;
+        --hover: #0000000a;
+        --scrim: #1c1f2659;
+        --shadow: #1c1f2626;
+        --accent-deep: #4a32b0;
+        --danger: #d12b4e;
+        color-scheme: light;
+      }
+      :root[data-theme='dark'] {
+        --bg: var(--bg);
+        --bg-raised: var(--bg-raised);
+        --bg-input: var(--bg-input);
+        --border: var(--border);
+        --border-strong: var(--border-strong);
+        --text: var(--text);
+        --text-dim: var(--text-dim);
+        --text-faint: var(--text-faint);
+        --accent: var(--accent);
+        --accent-soft: var(--accent-soft);
+        --accent-tint: var(--accent-tint);
+        --hero: var(--hero);
+        --danger: var(--danger);
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-theme='dark']) {
+          --bg: var(--bg);
+          --bg-raised: var(--bg-raised);
+          --bg-input: var(--bg-input);
+          --border: var(--border);
+          --border-strong: var(--border-strong);
+          --text: var(--text);
+          --text-dim: var(--text-dim);
+          --text-faint: var(--text-faint);
+          --accent: var(--accent);
+          --accent-soft: var(--accent-soft);
+          --accent-tint: var(--accent-tint);
+          --hero: var(--hero);
+          --danger: var(--danger);
+          color-scheme: dark;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; padding: 56px 24px 72px;
+        display: flex; flex-direction: column; align-items: center; gap: 26px;
+        background: radial-gradient(1100px 520px at 50% -12%, var(--hero) 0%, var(--bg) 62%);
+        color: var(--text);
+        font: 14px/1.65 "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      .mark {
+        width: 76px; height: 76px; border-radius: 20px;
+        background: linear-gradient(145deg, var(--accent), var(--accent-deep));
+        box-shadow: 0 12px 40px var(--accent)40;
+        display: grid; place-items: center;
+        font-size: 38px; font-weight: 700; color: #fff;
+      }
+      h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+      .version { margin: -18px 0 0; color: var(--text-dim); }
+      .tagline { margin: 0; color: var(--text-dim); max-width: 540px; text-align: center; }
+      section {
+        width: min(680px, 100%);
+        border: 1px solid var(--border); border-radius: 12px;
+        background: var(--bg-raised); overflow: hidden;
+      }
+      h2 {
+        margin: 0; padding: 12px 18px;
+        border-bottom: 1px solid var(--border);
+        font-size: 11.5px; font-weight: 650;
+        text-transform: uppercase; letter-spacing: .07em; color: var(--accent-soft);
+      }
+      table { width: 100%; border-collapse: collapse; }
+      td { padding: 9px 18px; border-bottom: 1px solid var(--bg-input); vertical-align: top; }
+      tr:last-child td { border-bottom: none; }
+      td:first-child { color: var(--text-dim); width: 190px; white-space: nowrap; }
+      td:last-child { font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; word-break: break-all; }
+      footer { color: var(--text-faint); font-size: 12px; text-align: center; max-width: 620px; }
+      a { color: var(--accent-soft); }
+    </style>
+  </head>
+  <body>
+    <div class="mark">N</div>
+    <h1>Nabsun</h1>
+    <p class="version">Version {{APP_VERSION}}</p>
+    <p class="tagline">
+      A browser for AI. The browser supplies the tools, the page state and the
+      permissions; an agent is the program that runs in it — asking before it
+      changes anything.
+    </p>
+
+    <section>
+      <h2>Engine</h2>
+      <table>
+        <tr><td>Chromium</td><td>{{CHROMIUM}}</td></tr>
+        <tr><td>Electron</td><td>{{ELECTRON}}</td></tr>
+        <tr><td>Node.js</td><td>{{NODE}}</td></tr>
+        <tr><td>V8</td><td>{{V8}}</td></tr>
+        <tr><td>Platform</td><td>{{PLATFORM}} ({{ARCH}})</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Assistant</h2>
+      <table>
+        <tr><td>Provider</td><td>{{PROVIDER}}</td></tr>
+        <tr><td>Model</td><td>{{MODEL}}</td></tr>
+        <tr><td>Tools available</td><td>{{TOOL_COUNT}}</td></tr>
+        <tr><td>Plugins loaded</td><td>{{PLUGIN_COUNT}}</td></tr>
+        <tr><td>MCP servers connected</td><td>{{MCP_COUNT}}</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>On this machine</h2>
+      <table>
+        <tr><td>Profile &amp; config</td><td>{{USER_DATA}}</td></tr>
+        <tr><td>Config file</td><td>{{CONFIG_FILE}}</td></tr>
+        <tr><td>Plugins folder</td><td>{{PLUGINS_DIR}}</td></tr>
+      </table>
+    </section>
+
+    <footer>
+      Built on Chromium and Electron. Model access is provided by Anthropic,
+      OpenAI or a local Ollama server, using credentials you supply — they are
+      encrypted with your operating system's keychain and never leave this device
+      except to the provider you selected.
+    </footer>
+  </body>
+</html>

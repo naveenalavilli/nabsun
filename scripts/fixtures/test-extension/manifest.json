@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Nabsun Test Extension",
+  "version": "1.0.0",
+  "description": "Fixture used by verify:browse to prove extensions actually load and run.",
+  "action": {
+    "default_title": "Test Extension",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icon.png" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage"]
+}

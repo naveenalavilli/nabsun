@@ -1,0 +1,95 @@
+appId: com.nabsun.app
+productName: Nabsun
+copyright: Copyright © 2026 Nabsun contributors
+
+directories:
+  output: release
+  buildResources: build
+
+# Application code is bundled by esbuild, so node_modules is not shipped —
+# everything the app imports is already inside dist/.
+files:
+  - dist/**/*
+  - package.json
+  # Licences travel with the build, not only with the repository. Neither of
+  # these was in the packaged app, which left the redistributed weights without
+  # the notice their licence requires.
+  - LICENSE
+  - THIRD-PARTY-NOTICES.md
+  - '!node_modules/**/*'
+
+# The embedded model engine and weights. Shipped as plain resources rather
+# than inside the asar: llama-server is spawned as a child process and
+# memory maps the .gguf, neither of which works from within an archive.
+#
+# `npm run dist` runs check-release-payload first, which refuses to build
+# without these. A build that silently omitted them produced an installer whose
+# advertised default backend was simply absent.
+extraResources:
+  - from: vendor
+    to: vendor
+    filter:
+      - '**/*'
+
+asar: true
+# A child process cannot be spawned from inside an asar archive, and the MCP
+# server is spawned by the agent CLIs, so it ships unpacked.
+asarUnpack:
+  - dist/bin/**
+
+# Electron ships its own copies of these; dropping them saves ~40 MB.
+removePackageScripts: true
+removePackageKeywords: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.png
+  artifactName: Nabsun-${version}-${arch}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Nabsun
+  deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: Nabsun-${version}-portable.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  icon: build/icon.png
+  category: public.app-category.productivity
+  artifactName: Nabsun-${version}-${arch}.${ext}
+  # V8 needs a writable-executable mapping, and the app spawns helper
+  # processes for MCP servers and the agent CLIs.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  gatekeeperAssess: false
+
+dmg:
+  title: Nabsun ${version}
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications
+
+linux:
+  target: [AppImage]
+  icon: build/icon.png
+  category: Network

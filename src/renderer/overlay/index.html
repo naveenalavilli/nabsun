@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Nabsun overlay</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --bg-raised: #f4f5f8;
+        --bg-input: #ffffff;
+        --border: #e2e4ea;
+        --border-strong: #c6cad3;
+        --text: #1c1f26;
+        --text-dim: #596072;
+        --text-faint: #878e9e;
+        --accent: #5b3fd6;
+        --accent-soft: #6d4fe0;
+        --accent-tint: #5b3fd626;
+        --hero: #ece9fb;
+        --hover: #0000000a;
+        --scrim: #1c1f2659;
+        --shadow: #1c1f2626;
+        --accent-deep: #4a32b0;
+        --danger: #d12b4e;
+        color-scheme: light;
+      }
+      :root[data-theme='dark'] {
+        --bg: var(--bg);
+        --bg-raised: var(--bg-raised);
+        --bg-input: var(--bg-input);
+        --border: var(--border);
+        --border-strong: var(--border-strong);
+        --text: var(--text);
+        --text-dim: var(--text-dim);
+        --text-faint: var(--text-faint);
+        --accent: var(--accent);
+        --accent-soft: var(--accent-soft);
+        --accent-tint: var(--accent-tint);
+        --hero: var(--hero);
+        --danger: var(--danger);
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-theme='dark']) {
+          --bg: var(--bg);
+          --bg-raised: var(--bg-raised);
+          --bg-input: var(--bg-input);
+          --border: var(--border);
+          --border-strong: var(--border-strong);
+          --text: var(--text);
+          --text-dim: var(--text-dim);
+          --text-faint: var(--text-faint);
+          --accent: var(--accent);
+          --accent-soft: var(--accent-soft);
+          --accent-tint: var(--accent-tint);
+          --hero: var(--hero);
+          --danger: var(--danger);
+          color-scheme: dark;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; height: 100%; overflow: hidden;
+        background: transparent; color: var(--text);
+        font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+        user-select: none;
+      }
+      #backdrop {
+        position: fixed; inset: 0;
+        background: var(--scrim);
+        display: flex; justify-content: center;
+        padding-top: 64px;
+      }
+      #backdrop.palette { align-items: flex-start; padding-top: 128px; }
+      #panel {
+        width: min(720px, calc(100vw - 96px));
+        max-height: calc(100vh - 140px);
+        display: flex; flex-direction: column;
+        background: var(--bg-raised);
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        box-shadow: 0 24px 64px var(--shadow);
+        overflow: hidden;
+      }
+      #input {
+        width: 100%; padding: 15px 18px;
+        border: none; border-bottom: 1px solid var(--border);
+        background: transparent; color: var(--text);
+        font: inherit; font-size: 15px; user-select: text;
+      }
+      #input:focus { outline: none; }
+      #input::placeholder { color: var(--text-faint); }
+      #list { overflow-y: auto; padding: 6px; }
+      .item {
+        display: flex; align-items: center; gap: 11px;
+        padding: 9px 12px; border-radius: 8px; cursor: default;
+      }
+      .item.selected { background: var(--accent-tint); }
+      .item .kind {
+        flex: 0 0 auto; width: 18px; text-align: center;
+        color: var(--text-faint); font-size: 13px;
+      }
+      .item .text { flex: 1; min-width: 0; }
+      .item .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .item .sub {
+        color: var(--text-faint); font-size: 11.5px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .item .hintkey {
+        flex: 0 0 auto; color: var(--text-faint); font-size: 11px;
+        border: 1px solid var(--border-strong); border-radius: 4px; padding: 1px 6px;
+      }
+      .empty { padding: 18px; color: var(--text-faint); text-align: center; }
+      ::-webkit-scrollbar { width: 9px; }
+      ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+    </style>
+  </head>
+  <body>
+    <div id="backdrop">
+      <div id="panel">
+        <input id="input" type="text" spellcheck="false" autocomplete="off" aria-label="Command input" />
+        <div id="list" role="listbox"></div>
+      </div>
+    </div>
+    <script type="module" src="overlay.js"></script>
+  </body>
+</html>
