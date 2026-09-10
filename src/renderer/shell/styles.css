@@ -41,9 +41,26 @@
   --scrollbar: #cdd2db;
   --scrollbar-hover: #aab1bf;
 
-  --radius: 8px;
+  /* Secondary hues. The chrome was a single violet ramp; these give
+     accents somewhere to travel to without introducing a second theme. */
+  --accent-2: #0ea5e9;
+  --accent-3: #ec4899;
+  --shadow-color: #1c1f2614;
+  --ring: #5b3fd63d;
+
+  --radius: 10px;
+  --radius-lg: 14px;
   --top-chrome: 76px;
   --find-bar: 40px;
+
+  /* Derived from the tokens above, so they follow the theme without
+     being restated in it. A custom property resolves where it is used,
+     not where it is declared. */
+  --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --grad-warm: linear-gradient(135deg, var(--accent-3), var(--accent));
+  --shadow-sm: 0 1px 2px var(--shadow-color);
+  --shadow-md: 0 8px 24px var(--shadow-color), 0 2px 6px var(--shadow-color);
+  --ease: 140ms cubic-bezier(.4, 0, .2, 1);
   color-scheme: light;
 }
 
@@ -75,6 +92,11 @@
   --on-danger: #1a0008;
   --scrollbar: #3a3a48;
   --scrollbar-hover: #4d4d61;
+
+  --accent-2: #38bdf8;
+  --accent-3: #f472b6;
+  --shadow-color: #00000066;
+  --ring: #7c5cff52;
 
   color-scheme: dark;
 }
@@ -108,6 +130,11 @@
     --on-danger: #1a0008;
     --scrollbar: #3a3a48;
     --scrollbar-hover: #4d4d61;
+
+    --accent-2: #38bdf8;
+    --accent-3: #f472b6;
+    --shadow-color: #00000066;
+    --ring: #7c5cff52;
 
     color-scheme: dark;
   }
@@ -169,9 +196,26 @@ html, body {
   font-size: 12.5px;
 }
 
+.tab { transition: background var(--ease), color var(--ease); }
 .tab:hover { background: var(--hover); color: var(--text); }
-.tab.active { background: var(--bg-raised); color: var(--text); }
-.tab.agent { box-shadow: inset 0 2px 0 var(--accent); }
+
+/* A 2px gradient cap reads as the selected tab far quicker than a fill alone,
+   and it is the one place the two accent hues sit next to each other. */
+.tab.active {
+  background-color: var(--bg-raised); color: var(--text);
+  background-image: var(--grad);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: top;
+}
+/* Agent tabs keep their own hue, and win over .active for the same reason they
+   are marked at all: which tab the agent is driving is the more urgent fact. */
+.tab.agent {
+  background-image: var(--grad-warm);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: top;
+}
 
 .tab .favicon {
   width: 15px; height: 15px; flex: 0 0 15px;
@@ -222,6 +266,7 @@ html, body {
   border: none; border-radius: 6px; background: transparent;
   color: var(--text-dim); font-size: 15px; cursor: default; padding: 0;
 }
+.icon-btn { transition: background var(--ease), color var(--ease); }
 .icon-btn:hover:not(:disabled) { background: var(--hover-strong); color: var(--text); }
 .icon-btn:disabled { opacity: .3; }
 .icon-btn.on { color: var(--accent); background: var(--accent-tint-strong); }
@@ -234,7 +279,11 @@ html, body {
   font-size: 12.5px; text-align: left; cursor: text;
   overflow: hidden;
 }
+#omnibox { transition: border-color var(--ease), box-shadow var(--ease); }
 #omnibox:hover { border-color: var(--border-strong); }
+#omnibox:focus-within, #omnibox:active {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring);
+}
 #omnibox .scheme { color: var(--text-faint); flex: 0 0 auto; }
 #omnibox-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #omnibox.placeholder #omnibox-text { color: var(--text-faint); }
@@ -343,7 +392,8 @@ body.no-bookmarks-bar #bookmarks-bar { display: none; }
 #content-placeholder { flex: 1; min-width: 0; background: var(--bg); }
 
 #sidebar-resizer { flex: 0 0 3px; cursor: col-resize; background: transparent; }
-#sidebar-resizer:hover, #sidebar-resizer.dragging { background: var(--accent); }
+#sidebar-resizer { transition: background var(--ease); }
+#sidebar-resizer:hover, #sidebar-resizer.dragging { background-image: var(--grad); }
 body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: none; }
 
 #sidebar {
@@ -352,16 +402,25 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
   background: var(--bg-raised); border-left: 1px solid var(--border);
 }
 
-#sidebar-head { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+#sidebar-head {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  background-image: var(--grad);
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: top;
+}
+/* Gradient text needs the fill transparent, which leaves nothing visible if
+   background-clip fails - so the colour underneath is the accent, not inherit. */
+#sidebar-title {
+  color: var(--accent);
+  background-image: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .row { display: flex; align-items: center; gap: 8px; }
 .grow { flex: 1; }
 .muted { color: var(--text-faint); font-size: 11.5px; }
-
-.badge {
-  padding: 2px 7px; border-radius: 999px;
-  background: var(--accent-tint-strong); color: var(--accent);
-  font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
-}
 
 #sidebar-views { flex: 1; display: flex; min-height: 0; }
 .view { display: none; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
@@ -379,13 +438,23 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
   text-transform: uppercase; color: var(--text-faint); margin-bottom: 5px;
 }
 .msg.user .bubble {
-  background: var(--bg-input); border: 1px solid var(--border);
+  background: var(--accent-tint); border: 1px solid var(--accent-tint-strong);
   border-radius: var(--radius); padding: 8px 11px;
 }
+/* The speaker labels carry the only colour in the transcript, which is enough
+   to tell the two apart when scrolling without tinting the assistant's text. */
+.msg.assistant .who { color: var(--accent); }
 .msg.assistant .bubble { padding: 0 1px; }
 
 .empty-state { color: var(--text-faint); padding: 24px 6px; text-align: center; line-height: 1.7; }
-.empty-state h3 { color: var(--text-dim); margin: 0 0 10px; font-size: 13px; }
+.empty-state h3 {
+  margin: 0 0 10px; font-size: 13px;
+  color: var(--accent);
+  background-image: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .empty-state code { color: var(--accent); }
 
 /* markdown */
@@ -420,9 +489,11 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 
 /* tool calls */
 .tool {
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--panel); margin: 0 0 9px; overflow: hidden;
+  transition: border-color var(--ease), box-shadow var(--ease);
 }
+.tool:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
 .tool-head {
   display: flex; align-items: center; gap: 7px;
   padding: 6px 9px; cursor: default; font-size: 12px;
@@ -491,7 +562,10 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 }
 .chip:hover { border-color: var(--border-strong); color: var(--text); }
 .chip input { accent-color: var(--accent); margin: 0; width: 12px; height: 12px; }
-.chip:has(input:checked) { border-color: var(--accent); color: var(--accent); }
+.chip { transition: border-color var(--ease), color var(--ease), background var(--ease); }
+.chip:has(input:checked) {
+  border-color: var(--accent); color: var(--accent); background: var(--accent-tint);
+}
 
 .composer-row { display: flex; gap: 7px; align-items: flex-end; }
 #prompt {
@@ -500,15 +574,22 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
   background: var(--bg-input); color: var(--text);
   font: inherit; line-height: 1.5; user-select: text;
 }
-#prompt:focus { outline: none; border-color: var(--accent); }
+#prompt { transition: border-color var(--ease), box-shadow var(--ease); }
+#prompt:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 
 button.primary, button.danger, button.ghost {
   padding: 7px 13px; border-radius: 6px; border: 1px solid transparent;
   font: inherit; font-size: 12px; cursor: default;
 }
-button.primary { background: var(--accent); color: var(--on-accent); }
-button.primary:hover { background: var(--accent-dim); }
-button.primary:disabled { opacity: .4; }
+button.primary, button.danger, button.ghost { transition: filter var(--ease), box-shadow var(--ease), border-color var(--ease), color var(--ease); }
+button.primary {
+  background-image: var(--grad); color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+}
+button.primary:hover:not(:disabled) { filter: brightness(1.08); box-shadow: var(--shadow-md); }
+/* Filter would dim the gradient and still look clickable; opacity plus a flat
+   shadow reads as unavailable. */
+button.primary:disabled { opacity: .4; filter: none; box-shadow: none; }
 button.danger { background: var(--danger); color: var(--on-danger); }
 button.ghost { background: transparent; border-color: var(--border-strong); color: var(--text-dim); }
 button.ghost:hover { color: var(--text); border-color: var(--accent); }

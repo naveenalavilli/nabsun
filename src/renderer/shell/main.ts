@@ -481,13 +481,11 @@ const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
 const settingsView = new SettingsView((next) => {
   settings = next;
-  renderModelBadge();
 });
 
 async function refreshSettings() {
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
-  renderModelBadge();
 }
 
 function wireExtensions() {
@@ -495,23 +493,6 @@ function wireExtensions() {
   // the Extensions panel is closed.
   window.nabsun.extensions.onChanged(renderExtensionActions);
   void window.nabsun.extensions.list().then(renderExtensionActions);
-}
-
-const PROVIDER_LABELS: Record<string, string> = {
-  'codex-cli': 'Codex CLI',
-  'claude-cli': 'Claude Code CLI',
-  anthropic: 'Claude API',
-  openai: 'OpenAI',
-  ollama: 'Ollama',
-};
-
-function renderModelBadge() {
-  if (!settings) return;
-  // CLI backends have no model override — blank means "whatever that tool is
-  // set to" — so name the backend rather than showing an empty badge.
-  const model = settings.models[settings.provider]?.trim();
-  $('#model-badge').textContent =
-    model || PROVIDER_LABELS[settings.provider] || settings.provider;
 }
 
 function wireSidebarButtons() {
@@ -557,7 +538,6 @@ window.nabsun.onWindowState((next) => {
 window.nabsun.onSettingsChanged((next) => {
   settings = next;
   applyTheme(next.theme);
-  renderModelBadge();
 });
 
 /**
@@ -640,7 +620,6 @@ async function boot() {
   wireExtensions();
 
   settings = await window.nabsun.settings.get();
-  renderModelBadge();
   $<HTMLInputElement>('#autopilot').checked = settings.autoApprove.write;
   $<HTMLInputElement>('#autopilot').addEventListener('change', async (e) => {
     const on = (e.target as HTMLInputElement).checked;
