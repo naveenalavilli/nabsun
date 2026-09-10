@@ -3,6 +3,30 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ChatMessage, ChatSession } from '../../shared/types';
 
+/** Attempts, spaced 15/30/60/120ms - about a quarter second in total. */
+const RENAME_ATTEMPTS = 5;
+
+/**
+ * Whether an error looks like another process holding the file open, rather
+ * than something waiting cannot fix. Windows reports that contention through
+ * any of these three depending on what has the handle.
+ */
+function isContended(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+}
+
+/**
+ * Blocks this thread for `ms`.
+ *
+ * `save` is synchronous to its IPC handler, and turning the whole chain async
+ * to wait a few milliseconds would change every caller for no benefit the
+ * user could perceive.
+ */
+function sleepSync(ms: number) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 /**
  * Chat history, one JSON file per session so a long transcript never rewrites
  * every other one. Sessions are the browser's equivalent of editor tabs for
@@ -22,14 +46,12 @@ export class SessionStore {
     return path.join(this.dir, `${id}.json`);
   }
 
+  private blank(id: string): ChatSession {
+    return { id, title: 'New chat', createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+  }
+
   create(): ChatSession {
-    const session: ChatSession = {
-      id: randomUUID(),
-      title: 'New chat',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [],
-    };
+    const session = this.blank(randomUUID());
     this.save(session);
     return session;
   }
@@ -42,11 +64,47 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Writes the session atomically: whole file to a sibling, then rename.
+   *
+   * The rename is retried. On Windows it fails with EPERM when a virus
+   * scanner or the search indexer still holds the file we have just written
+   * open - and it succeeds a few milliseconds later. Unretried, that threw
+   * out of `upsert`, out of the turn loop, and killed a completed assistant
+   * response because a history file could not be renamed.
+   *
+   * Every call rewrites the entire session, so a write that is abandoned
+   * after all attempts is repaired by the next one rather than leaving the
+   * transcript with a hole in it.
+   */
   save(session: ChatSession) {
     session.updatedAt = Date.now();
-    const tmp = `${this.file(session.id)}.tmp`;
+    const target = this.file(session.id);
+    const tmp = `${target}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(session, null, 2), 'utf8');
-    fs.renameSync(tmp, this.file(session.id));
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt < RENAME_ATTEMPTS; attempt++) {
+      try {
+        fs.renameSync(tmp, target);
+        return;
+      } catch (err) {
+        lastError = err;
+        // A name that is invalid, or a disk that is full, will not become
+        // valid or empty by waiting for it.
+        if (!isContended(err)) break;
+        if (attempt < RENAME_ATTEMPTS - 1) sleepSync(15 * 2 ** attempt);
+      }
+    }
+
+    // The temporary file is litter at this point, and failing to clear it is
+    // not the failure worth reporting.
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* nothing useful to do */
+    }
+    throw lastError;
   }
 
   append(id: string, message: ChatMessage): ChatSession {
@@ -62,6 +120,29 @@ export class SessionStore {
     }
     this.save(session);
     return session;
+  }
+
+  /**
+   * Appends a message and returns the session even if it cannot be written.
+   *
+   * The turn loop needs the conversation so far to build its request; it does
+   * not need that conversation to be on disk. Losing a line of history is a
+   * bad day - losing the answer the user asked for *because* history could not
+   * be written is a worse one, and that is what used to happen: this threw
+   * from `create` before the model was ever called, so the turn produced
+   * nothing at all.
+   */
+  appendBestEffort(id: string, message: ChatMessage): ChatSession {
+    try {
+      return this.append(id, message);
+    } catch (err) {
+      console.error('[sessions] could not persist the message:', err);
+      // `load` reports a missing or unreadable file as null rather than
+      // throwing, so this stays on its feet when the store is unusable.
+      const session = this.load(id) ?? this.blank(id);
+      session.messages.push(message);
+      return session;
+    }
   }
 
   /**
