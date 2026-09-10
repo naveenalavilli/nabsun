@@ -1,5 +1,5 @@
 /**
- * Generates build/icon.png — a 512x512 app icon.
+ * Generates build/icon.png — a 1024x1024 app icon.
  *
  * Written by hand rather than pulled from a design tool so the repo has no
  * binary asset to keep in sync and no image dependency. electron-builder
@@ -10,7 +10,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-const SIZE = 512;
+const SIZE = 1024;
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /* ------------------------------------------------------------ primitives -- */
@@ -47,69 +47,97 @@ const coverage = (d) => Math.min(1, Math.max(0, 0.5 - d));
 
 /* ----------------------------------------------------------------- shape -- */
 
-const VIOLET = [124, 92, 255];
-const DEEP = [74, 47, 208];
-const INK = [18, 18, 26];
-const WHITE = [246, 245, 255];
+/*
+ * A gradient tile carrying a sparkle.
+ *
+ * The previous mark drew a browser window - a title bar, three dots and a
+ * cursor - which is a lot of incident for something that spends most of its
+ * life 16px wide in a taskbar. At that size the dots merge into a smear and
+ * the window outline reads as a plain rectangle, so the icon said "some app"
+ * rather than naming itself.
+ *
+ * This keeps one shape big enough to survive the downscale. The sparkle is
+ * doing double duty: it is the common visual shorthand for a model acting on
+ * your behalf, and the product is called Nabsun, so a small sun is the mark
+ * the name already implies.
+ */
+
+const DEEP = [74, 47, 208];   // indigo, matching --accent-dim
+const VIOLET = [124, 92, 255]; // --accent in the dark theme
+const SKY = [56, 189, 248];    // --accent-2, the hue added to the chrome
+const WHITE = [255, 255, 255];
 
 const c = SIZE / 2;
+const unit = SIZE / 1024; // every measurement below is quoted at 1024
 
-// Rounded-square body with a diagonal gradient.
+/** Three-stop ramp along the diagonal, so the tile is never flat. */
+function tileColour(x, y) {
+  const t = Math.min(1, Math.max(0, (x / SIZE) * 0.55 + (y / SIZE) * 0.45));
+  return t < 0.5 ? mix(DEEP, VIOLET, t / 0.5) : mix(VIOLET, SKY, (t - 0.5) / 0.5);
+}
+
+// The tile. A generous corner radius reads as a modern app icon and survives
+// the mask macOS and Windows apply anyway.
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
-    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 232, 232, 108);
+    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
     const cov = coverage(d);
     if (cov <= 0) continue;
-    const t = (x / SIZE) * 0.5 + (y / SIZE) * 0.5;
-    setPixel(x, y, mix(VIOLET, DEEP, t), cov);
+    setPixel(x, y, tileColour(x, y), cov);
   }
 }
 
-// A browser window: title bar with three dots, over a darker content area.
-const winHalfW = 150;
-const winHalfH = 116;
-const winTop = c - winHalfH;
-
+// A light wash across the top-left, so the tile has a direction to it rather
+// than reading as a flat swatch.
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
-    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, winHalfW, winHalfH, 26);
-    const cov = coverage(d);
-    if (cov <= 0) continue;
-    // Top 56px is the chrome; the rest is the page.
-    const inChrome = y < winTop + 56;
-    setPixel(x, y, inChrome ? [38, 38, 52] : INK, cov);
-  }
-}
-
-for (let i = 0; i < 3; i++) {
-  const dotX = c - winHalfW + 34 + i * 30;
-  const dotY = winTop + 28;
-  for (let y = dotY - 10; y <= dotY + 10; y++) {
-    for (let x = dotX - 10; x <= dotX + 10; x++) {
-      const cov = coverage(Math.hypot(x + 0.5 - dotX, y + 0.5 - dotY) - 7);
-      if (cov > 0) setPixel(x, y, [90, 90, 118], cov);
-    }
+    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
+    if (coverage(d) <= 0) continue;
+    const t = 1 - Math.min(1, Math.hypot(x - 250 * unit, y - 210 * unit) / (620 * unit));
+    if (t > 0) setPixel(x, y, WHITE, t * t * 0.16);
   }
 }
 
 /**
- * A cursor/spark mark in the page area — the "agent acting on the page" idea,
- * drawn as a four-point star so it reads at 16px as well as 512px.
+ * A four-point sparkle.
+ *
+ * The astroid |x|^(2/3) + |y|^(2/3) = 1 gives concave arms, which stay
+ * recognisable as a star when the whole glyph is a dozen pixels across - a
+ * convex diamond at that size just looks like a blob. `soft` widens the
+ * anti-aliased edge for the glow that sits under the main one.
  */
-const sparkX = c;
-const sparkY = winTop + 150;
-for (let y = 0; y < SIZE; y++) {
-  for (let x = 0; x < SIZE; x++) {
-    const dx = (x + 0.5 - sparkX) / 74;
-    const dy = (y + 0.5 - sparkY) / 74;
-    const r = Math.hypot(dx, dy);
-    if (r > 1.2) continue;
-    // Astroid: |x|^(2/3) + |y|^(2/3) = 1 gives concave star arms.
-    const star = Math.pow(Math.abs(dx), 2 / 3) + Math.pow(Math.abs(dy), 2 / 3);
-    const cov = coverage((star - 1) * 34);
-    if (cov > 0) setPixel(x, y, WHITE, cov);
+function sparkle(cx, cy, radius, alpha = 1, soft = 34) {
+  const reach = radius * 1.25;
+  for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y++) {
+    for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x++) {
+      const dx = (x + 0.5 - cx) / radius;
+      const dy = (y + 0.5 - cy) / radius;
+      if (Math.hypot(dx, dy) > 1.3) continue;
+      const star = Math.pow(Math.abs(dx), 2 / 3) + Math.pow(Math.abs(dy), 2 / 3);
+      const cov = coverage((star - 1) * soft);
+      if (cov > 0) setPixel(x, y, WHITE, cov * alpha);
+    }
   }
 }
+
+const mainX = c - 46 * unit;
+const mainY = c + 30 * unit;
+
+// A halo under the main sparkle. Without it the white sits flat on the
+// gradient; with it the mark has a source and the "sun" reading lands.
+for (let y = 0; y < SIZE; y++) {
+  for (let x = 0; x < SIZE; x++) {
+    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
+    if (coverage(d) <= 0) continue;
+    const t = 1 - Math.min(1, Math.hypot(x - mainX, y - mainY) / (330 * unit));
+    if (t > 0) setPixel(x, y, WHITE, t * t * t * 0.30);
+  }
+}
+
+sparkle(mainX, mainY, 246 * unit, 1);
+// A second, smaller sparkle. One star is a bullet; two read as motion, and it
+// fills the corner the main glyph leaves empty.
+sparkle(c + 210 * unit, c - 226 * unit, 104 * unit, 0.95);
 
 /* ------------------------------------------------------------ PNG output -- */
 
