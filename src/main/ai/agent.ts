@@ -418,7 +418,9 @@ export class Agent {
       blocks: [{ type: 'text', text }],
       createdAt: Date.now(),
     };
-    const session = sessions.append(sessionId, userMessage);
+    // Best-effort: see the method, and `journal` below. An unwritable
+    // history must not stop the turn before it starts.
+    const session = sessions.appendBestEffort(sessionId, userMessage);
 
     const working: ModelMessage[] = rebuildHistory(session.messages.slice(0, -1));
     const context = turnContext({
@@ -448,16 +450,32 @@ export class Agent {
     const maxSteps = Math.max(1, config.maxAgentSteps);
     let stopReason = 'end_turn';
 
-    /** Writes the turn record so far, so a later failure cannot erase it. */
+    /**
+     * Writes the turn record so far, so a later failure cannot erase it.
+     *
+     * Never throws. `SessionStore.save` already retries the contended rename
+     * that made this fail in practice, but the guarantee worth stating here is
+     * the one about priority: the answer the user is watching arrive matters
+     * more than the record of it. Letting a history write abort the turn
+     * inverted the point of journalling - the writes meant to preserve the
+     * turn were the thing destroying it.
+     *
+     * Each call rewrites the whole session, so a dropped write is made good by
+     * the next one; only the final write of a turn can actually go missing.
+     */
     const journal = (reason?: string) => {
       if (!assistantBlocks.length && !reason) return;
-      sessions.upsert(sessionId, {
-        id: messageId,
-        role: 'assistant',
-        blocks: assistantBlocks,
-        createdAt: Date.now(),
-        stopReason: reason ?? 'interrupted',
-      });
+      try {
+        sessions.upsert(sessionId, {
+          id: messageId,
+          role: 'assistant',
+          blocks: assistantBlocks,
+          createdAt: Date.now(),
+          stopReason: reason ?? 'interrupted',
+        });
+      } catch (err) {
+        console.error('[agent] could not write the turn to history:', err);
+      }
     };
 
     for (let step = 0; step < maxSteps; step++) {

@@ -1177,6 +1177,122 @@ app.whenReady().then(async () => {
       `ran=${sideEffects.includes('batch-first')} recorded=${batchCalls.length} ` +
         `roles=${JSON.stringify((batchReloaded?.messages ?? []).map((m) => m.role))}`,
     );
+
+    /*
+     * A contended rename must not cost the user their answer.
+     *
+     * On Windows a virus scanner or the search indexer holds a file open for
+     * a few milliseconds after it is written, and `renameSync` fails with
+     * EPERM. That threw out of the session store, out of `journal`, out of the
+     * turn loop - so a completed assistant response was thrown away because a
+     * history file could not be renamed. It was observed in this very harness
+     * before it was fixed, and the suite still reported every check passing.
+     *
+     * `fs.renameSync` is patched rather than a real scanner simulated: the
+     * point is what the store does when the call fails, and a timing-dependent
+     * fault reproduced by luck is not a regression test.
+     */
+    const realRename = fs.renameSync;
+    let renameCalls = 0;
+    // Created before the fault is installed, so the assertion below is about
+    // `save` and not about whatever `create` happens to do.
+    const retried = sessions.create();
+    try {
+      // Fails twice with EPERM, then relents - exactly the transient case.
+      (fs as { renameSync: typeof fs.renameSync }).renameSync = ((from: string, to: string) => {
+        renameCalls++;
+        if (renameCalls <= 2) {
+          const err = new Error('EPERM: operation not permitted, rename') as NodeJS.ErrnoException;
+          err.code = 'EPERM';
+          throw err;
+        }
+        return realRename(from, to);
+      }) as typeof fs.renameSync;
+
+      retried.messages.push({
+        id: 'contended-1',
+        role: 'assistant',
+        blocks: [{ type: 'text', text: 'survived the scanner' }],
+        createdAt: Date.now(),
+      });
+      renameCalls = 0;
+      let threw: unknown = null;
+      try {
+        sessions.save(retried);
+      } catch (err) {
+        threw = err;
+      }
+      check(
+        'a session survives a rename that is contended twice',
+        threw === null && renameCalls === 3,
+        `threw=${threw ? String(threw) : 'no'} attempts=${renameCalls}`,
+      );
+      check(
+        'and the contents actually reached disk',
+        sessions.load(retried.id)?.messages[0]?.id === 'contended-1',
+        JSON.stringify(sessions.load(retried.id)?.messages?.length ?? null),
+      );
+
+      // Permanently unwritable: the turn must still finish. This is the case
+      // the retry cannot rescue, and the one that used to lose the answer.
+      (fs as { renameSync: typeof fs.renameSync }).renameSync = (() => {
+        const err = new Error('EPERM: operation not permitted, rename') as NodeJS.ErrnoException;
+        err.code = 'EPERM';
+        throw err;
+      }) as typeof fs.renameSync;
+
+      const plain: Provider = {
+        id: 'anthropic' as ProviderId,
+        label: 'Plain',
+        async listModels() {
+          return ['stub'];
+        },
+        supportsVision() {
+          return false;
+        },
+        async *stream(): AsyncGenerator<StreamEvent> {
+          yield { type: 'text', delta: 'answered despite unwritable history' };
+          yield { type: 'stop', reason: 'end_turn' };
+        },
+      };
+      // What the user actually sees. Not throwing is necessary but not
+      // sufficient - the answer has to reach the transcript.
+      let sawText = '';
+      let sawError = '';
+      const doomedAgent = new Agent({
+        providers: new Map<string, Provider>([['anthropic', plain]]),
+        settings,
+        sessions,
+        tabs,
+        history,
+        approvals,
+        userDataPath: tmp,
+        getTools: () => [...browserTools(), ...tabTools()],
+        emit: (e) => {
+          if (e.type === 'text_delta') sawText += e.delta;
+          if (e.type === 'error') sawError += e.message;
+        },
+      });
+
+      // The session cannot be created through the store either, since that
+      // saves too - so the id is fabricated and the turn has to cope.
+      const doomedId = 'doomed-session-1';
+      let turnErr: unknown = null;
+      try {
+        await doomedAgent.send(doomedId, 'Answer me.');
+      } catch (err) {
+        turnErr = err;
+      }
+      check(
+        'an unwritable history does not destroy the answer',
+        turnErr === null && sawText.includes('answered despite unwritable history') && !sawError,
+        turnErr
+          ? String(turnErr).slice(0, 200)
+          : `text=${JSON.stringify(sawText.slice(0, 60))} error=${JSON.stringify(sawError.slice(0, 120))}`,
+      );
+    } finally {
+      (fs as { renameSync: typeof fs.renameSync }).renameSync = realRename;
+    }
   } catch (err) {
     check('harness completed', false, err instanceof Error ? err.stack : String(err));
   }
