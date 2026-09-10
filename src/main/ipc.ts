@@ -184,7 +184,7 @@ export function registerIpc(deps: IpcDeps): void {
           kind: 'cli',
           hasCredentials: Boolean(found),
           models: [],
-          detail: found ?? 'Not found on PATH',
+          detail: found ?? 'Not found',
         });
         continue;
       }
