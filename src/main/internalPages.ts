@@ -56,8 +56,13 @@ function scriptRanges(html: string): [number, number][] {
   return ranges;
 }
 
-const sha256 = (text: string): string =>
-  `'sha256-${createHash('sha256').update(text, 'utf8').digest('base64')}'`;
+/**
+ * Browsers normalise CRLF/CR line endings inside inline blocks to LF before CSP
+ * hashing. Hashing the raw bytes from a Windows checkout therefore drifts from
+ * what Chromium verifies and blocks our own pages only on Windows.
+ */
+export const inlineCspHash = (text: string): string =>
+  `'sha256-${createHash('sha256').update(text.replace(/\r\n?/g, '\n'), 'utf8').digest('base64')}'`;
 
 /**
  * Builds a strict CSP for one of our own pages.
@@ -75,7 +80,7 @@ const sha256 = (text: string): string =>
 function policyFor(html: string): string {
   const hashes = (tag: 'script' | 'style'): string[] =>
     [...html.matchAll(new RegExp(`<${tag}(?![^>]*\\ssrc=)[^>]*>([\\s\\S]*?)</${tag}>`, 'g'))]
-      .map((m) => sha256(m[1]))
+      .map((m) => inlineCspHash(m[1]))
       .filter((h, i, all) => all.indexOf(h) === i);
 
   const script = hashes('script');
