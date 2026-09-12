@@ -31,6 +31,8 @@ extraResources:
     filter:
       - '**/*'
 
+publish: never
+
 asar: true
 # A child process cannot be spawned from inside an asar archive, and the MCP
 # server is spawned by the agent CLIs, so it ships unpacked.
