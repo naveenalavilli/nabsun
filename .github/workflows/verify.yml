@@ -1,99 +1,111 @@
-name: verify
+﻿name: verify
 
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      upload_installers:
+        description: 'Upload Windows installers (approximately 2.6 GB)'
+        type: boolean
+        default: false
 
-# These jobs are expensive: a ~1.2 GB payload fetch, real CPU inference, and a
-# 1.3 GB installer build. Without this, three pushes in a row run three full
-# copies of all of that concurrently and queue behind each other. The newest
-# commit is the one anyone is waiting on.
 concurrency:
-  group: verify-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Nothing here writes to the repository; artifacts upload under the job's own
-# scope. Declared so the workflow does not inherit a broader default token.
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  CI: 'true'
+
 jobs:
   verify:
-    # Windows, because that is where the Electron harnesses are proven and where
-    # the CLI-shim resolution actually matters. They spawn real Electron with a
-    # real Chromium, so a windowed runner is the honest environment for them.
-    runs-on: windows-latest
-    # Those harnesses spawn Electron, Chromium and llama-server. When one of
-    # them wedges — a window that never closes, inference that never returns —
-    # the step produces no output and the job runs to the six-hour default.
-    # This fails it in a reasonable time instead of burning a runner all day.
+    runs-on: windows-2022
     timeout-minutes: 60
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --include=dev
+      - name: Ensure Electron is installed
+        run: npm run setup
 
-      # npm occasionally skips Electron's postinstall, which leaves the binary
-      # missing and every harness failing with a confusing module error.
-      - name: Ensure the Electron binary is present
-        shell: pwsh
-        run: |
-          if (-not (Test-Path node_modules/electron/dist/electron.exe)) {
-            Write-Host 'Electron binary missing; running its installer.'
-            npm run setup
-          }
-
-      # ~1.2 GB, pinned by revision and verified by digest.
-      #
-      # `restore-keys` matters more than the exact key here. The key hashes the
-      # whole fetch script, so editing a comment in it misses the cache and
-      # refetches 1.2 GB — for a change that moved no pin. The fallback restores
-      # the last vendor directory instead, and the fetch script then verifies
-      # every file against its pinned digest and refetches only what actually
-      # differs. The digests are the integrity guarantee, not the cache key, so
-      # reusing an older entry cannot smuggle in the wrong bytes.
-      - name: Cache the embedded engine and model
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: vendor-${{ hashFiles('scripts/fetch-local-model.mjs') }}
-          restore-keys: |
-            vendor-
-
-      # Not optional, and not allowed to be quietly skipped. The local harness
-      # *skips* when weights are absent, so without this step a run could go
-      # green having never exercised the default backend at all.
-      - name: Fetch the embedded engine and model
-        run: npm run fetch:model
-
+      # Diagnose ordinary build/test failures before downloading the model.
       - name: Type check
-        run: npm run typecheck
+        run: ./scripts/ci-run.ps1 typecheck
+      - name: Verify CI publishing configuration
+        run: node --test scripts/verify-ci-publishing.cjs
+      - name: Build
+        run: ./scripts/ci-run.ps1 build
+      - name: Verify CLI launching
+        timeout-minutes: 5
+        run: ./scripts/ci-run.ps1 verify:cli
+      - name: Verify browser
+        timeout-minutes: 10
+        run: ./scripts/ci-run.ps1 verify:browse
+      - name: Verify page bridge
+        timeout-minutes: 10
+        run: ./scripts/ci-run.ps1 verify:page
+      - name: Verify agent
+        timeout-minutes: 10
+        run: ./scripts/ci-run.ps1 verify:agent
+      - name: Verify MCP bridge
+        timeout-minutes: 5
+        run: ./scripts/ci-run.ps1 verify:mcp
 
-      # Builds, then runs all six harnesses: the browser itself, the page
-      # bridge, the agent loop, the MCP bridge, CLI launching, and real
-      # inference on the bundled model. No API key is needed and no hosted
-      # model is called.
-      # NABSUN_REQUIRE_LOCAL turns the local harness's "weights absent, skip"
-      # into a failure, so a green run cannot mean the default backend went
-      # untested. This used to be a second `verify:local` invocation after the
-      # suite, which ran real CPU inference on the runner twice.
-      - name: Verify
+      # Cache only weights, verified against the fetch script's pinned digest.
+      # Re-download the small, digest-pinned engine archive each job instead of
+      # trusting the extracted engine's self-authored cache manifest.
+      - name: Restore model weights
+        id: model-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Fetch and verify embedded payload
+        timeout-minutes: 20
+        run: ./scripts/ci-run.ps1 fetch:model
+      - name: Check release payload
+        run: ./scripts/ci-run.ps1 check:payload
+
+      # A later test failure should not force another gigabyte download.
+      - name: Cache verified model weights
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: vendor/models/*.gguf
+          key: ${{ steps.model-cache.outputs.cache-primary-key }}
+      - name: Verify bundled model inference
+        timeout-minutes: 20
         env:
           NABSUN_REQUIRE_LOCAL: '1'
-        run: npm run verify
+        run: ./scripts/ci-run.ps1 verify:local
+
+      - name: Upload failure diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs-${{ github.run_attempt }}
+          path: ci-logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   package:
-    # Proves the app still packages, which type checking alone does not.
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: verify
     timeout-minutes: 60
     steps:
@@ -102,60 +114,44 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-
-      # Restore only. `verify` has already finished by the time this job starts
-      # and saved this exact key; a full `cache` action here would try to save
-      # it a second time and warn that the entry already exists on every run.
-      - name: Restore the embedded engine and model
+      - name: Install dependencies
+        run: npm ci --include=dev
+      - name: Ensure Electron is installed
+        run: npm run setup
+      - name: Restore model weights
         uses: actions/cache/restore@v4
         with:
-          path: vendor
-          key: vendor-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
           restore-keys: |
-            vendor-
-
-      # An installer without the weights is not the product this repository
-      # describes, so the payload is fetched and then checked before building.
-      - name: Fetch the embedded engine and model
-        run: npm run fetch:model
-
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Fetch and verify embedded payload
+        timeout-minutes: 20
+        run: ./scripts/ci-run.ps1 fetch:model
+      # Verification builds must never attempt to create a GitHub release.
       - name: Build installers
-        run: npm run dist:win
-
-      # The gate inside `dist:win` checks the source tree; this checks the
-      # artifact that actually ships.
+        timeout-minutes: 35
+        run: ./scripts/ci-run.ps1 dist:win:ci
       - name: Verify the packaged payload
-        shell: pwsh
-        run: |
-          $root = 'release/win-unpacked/resources'
-          $required = @(
-            "$root/vendor/models/Qwen3-1.7B-Q4_K_M.gguf",
-            "$root/vendor/models/LICENSE-Apache-2.0.txt",
-            "$root/vendor/models/MODEL-LICENSE.txt",
-            "$root/vendor/llama/llama-server.exe",
-            "$root/vendor/llama/LICENSE-llama.cpp.txt"
-          )
-          $missing = $required | Where-Object { -not (Test-Path $_) }
-          if ($missing) {
-            Write-Error "Packaged app is missing:`n$($missing -join "`n")"
-            exit 1
-          }
-          Write-Host 'Packaged payload complete.'
-
-      # Only when someone asks for the binaries, or on a tag.
-      #
-      # Bundling the model made each installer 1.3 GB, so uploading both on
-      # every push is 2.6 GB a run against a repository storage quota — which
-      # exhausts it within a couple of pushes and then fails the job for a
-      # reason that has nothing to do with the code. The step above already
-      # proves the app packages and that the payload is complete; keeping the
-      # binaries is a separate want, so it is asked for separately.
+        run: node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
+      - name: Upload failure diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-logs-${{ github.run_attempt }}
+          path: |
+            ci-logs/*.log
+            release/builder-debug.yml
+          if-no-files-found: ignore
+          retention-days: 7
+      # Manual verification only uploads installers when explicitly requested.
       - name: Upload installers
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.upload_installers)
         uses: actions/upload-artifact@v4
         with:
           name: nabsun-windows
-          path: |
-            release/*.exe
-          retention-days: 14
+          path: release/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

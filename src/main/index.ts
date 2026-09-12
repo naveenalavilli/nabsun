@@ -67,12 +67,19 @@ app.setName('Nabsun');
 
 let appWindow: AppWindow | null = null;
 
+/*
+ * Before Electron initialises the profile, not merely before the stores open.
+ *
+ * Electron creates `userData` as an empty directory while it starts up, so
+ * running this from `boot()` - after `whenReady` - meant the destination always
+ * existed by the time the helper looked, and the migration was skipped for
+ * every user on every launch. Module scope is evaluated before `whenReady`,
+ * which is the only point where the destination is still genuinely absent.
+ */
+migrateProfile(app.getPath('appData'), app.getPath('userData'));
+
 async function boot() {
   const userDataPath = app.getPath('userData');
-
-  // Before any store opens a file: the profile still lives under the previous
-  // product name, and every store below would otherwise start empty.
-  migrateProfile(app.getPath('appData'), userDataPath);
 
   const settings = new SettingsStore();
   // A homepage saved as `smart://home` still resolves, but the address bar

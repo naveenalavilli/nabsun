@@ -460,8 +460,9 @@ export class Agent {
      * inverted the point of journalling - the writes meant to preserve the
      * turn were the thing destroying it.
      *
-     * Each call rewrites the whole session, so a dropped write is made good by
-     * the next one; only the final write of a turn can actually go missing.
+     * A dropped write is made good by the next successful one, because the
+     * store keeps the unwritten session and prefers it on reload. Only a
+     * turn's final write can actually go missing.
      */
     const journal = (reason?: string) => {
       if (!assistantBlocks.length && !reason) return;
