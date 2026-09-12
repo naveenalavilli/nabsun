@@ -1,11 +1,31 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { test } = require('node:test');
+const { Writable } = require('node:stream');
+const { test, after } = require('node:test');
+const { log } = require('builder-util');
 const { getConfig } = require('app-builder-lib/out/util/config/config');
 const { createPublisher, getPublishConfigs, getAppUpdatePublishConfiguration } = require('app-builder-lib/out/publish/PublishManager');
 const { createYargs, configureBuildCommand, normalizeOptions } = require('electron-builder/out/builder');
 
 const root = path.resolve(__dirname, '..');
+
+// Node 22's test-worker decoder can misread non-ASCII stdout interleaved with
+// serialized test events (nodejs/node#65934). electron-builder writes Unicode
+// markers directly to its logger stream. Capture only that logger's output;
+// do not replace process.stdout or suppress the test runner's failure reports.
+const builderLogs = [];
+const originalLogStream = log.stream;
+const capturedLogStream = new Writable({
+  write(chunk, encoding, callback) {
+    builderLogs.push(chunk.toString('utf8'));
+    callback();
+  },
+});
+log.stream = capturedLogStream;
+after(() => {
+  log.stream = originalLogStream;
+  capturedLogStream.end();
+});
 
 test('the normal build configuration also disables publisher destinations', async () => {
   const config = await getConfig(root, 'electron-builder.yml', null);
@@ -39,4 +59,5 @@ test('never used as a provider reproduces the reported module-resolution failure
     createPublisher({}, '0.0.0', { provider: 'never' }, {}, { buildResourcesDir: path.join(root, 'build') }),
     /Cannot find module for publisher "never"/,
   );
+  assert.match(builderLogs.join(''), /unable to find publish provider in build resources/);
 });

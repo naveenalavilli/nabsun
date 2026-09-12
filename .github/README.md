@@ -8,6 +8,11 @@ The verification job installs dependencies and Electron, then runs typechecking,
 the build and each of the six harnesses as separate steps. The local inference
 step requires the bundled model; missing weights fail rather than skip.
 
+The publishing regression tests capture electron-builder's logger in memory.
+Its Unicode stdout markers can trigger Node 22's test-worker deserialization
+bug (nodejs/node#65934). Assertions and test-runner failure output remain active;
+the capture also checks the expected invalid-publisher diagnostic.
+
 Only model weights are cached. The fetch script verifies their pinned digest
 after restoration. The smaller engine archive is fetched afresh and verified
 against its pinned digest in each job. Verified weights are saved before the
@@ -20,9 +25,19 @@ Do not use `publish: never` in configuration: it names a publisher plugin called
 `never`, rather than disabling publishing. PR publishing remains disabled.
 The job builds both Windows installers, then
 checks the shipped resources, including runtime DLLs and notices in `app.asar`.
-Installers are uploaded on version tags or when a manual run's
-`upload_installers` input is selected. They are kept for seven days and are
-already compressed, so artifact compression is disabled.
+Every successful package job uploads the setup installer, portable executable
+and `SHA256SUMS.txt`, including PRs, main/master pushes, version tags and manual
+runs. Both installers must exist and be nonempty before upload. Upload failures
+fail the job; a green package job must mean downloadable files were uploaded.
+Artifacts are kept for seven days and named with the version, run number and
+attempt. The installers are already compressed, so artifact compression is disabled.
+
+To download: open the repository's **Actions** tab, select the **verify** run,
+then use the **Windows packages** link in its summary or the **Artifacts** list.
+Sign in with repository access. These are Actions artifacts, not entries in the
+GitHub Packages registry or GitHub Releases. Manual runs need no upload option.
+Each upload is approximately 2.6 GB; the repository needs sufficient Actions
+artifact storage. A storage-quota failure must be resolved before upload can succeed.
 
 For failures, open the named failing step. `scripts/ci-run.ps1` streams npm
 output to the Actions log and `ci-logs/`, preserving the npm exit code. Small
@@ -36,6 +51,7 @@ Local reproduction on Windows with PowerShell 7:
 ```powershell
 npm ci --include=dev
 npm run setup
+node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
 ./scripts/ci-run.ps1 typecheck
 ./scripts/ci-run.ps1 build
 ./scripts/ci-run.ps1 verify:browse # substitute the failing harness
