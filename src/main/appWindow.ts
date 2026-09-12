@@ -47,7 +47,9 @@ export class AppWindow {
       minWidth: 900,
       minHeight: 600,
       frame: false,
-      backgroundColor: '#14141a',
+      // Painted before the renderer has anything up, so it should be the
+      // theme's paper rather than a dark flash on a light desktop.
+      backgroundColor: '#f4f2eb',
       title: 'Nabsun',
     });
 
