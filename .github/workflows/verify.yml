@@ -6,11 +6,6 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
-    inputs:
-      upload_installers:
-        description: 'Upload Windows installers (approximately 2.6 GB)'
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
@@ -44,8 +39,8 @@ jobs:
       # Diagnose ordinary build/test failures before downloading the model.
       - name: Type check
         run: ./scripts/ci-run.ps1 typecheck
-      - name: Verify CI publishing configuration
-        run: node --test scripts/verify-ci-publishing.cjs
+      - name: Verify CI configuration and artifacts
+        run: node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
       - name: Build
         run: ./scripts/ci-run.ps1 build
       - name: Verify CLI launching
@@ -134,6 +129,26 @@ jobs:
         run: ./scripts/ci-run.ps1 dist:win:ci
       - name: Verify the packaged payload
         run: node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
+      - name: Check installers and generate checksums
+        id: installers
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installers = @(
+            "release/Nabsun-$version-x64-setup.exe",
+            "release/Nabsun-$version-portable.exe"
+          )
+          $checksums = foreach ($installer in $installers) {
+            if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+              throw "Expected installer missing: $installer"
+            }
+            if ((Get-Item -LiteralPath $installer).Length -eq 0) {
+              throw "Installer is empty: $installer"
+            }
+            $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $installer)"
+          }
+          $checksums | Set-Content -LiteralPath release/SHA256SUMS.txt -Encoding ascii
+          "version=$version" >> $env:GITHUB_OUTPUT
       - name: Upload failure diagnostics
         if: failure()
         continue-on-error: true
@@ -145,13 +160,36 @@ jobs:
             release/builder-debug.yml
           if-no-files-found: ignore
           retention-days: 7
-      # Manual verification only uploads installers when explicitly requested.
+      # A successful package job must leave downloadable installers on GitHub,
+      # including PRs and ordinary branch pushes. Do not make upload optional.
       - name: Upload installers
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.upload_installers)
+        id: upload-installers
         uses: actions/upload-artifact@v4
         with:
-          name: nabsun-windows
-          path: release/*.exe
+          name: nabsun-windows-${{ steps.installers.outputs.version }}-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            release/Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe
+            release/Nabsun-${{ steps.installers.outputs.version }}-portable.exe
+            release/SHA256SUMS.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
+      - name: Show package download
+        if: always()
+        env:
+          INSTALLER_URL: ${{ steps.upload-installers.outputs.artifact-url }}
+          UPLOAD_OUTCOME: ${{ steps.upload-installers.outcome }}
+          PACKAGE_VERSION: ${{ steps.installers.outputs.version }}
+        run: |
+          if ($env:UPLOAD_OUTCOME -eq 'success' -and $env:INSTALLER_URL) {
+            @"
+          ## Windows packages - $env:PACKAGE_VERSION
+
+          [Download setup and portable installers]($env:INSTALLER_URL)
+
+          Includes SHA256SUMS.txt. Download available for 7 days; sign in to GitHub with repository access.
+          "@ >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            '## Windows packages' >> $env:GITHUB_STEP_SUMMARY
+            'No downloadable package was uploaded. Check the failed or cancelled steps above.' >> $env:GITHUB_STEP_SUMMARY
+          }
