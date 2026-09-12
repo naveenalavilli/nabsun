@@ -62,18 +62,18 @@ const coverage = (d) => Math.min(1, Math.max(0, 0.5 - d));
  * the name already implies.
  */
 
-const DEEP = [74, 47, 208];   // indigo, matching --accent-dim
-const VIOLET = [124, 92, 255]; // --accent in the dark theme
-const SKY = [56, 189, 248];    // --accent-2, the hue added to the chrome
-const WHITE = [255, 255, 255];
+// The site's palette: warm paper, one flat orange. No second hue, because the
+// brand does not have one - nabsun.web.app uses no gradient anywhere.
+const PAPER = [244, 242, 235];  // --bg in the light theme
+const ORANGE = [255, 91, 44];   // --accent
+const DEEP = [217, 65, 15];     // --accent-dim, for the faintest depth
 
 const c = SIZE / 2;
 const unit = SIZE / 1024; // every measurement below is quoted at 1024
 
-/** Three-stop ramp along the diagonal, so the tile is never flat. */
-function tileColour(x, y) {
-  const t = Math.min(1, Math.max(0, (x / SIZE) * 0.55 + (y / SIZE) * 0.45));
-  return t < 0.5 ? mix(DEEP, VIOLET, t / 0.5) : mix(VIOLET, SKY, (t - 0.5) / 0.5);
+/** Flat paper. The brand's tile has no ramp in it. */
+function tileColour() {
+  return PAPER;
 }
 
 // The tile. A generous corner radius reads as a modern app icon and survives
@@ -83,18 +83,7 @@ for (let y = 0; y < SIZE; y++) {
     const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
     const cov = coverage(d);
     if (cov <= 0) continue;
-    setPixel(x, y, tileColour(x, y), cov);
-  }
-}
-
-// A light wash across the top-left, so the tile has a direction to it rather
-// than reading as a flat swatch.
-for (let y = 0; y < SIZE; y++) {
-  for (let x = 0; x < SIZE; x++) {
-    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
-    if (coverage(d) <= 0) continue;
-    const t = 1 - Math.min(1, Math.hypot(x - 250 * unit, y - 210 * unit) / (620 * unit));
-    if (t > 0) setPixel(x, y, WHITE, t * t * 0.16);
+    setPixel(x, y, tileColour(), cov);
   }
 }
 
@@ -106,7 +95,7 @@ for (let y = 0; y < SIZE; y++) {
  * convex diamond at that size just looks like a blob. `soft` widens the
  * anti-aliased edge for the glow that sits under the main one.
  */
-function sparkle(cx, cy, radius, alpha = 1, soft = 34) {
+function sparkle(cx, cy, radius, alpha = 1, soft = 34, colour = ORANGE) {
   const reach = radius * 1.25;
   for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y++) {
     for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x++) {
@@ -115,7 +104,7 @@ function sparkle(cx, cy, radius, alpha = 1, soft = 34) {
       if (Math.hypot(dx, dy) > 1.3) continue;
       const star = Math.pow(Math.abs(dx), 2 / 3) + Math.pow(Math.abs(dy), 2 / 3);
       const cov = coverage((star - 1) * soft);
-      if (cov > 0) setPixel(x, y, WHITE, cov * alpha);
+      if (cov > 0) setPixel(x, y, colour, cov * alpha);
     }
   }
 }
@@ -123,21 +112,10 @@ function sparkle(cx, cy, radius, alpha = 1, soft = 34) {
 const mainX = c - 46 * unit;
 const mainY = c + 30 * unit;
 
-// A halo under the main sparkle. Without it the white sits flat on the
-// gradient; with it the mark has a source and the "sun" reading lands.
-for (let y = 0; y < SIZE; y++) {
-  for (let x = 0; x < SIZE; x++) {
-    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
-    if (coverage(d) <= 0) continue;
-    const t = 1 - Math.min(1, Math.hypot(x - mainX, y - mainY) / (330 * unit));
-    if (t > 0) setPixel(x, y, WHITE, t * t * t * 0.30);
-  }
-}
-
 sparkle(mainX, mainY, 246 * unit, 1);
 // A second, smaller sparkle. One star is a bullet; two read as motion, and it
 // fills the corner the main glyph leaves empty.
-sparkle(c + 210 * unit, c - 226 * unit, 104 * unit, 0.95);
+sparkle(c + 210 * unit, c - 226 * unit, 104 * unit, 1, 34, DEEP);
 
 /* ------------------------------------------------------------ PNG output -- */
 

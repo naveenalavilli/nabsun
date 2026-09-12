@@ -1192,6 +1192,62 @@ app.whenReady().then(async () => {
      * point is what the store does when the call fails, and a timing-dependent
      * fault reproduced by luck is not a regression test.
      */
+    /*
+     * Storage recovering must bring the lost message back with it.
+     *
+     * The store used to be disk-authoritative: a user message that failed to
+     * persist was gone from the lineage for good, because the next `upsert`
+     * reloaded the stale file and wrote on top of it. A failed request followed
+     * by a successful answer left `["assistant"]` on disk - an answer with no
+     * question. Surviving an unavailable store is not the same property as
+     * recovering from one, and only the first was being tested.
+     */
+    {
+      const recoverStore = new SessionStore(fs.mkdtempSync(path.join(os.tmpdir(), 'recover-')));
+      const recovered = recoverStore.create();
+      const realRenameR = fs.renameSync;
+      let failing = true;
+      try {
+        (fs as { renameSync: typeof fs.renameSync }).renameSync = ((from: string, to: string) => {
+          if (failing) {
+            const err = new Error('EIO: i/o error, rename') as NodeJS.ErrnoException;
+            err.code = 'EIO';
+            throw err;
+          }
+          return realRenameR(from, to);
+        }) as typeof fs.renameSync;
+
+        recoverStore.appendBestEffort(recovered.id, {
+          id: 'req-1',
+          role: 'user',
+          blocks: [{ type: 'text', text: 'the user request' }],
+          createdAt: Date.now(),
+        });
+        failing = false; // storage comes back
+        recoverStore.upsert(recovered.id, {
+          id: 'ans-1',
+          role: 'assistant',
+          blocks: [{ type: 'text', text: 'the answer' }],
+          createdAt: Date.now(),
+        });
+      } finally {
+        (fs as { renameSync: typeof fs.renameSync }).renameSync = realRenameR;
+      }
+
+      const reloaded = recoverStore.load(recovered.id);
+      const ids = (reloaded?.messages ?? []).map((m) => m.id);
+      check(
+        'a user message lost to a failed write is restored once storage recovers',
+        ids.includes('req-1') && ids.includes('ans-1'),
+        JSON.stringify(ids),
+      );
+      check(
+        'and it is restored once, not duplicated',
+        ids.filter((id) => id === 'req-1').length === 1,
+        JSON.stringify(ids),
+      );
+    }
+
     const realRename = fs.renameSync;
     let renameCalls = 0;
     // Created before the fault is installed, so the assertion below is about
