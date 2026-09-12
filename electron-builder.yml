@@ -31,7 +31,8 @@ extraResources:
     filter:
       - '**/*'
 
-publish: never
+# Destinations use null to disable publishing; "never" is only a CLI policy.
+publish: null
 
 asar: true
 # A child process cannot be spawned from inside an asar archive, and the MCP

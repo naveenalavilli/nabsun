@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+ci-logs/
 build/icon.png
 *.log
 .DS_Store

@@ -3,8 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ChatMessage, ChatSession } from '../../shared/types';
 
-/** Attempts, spaced 15/30/60/120ms - about a quarter second in total. */
-const RENAME_ATTEMPTS = 5;
+/**
+ * Attempts, spaced 10/20/40ms - about 70ms in total.
+ *
+ * Deliberately short. `save` is synchronous on the main process, so every
+ * millisecond here is a millisecond the UI is not painting, and the retry is
+ * no longer what protects the conversation: `unsaved` does that, and an
+ * exhausted retry now costs a delayed write rather than a lost message.
+ */
+const RENAME_ATTEMPTS = 4;
 
 /**
  * Whether an error looks like another process holding the file open, rather
@@ -35,6 +42,23 @@ function sleepSync(ms: number) {
 export class SessionStore {
   private readonly dir: string;
 
+  /**
+   * Sessions whose last write failed, and which the disk copy is therefore
+   * behind.
+   *
+   * Without this the store is disk-authoritative, and a message that failed to
+   * persist is gone from the lineage for good: the next `upsert` reloads the
+   * stale file, writes on top of it, and the earlier message is never seen
+   * again even though storage has recovered. A failed user request followed by
+   * a successful answer left `["assistant"]` on disk - the question the answer
+   * was to, missing.
+   *
+   * Holding the last known-complete session here and preferring it in `load`
+   * makes the next successful write persist everything that was lost, which is
+   * the repair the comments used to claim without implementing.
+   */
+  private unsaved = new Map<string, ChatSession>();
+
   constructor(userDataPath: string) {
     this.dir = path.join(userDataPath, 'sessions');
     fs.mkdirSync(this.dir, { recursive: true });
@@ -57,6 +81,10 @@ export class SessionStore {
   }
 
   load(id: string): ChatSession | null {
+    // Anything still waiting to be written is newer than the file by
+    // definition, so it wins.
+    const pending = this.unsaved.get(id);
+    if (pending) return pending;
     try {
       return JSON.parse(fs.readFileSync(this.file(id), 'utf8')) as ChatSession;
     } catch {
@@ -73,9 +101,11 @@ export class SessionStore {
    * out of `upsert`, out of the turn loop, and killed a completed assistant
    * response because a history file could not be renamed.
    *
-   * Every call rewrites the entire session, so a write that is abandoned
-   * after all attempts is repaired by the next one rather than leaving the
-   * transcript with a hole in it.
+   * A write abandoned after all attempts leaves the session in `unsaved`, and
+   * because every call writes the whole session the next successful save
+   * carries the missing messages with it. That repair is the map's doing, not
+   * something whole-file writes give for free - this comment previously
+   * claimed the latter, and was wrong.
    */
   save(session: ChatSession) {
     session.updatedAt = Date.now();
@@ -87,13 +117,14 @@ export class SessionStore {
     for (let attempt = 0; attempt < RENAME_ATTEMPTS; attempt++) {
       try {
         fs.renameSync(tmp, target);
+        this.unsaved.delete(session.id);
         return;
       } catch (err) {
         lastError = err;
         // A name that is invalid, or a disk that is full, will not become
         // valid or empty by waiting for it.
         if (!isContended(err)) break;
-        if (attempt < RENAME_ATTEMPTS - 1) sleepSync(15 * 2 ** attempt);
+        if (attempt < RENAME_ATTEMPTS - 1) sleepSync(10 * 2 ** attempt);
       }
     }
 
@@ -104,6 +135,8 @@ export class SessionStore {
     } catch {
       /* nothing useful to do */
     }
+    // The caller's object is the only complete copy of this conversation now.
+    this.unsaved.set(session.id, session);
     throw lastError;
   }
 
@@ -139,7 +172,12 @@ export class SessionStore {
       console.error('[sessions] could not persist the message:', err);
       // `load` reports a missing or unreadable file as null rather than
       // throwing, so this stays on its feet when the store is unusable.
-      const session = this.load(id) ?? this.blank(id);
+      const kept = this.load(id);
+      // The failed `save` held on to the session it could not write, and that
+      // session already contains this message. Appending it again would show
+      // the user their own request twice.
+      if (kept?.messages.some((m) => m.id === message.id)) return kept;
+      const session = kept ?? this.blank(id);
       session.messages.push(message);
       return session;
     }

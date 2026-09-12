@@ -5,56 +5,56 @@
     <title>About Nabsun</title>
     <style>
       :root {
-        --bg: #ffffff;
-        --bg-raised: #f4f5f8;
-        --bg-input: #ffffff;
-        --border: #e2e4ea;
-        --border-strong: #c6cad3;
-        --text: #1c1f26;
-        --text-dim: #596072;
-        --text-faint: #878e9e;
-        --accent: #5b3fd6;
-        --accent-soft: #6d4fe0;
-        --accent-tint: #5b3fd626;
-        --hero: #ece9fb;
-        --hover: #0000000a;
-        --scrim: #1c1f2659;
-        --shadow: #1c1f2626;
-        --accent-deep: #4a32b0;
-        --danger: #d12b4e;
+        --bg: #dfe4d3;
+        --bg-raised: #faf9f5;
+        --bg-input: #faf9f5;
+        --border: #d6d5ce;
+        --border-strong: #bcbbaf;
+        --text: #20211e;
+        --text-dim: #55564d;
+        --text-faint: #74766c;
+        --accent: #ff5b2c;
+        --accent-soft: #c2410c;
+        --accent-tint: #ff5b2c1f;
+        --hero: #e7ebdc;
+        --hover: #20211e0a;
+        --scrim: #20211e59;
+        --shadow: #20211e1f;
+        --accent-deep: #a8380c;
+        --danger: #b3392a;
         color-scheme: light;
       }
       :root[data-theme='dark'] {
-        --bg: #14141a;
-        --bg-raised: #1c1c24;
-        --bg-input: #23232d;
-        --border: #2e2e3a;
-        --border-strong: #3d3d4d;
-        --text: #e8e8f0;
-        --text-dim: #9a9aae;
-        --text-faint: #6b6b80;
-        --accent: #7c5cff;
-        --accent-soft: #9b82ff;
-        --accent-tint: #7c5cff26;
-        --hero: #221c44;
-        --danger: #ff5c7c;
+        --bg: #1e1f1b;
+        --bg-raised: #24251f;
+        --bg-input: #2b2c26;
+        --border: #33342e;
+        --border-strong: #4a4b42;
+        --text: #dedcd2;
+        --text-dim: #a8a99e;
+        --text-faint: #83847a;
+        --accent: #ff6f42;
+        --accent-soft: #ff9169;
+        --accent-tint: #ff6f4224;
+        --hero: #26281f;
+        --danger: #f0705f;
         color-scheme: dark;
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme='light']):not([data-theme='dark']) {
-          --bg: #14141a;
-          --bg-raised: #1c1c24;
-          --bg-input: #23232d;
-          --border: #2e2e3a;
-          --border-strong: #3d3d4d;
-          --text: #e8e8f0;
-          --text-dim: #9a9aae;
-          --text-faint: #6b6b80;
-          --accent: #7c5cff;
-          --accent-soft: #9b82ff;
-          --accent-tint: #7c5cff26;
-          --hero: #221c44;
-          --danger: #ff5c7c;
+          --bg: #1e1f1b;
+          --bg-raised: #24251f;
+          --bg-input: #2b2c26;
+          --border: #33342e;
+          --border-strong: #4a4b42;
+          --text: #dedcd2;
+          --text-dim: #a8a99e;
+          --text-faint: #83847a;
+          --accent: #ff6f42;
+          --accent-soft: #ff9169;
+          --accent-tint: #ff6f4224;
+          --hero: #26281f;
+          --danger: #f0705f;
           color-scheme: dark;
         }
       }
@@ -68,7 +68,7 @@
       }
       .mark {
         width: 76px; height: 76px; border-radius: 20px;
-        background: linear-gradient(145deg, var(--accent), var(--accent-deep));
+        background: var(--accent);
         box-shadow: 0 12px 40px var(--accent)40;
         display: grid; place-items: center;
         font-size: 38px; font-weight: 700; color: #fff;

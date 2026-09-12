@@ -22,6 +22,7 @@
     "icon": "node scripts/make-icon.mjs",
     "dist": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder",
     "dist:win": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --win",
+    "dist:win:ci": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --win --config electron-builder.ci.yml --publish never",
     "dist:mac": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --mac",
     "dist:linux": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --linux",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
