@@ -12,6 +12,7 @@
  *
  *   node scripts/check-release-payload.mjs
  *   node scripts/check-release-payload.mjs --allow-missing-model   (dev builds)
+ *   node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +20,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const allowMissing = process.argv.includes('--allow-missing-model');
+const resourcesArg = process.argv.indexOf('--resources');
+if (resourcesArg !== -1 && (!process.argv[resourcesArg + 1] || process.argv[resourcesArg + 1].startsWith('--'))) {
+  console.error('--resources requires the packaged resources directory');
+  process.exit(1);
+}
+const resources = resourcesArg === -1 ? null : path.resolve(process.argv[resourcesArg + 1]);
+// Application notices live inside app.asar; engine and model files are unpacked.
+const asar = resources ? await import('@electron/asar') : null;
 
 /** Things whose absence changes what the product is, not merely how it looks. */
 const REQUIRED = [
@@ -69,11 +78,15 @@ const REQUIRED = [
 
 const problems = [];
 for (const item of REQUIRED) {
-  const full = path.join(root, item.file);
+  const full = path.join(resources ?? root, item.file);
   let size = -1;
   try {
-    const stat = fs.statSync(full);
-    size = stat.isFile() ? stat.size : -1;
+    if (resources && !item.file.startsWith('vendor/')) {
+      size = asar.extractFile(path.join(resources, 'app.asar'), item.file).length;
+    } else {
+      const stat = fs.statSync(full);
+      size = stat.isFile() ? stat.size : -1;
+    }
   } catch {
     // Reported below.
   }
@@ -84,13 +97,13 @@ for (const item of REQUIRED) {
 }
 
 if (!problems.length) {
-  console.log('release payload: engine, weights and licences all present');
+  console.log(`${resources ? 'packaged' : 'release'} payload: engine, weights and licences all present`);
   process.exit(0);
 }
 
 console.error('\nRelease payload incomplete:\n');
 for (const p of problems) console.error(`  ${p}`);
-console.error('\nRun `npm run fetch:model` first.');
+console.error(resources ? '\nRebuild after checking the source payload and packaging configuration.' : '\nRun `npm run fetch:model` first.');
 
 if (allowMissing) {
   console.error('\n--allow-missing-model given: continuing with a DEVELOPMENT build.');

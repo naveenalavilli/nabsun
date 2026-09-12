@@ -17,7 +17,7 @@ import { HistoryStore } from '../main/history';
 import { registerInternalProtocol } from '../main/internalPages';
 import { handleCommand, suggestedFileName, type IpcDeps } from '../main/ipc';
 import { PasswordStore } from '../main/passwords';
-import { migrateProfile, rewriteInternalUrl } from '../main/rebrand';
+import { MIGRATION_MARKER, migrateProfile, rewriteInternalUrl } from '../main/rebrand';
 import { applyPermissionPolicy } from '../main/security';
 import { SettingsStore } from '../main/store';
 import { TabManager, delay } from '../main/tabs';
@@ -277,6 +277,71 @@ app.whenReady().then(async () => {
       'a second run leaves the current profile alone',
       fs.readFileSync(path.join(newProfile, 'passwords.json'), 'utf8').includes('newer'),
       fs.readFileSync(path.join(newProfile, 'passwords.json'), 'utf8'),
+    );
+
+    /*
+     * The lifecycle case, which is the one that actually shipped broken.
+     *
+     * Electron creates `userData` as an empty directory while it starts up, so
+     * on a real upgrade the destination always exists by the time migration
+     * runs. The checks above pass a destination that does not exist yet, which
+     * is why they went on passing while no user was ever migrated. This one
+     * reproduces what Electron leaves behind.
+     */
+    const lifecycleRoot = path.join(tmp, 'rebrand-lifecycle');
+    const lifecycleOld = path.join(lifecycleRoot, 'SmartBrowser');
+    const lifecycleNew = path.join(lifecycleRoot, 'Nabsun');
+    fs.mkdirSync(path.join(lifecycleOld, 'Partitions', 'smartbrowser'), { recursive: true });
+    fs.writeFileSync(path.join(lifecycleOld, 'history.json'), '["a visited page"]', 'utf8');
+    fs.writeFileSync(path.join(lifecycleOld, 'Partitions', 'smartbrowser', 'Cookies'), 'x', 'utf8');
+    fs.mkdirSync(lifecycleNew, { recursive: true }); // exactly what Electron does
+
+    const lifecycleMoved = migrateProfile(lifecycleRoot, lifecycleNew);
+    check(
+      'a profile migrates even though Electron already made the destination',
+      lifecycleMoved !== null && fs.existsSync(path.join(lifecycleNew, 'history.json')),
+      `moved=${String(lifecycleMoved)} entries=${fs.readdirSync(lifecycleNew).join(',')}`,
+    );
+    check(
+      'and the partition still comes with it',
+      fs.existsSync(path.join(lifecycleNew, 'Partitions', 'nabsun', 'Cookies')),
+      fs.readdirSync(path.join(lifecycleNew, 'Partitions')).join(','),
+    );
+    check(
+      'a completion marker records that it happened',
+      fs.existsSync(path.join(lifecycleNew, MIGRATION_MARKER)),
+      fs.readdirSync(lifecycleNew).join(','),
+    );
+
+    // With the marker present the old profile must be left where it is, even
+    // if one reappears - the user may have reinstalled the old build.
+    fs.mkdirSync(path.join(lifecycleOld, 'Partitions'), { recursive: true });
+    fs.writeFileSync(path.join(lifecycleOld, 'history.json'), '["stale"]', 'utf8');
+    const secondRun = migrateProfile(lifecycleRoot, lifecycleNew);
+    check(
+      'the marker stops a second migration over live data',
+      secondRun === null &&
+        fs.readFileSync(path.join(lifecycleNew, 'history.json'), 'utf8').includes('a visited page'),
+      fs.readFileSync(path.join(lifecycleNew, 'history.json'), 'utf8'),
+    );
+
+    // An interrupted copy must not be mistaken for a profile, and must not
+    // block the next attempt.
+    const resumeRoot = path.join(tmp, 'rebrand-resume');
+    const resumeOld = path.join(resumeRoot, 'SmartBrowser');
+    const resumeNew = path.join(resumeRoot, 'Nabsun');
+    fs.mkdirSync(resumeOld, { recursive: true });
+    fs.writeFileSync(path.join(resumeOld, 'history.json'), '["real"]', 'utf8');
+    fs.mkdirSync(`${resumeNew}.migrating`, { recursive: true });
+    fs.writeFileSync(path.join(`${resumeNew}.migrating`, 'history.json'), '["half copied"]', 'utf8');
+
+    const resumed = migrateProfile(resumeRoot, resumeNew);
+    check(
+      'an interrupted migration is discarded and retried, not adopted',
+      resumed !== null &&
+        fs.readFileSync(path.join(resumeNew, 'history.json'), 'utf8').includes('real') &&
+        !fs.existsSync(`${resumeNew}.migrating`),
+      `moved=${String(resumed)} staging=${fs.existsSync(`${resumeNew}.migrating`)}`,
     );
 
     check(

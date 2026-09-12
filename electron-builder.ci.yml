@@ -1,0 +1,10 @@
+# Publish destinations and the CLI publication policy are different settings.
+# `publish: never` here would try to load an electron-publisher-never plugin.
+extends: ./electron-builder.yml
+publish: null
+win:
+  publish: null
+nsis:
+  publish: null
+portable:
+  publish: null
