@@ -915,9 +915,9 @@ function highlight(refList: unknown[], durationMs = 1400) {
       top: `${r.top}px`,
       width: `${r.width}px`,
       height: `${r.height}px`,
-      border: '2px solid #7c5cff',
+      border: '2px solid #ff5b2c',
       borderRadius: '4px',
-      boxShadow: '0 0 0 3px rgba(124,92,255,.25)',
+      boxShadow: '0 0 0 3px rgba(255,91,44,.25)',
       transition: 'opacity .3s',
     } as CSSStyleDeclaration);
     layer.appendChild(box);
