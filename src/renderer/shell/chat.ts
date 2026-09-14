@@ -20,6 +20,7 @@ interface LiveTurn {
   textBuffer: string;
   textEl: HTMLElement | null;
   thinkingEl: HTMLElement | null;
+  activityEl: HTMLElement | null;
   tools: Map<string, HTMLElement>;
   renderQueued: boolean;
 }
@@ -30,6 +31,7 @@ export class ChatView {
   private sendBtn = $<HTMLButtonElement>('#send');
   private stopBtn = $<HTMLButtonElement>('#stop');
   private stepBadge = $('#step-badge');
+  private busyBar = $('#busy-bar');
   private attachPage = $<HTMLInputElement>('#attach-page');
 
   private sessionId: string | null = null;
@@ -130,6 +132,7 @@ export class ChatView {
   }
 
   private setBusy(busy: boolean) {
+    this.busyBar.hidden = !busy;
     this.busy = busy;
     this.sendBtn.hidden = busy;
     this.stopBtn.hidden = !busy;
@@ -143,6 +146,7 @@ export class ChatView {
     switch (event.type) {
       case 'turn_start':
         this.live = this.beginTurn(event.messageId);
+        this.setActivity('Working');
         break;
 
       case 'text_delta':
@@ -169,6 +173,7 @@ export class ChatView {
 
       case 'tool_start': {
         if (!this.live) break;
+        this.setActivity(humanizeTool(event.name));
         // A tool call ends the current paragraph; later prose starts a new one.
         this.flushText();
         const card = this.renderToolCard(event.name, event.input);
@@ -181,11 +186,15 @@ export class ChatView {
       case 'tool_end': {
         const card = this.live?.tools.get(event.toolCallId);
         if (card) this.updateToolCard(card, event.status, event.result, event.durationMs);
+        // Back to a neutral label: the next tool has not started yet, but the
+        // turn is still running and the user should still see that.
+        this.setActivity('Working');
         break;
       }
 
       case 'turn_end':
         this.flushText();
+        this.clearActivity();
         this.live = null;
         this.setBusy(false);
         this.onSessionChanged();
@@ -193,6 +202,7 @@ export class ChatView {
 
       case 'aborted':
         this.flushText();
+        this.clearActivity();
         // Stop cancels the question too, so the card must go with it — leaving
         // it on screen invited an answer to a task that no longer exists.
         this.dropQuestions(event.sessionId);
@@ -203,6 +213,7 @@ export class ChatView {
 
       case 'error':
         this.flushText();
+        this.clearActivity();
         this.appendNotice(event.message, 'error');
         this.live = null;
         this.setBusy(false);
@@ -224,7 +235,7 @@ export class ChatView {
     root.append(who, body);
     this.transcript.appendChild(root);
     this.scrollToEnd();
-    return { messageId, root, body, textBuffer: '', textEl: null, tools: new Map(), thinkingEl: null, renderQueued: false };
+    return { messageId, root, body, textBuffer: '', textEl: null, tools: new Map(), thinkingEl: null, activityEl: null, renderQueued: false };
   }
 
   /**
@@ -257,6 +268,40 @@ export class ChatView {
     this.live.textBuffer = '';
     this.live.textEl = null;
     this.live.thinkingEl = null;
+  }
+
+  /* ------------------------------------------------------------ activity -- */
+
+  /**
+   * A single line saying what the assistant is doing right now.
+   *
+   * This is what the user gets in place of the trace when verbose is off. It
+   * is always built - CSS decides whether it or the detailed cards are shown -
+   * so neither mode needs the other to be torn down first.
+   */
+  private setActivity(label: string) {
+    if (!this.live) return;
+    if (!this.live.activityEl) {
+      const row = document.createElement('div');
+      row.className = 'activity';
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      const text = document.createElement('span');
+      text.className = 'activity-label';
+      row.append(spinner, text);
+      this.live.activityEl = row;
+      this.live.body.appendChild(row);
+    }
+    const label_ = this.live.activityEl.querySelector<HTMLElement>('.activity-label');
+    if (label_) label_.textContent = `${label}…`;
+    // Always last, so it trails the answer as it streams in.
+    this.live.body.appendChild(this.live.activityEl);
+    this.scrollToEnd();
+  }
+
+  private clearActivity() {
+    this.live?.activityEl?.remove();
+    if (this.live) this.live.activityEl = null;
   }
 
   /* --------------------------------------------------------------- cards -- */
@@ -532,6 +577,32 @@ function button(label: string, cls: string, onClick: () => void): HTMLButtonElem
   b.textContent = label;
   b.addEventListener('click', onClick);
   return b;
+}
+
+/**
+ * A tool id turned into something worth showing a person.
+ *
+ * `mcp__nabsun__browser_read_text` becomes "Reading text" - the prefix is
+ * routing information, and the underscores are an identifier convention. A
+ * name that falls through the table still reads better unprefixed than raw.
+ */
+export function humanizeTool(name: string): string {
+  const bare = name.replace(/^mcp__[a-z0-9-]+__/i, '').replace(/^browser_/, '');
+  const known: Record<string, string> = {
+    web_search: 'Searching the web',
+    fetch_url: 'Fetching a page',
+    read_text: 'Reading the page',
+    snapshot: 'Looking at the page',
+    navigate: 'Opening a page',
+    tab_open: 'Opening a tab',
+    click: 'Clicking',
+    type: 'Typing',
+    extract: 'Extracting data',
+    screenshot: 'Taking a screenshot',
+  };
+  if (known[bare]) return known[bare];
+  const words = bare.replace(/_/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Working';
 }
 
 /** One-line gist of a tool's arguments for the collapsed card header. */

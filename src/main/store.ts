@@ -96,6 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
   maxAgentSteps: 40,
   vision: true,
   extendedThinking: false,
+  verbose: false,
   blockAds: true,
   bookmarksBarVisible: true,
   savePasswords: true,
