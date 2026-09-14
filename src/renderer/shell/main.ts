@@ -486,6 +486,7 @@ const settingsView = new SettingsView((next) => {
 async function refreshSettings() {
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
+  applyVerbose(settings.verbose);
 }
 
 function wireExtensions() {
@@ -538,6 +539,7 @@ window.nabsun.onWindowState((next) => {
 window.nabsun.onSettingsChanged((next) => {
   settings = next;
   applyTheme(next.theme);
+  applyVerbose(next.verbose);
 });
 
 /**
@@ -554,6 +556,17 @@ function applyTheme(theme: Settings['theme']): void {
   const root = document.documentElement;
   if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
   else delete root.dataset.theme;
+}
+
+/**
+ * Verbosity is a class on the root, not a branch in the renderer.
+ *
+ * The reasoning and tool cards are still built and still in the DOM, so
+ * turning this on reveals what has already happened rather than only applying
+ * to the next turn - including a session restored from history.
+ */
+function applyVerbose(verbose: boolean): void {
+  document.documentElement.classList.toggle('verbose', verbose);
 }
 
 

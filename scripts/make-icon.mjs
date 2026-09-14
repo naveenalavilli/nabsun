@@ -48,74 +48,55 @@ const coverage = (d) => Math.min(1, Math.max(0, 0.5 - d));
 /* ----------------------------------------------------------------- shape -- */
 
 /*
- * A gradient tile carrying a sparkle.
+ * A sun rising over a horizon.
  *
- * The previous mark drew a browser window - a title bar, three dots and a
- * cursor - which is a lot of incident for something that spends most of its
- * life 16px wide in a taskbar. At that size the dots merge into a smear and
- * the window outline reads as a plain rectangle, so the icon said "some app"
- * rather than naming itself.
+ * The product is nab-sun, so the mark should carry the name, but the obvious
+ * reading of that - a radial burst - is territory Claude already occupies, in
+ * the same orange, on the same cream. An eight-ray sun on a paper tile was a
+ * near-collision rather than an homage, so the rays are gone entirely.
  *
- * This keeps one shape big enough to survive the downscale. The sparkle is
- * doing double duty: it is the common visual shorthand for a model acting on
- * your behalf, and the product is called Nabsun, so a small sun is the mark
- * the name already implies.
+ * What is left is a silhouette nothing else in the category has: a disc cut by
+ * a bar. It still says sun, the bar reads as an address bar, and the dark tile
+ * moves the whole mark off the cream ground the comparison depended on.
+ *
+ * Geometry is quoted on the 100-unit square that favicon.svg uses, so the two
+ * cannot drift: disc r26 centred at (50,57), horizon 74x8 at y63, both clipped
+ * to the tile.
  */
 
-// The site's palette: warm paper, one flat orange. No second hue, because the
-// brand does not have one - nabsun.web.app uses no gradient anywhere.
-const PAPER = [244, 242, 235];  // --bg in the light theme
-const ORANGE = [255, 91, 44];   // --accent
-const DEEP = [217, 65, 15];     // --accent-dim, for the faintest depth
+const TILE = [34, 35, 31];    // --dark
+const ORANGE = [255, 91, 44]; // --orange
+const PAPER = [244, 242, 235];// --paper
 
 const c = SIZE / 2;
-const unit = SIZE / 1024; // every measurement below is quoted at 1024
+const u = SIZE / 100; // one unit of the 100-square the mark is designed on
 
-/** Flat paper. The brand's tile has no ramp in it. */
-function tileColour() {
-  return PAPER;
+/** Rounded-rectangle coverage, reused for the tile and the horizon bar. */
+function rrect(px, py, cx, cy, halfW, halfH, r) {
+  return coverage(roundedRectSdf(px, py, cx, cy, halfW, halfH, r));
 }
 
-// The tile. A generous corner radius reads as a modern app icon and survives
-// the mask macOS and Windows apply anyway.
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
-    const d = roundedRectSdf(x + 0.5, y + 0.5, c, c, 464 * unit, 464 * unit, 224 * unit);
-    const cov = coverage(d);
-    if (cov <= 0) continue;
-    setPixel(x, y, tileColour(), cov);
-  }
-}
+    const px = x + 0.5;
+    const py = y + 0.5;
 
-/**
- * A four-point sparkle.
- *
- * The astroid |x|^(2/3) + |y|^(2/3) = 1 gives concave arms, which stay
- * recognisable as a star when the whole glyph is a dozen pixels across - a
- * convex diamond at that size just looks like a blob. `soft` widens the
- * anti-aliased edge for the glow that sits under the main one.
- */
-function sparkle(cx, cy, radius, alpha = 1, soft = 34, colour = ORANGE) {
-  const reach = radius * 1.25;
-  for (let y = Math.floor(cy - reach); y <= Math.ceil(cy + reach); y++) {
-    for (let x = Math.floor(cx - reach); x <= Math.ceil(cx + reach); x++) {
-      const dx = (x + 0.5 - cx) / radius;
-      const dy = (y + 0.5 - cy) / radius;
-      if (Math.hypot(dx, dy) > 1.3) continue;
-      const star = Math.pow(Math.abs(dx), 2 / 3) + Math.pow(Math.abs(dy), 2 / 3);
-      const cov = coverage((star - 1) * soft);
-      if (cov > 0) setPixel(x, y, colour, cov * alpha);
+    const tile = rrect(px, py, c, c, 50 * u, 50 * u, 20 * u);
+    if (tile <= 0) continue;
+    setPixel(x, y, TILE, tile);
+
+    // The sun, clipped at the horizon line so it reads as rising rather than
+    // floating. The clip is a hard edge, which is what the bar sitting on top
+    // of it expects.
+    if (py < 63 * u) {
+      const sun = coverage(Math.hypot(px - 50 * u, py - 57 * u) - 26 * u);
+      if (sun > 0) setPixel(x, y, ORANGE, sun * tile);
     }
+
+    const bar = rrect(px, py, 50 * u, 67 * u, 37 * u, 4 * u, 4 * u);
+    if (bar > 0) setPixel(x, y, PAPER, bar * tile);
   }
 }
-
-const mainX = c - 46 * unit;
-const mainY = c + 30 * unit;
-
-sparkle(mainX, mainY, 246 * unit, 1);
-// A second, smaller sparkle. One star is a bullet; two read as motion, and it
-// fills the corner the main glyph leaves empty.
-sparkle(c + 210 * unit, c - 226 * unit, 104 * unit, 1, 34, DEEP);
 
 /* ------------------------------------------------------------ PNG output -- */
 
