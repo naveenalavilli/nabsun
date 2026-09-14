@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
+import { StringDecoder } from 'node:string_decoder';
 import os from 'node:os';
 import path from 'node:path';
 import type { ProviderId } from '../../../shared/types';
@@ -659,9 +660,14 @@ abstract class CliProvider implements Provider {
       notify?.();
     };
 
+    // Decoded through a StringDecoder rather than per chunk. A multi-byte
+    // character split across two reads decodes to replacement bytes on both
+    // sides of the boundary, which is how a bullet in the model's reasoning
+    // reached the transcript as mojibake.
+    const outDecoder = new StringDecoder('utf8');
     let stdoutBuffer = '';
     child.stdout.on('data', (chunk: Buffer) => {
-      stdoutBuffer += chunk.toString('utf8');
+      stdoutBuffer += outDecoder.write(chunk);
       const lines = stdoutBuffer.split('\n');
       stdoutBuffer = lines.pop() ?? '';
       for (const line of lines) {
@@ -674,8 +680,9 @@ abstract class CliProvider implements Provider {
       }
     });
 
+    const errDecoder = new StringDecoder('utf8');
     child.stderr.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf8');
+      const text = errDecoder.write(chunk);
       stderrTail = `${stderrTail}${text}`.slice(-4000);
     });
 

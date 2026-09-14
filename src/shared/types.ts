@@ -202,6 +202,17 @@ export interface Settings {
   /** Send a screenshot alongside the DOM snapshot when the model supports it. */
   vision: boolean;
   extendedThinking: boolean;
+  /**
+   * Show the mechanics - reasoning trace and per-tool cards - in the
+   * transcript.
+   *
+   * Distinct from `extendedThinking`, which asks the *model* for reasoning.
+   * The CLI backends stream their reasoning whether or not it was asked for,
+   * so the only way to keep the panel readable is to decide separately what
+   * the transcript displays. Off by default: a wall of `mcp__nabsun__fetch_url`
+   * lines tells the user nothing they wanted to know.
+   */
+  verbose: boolean;
   blockAds: boolean;
   bookmarksBarVisible: boolean;
   /** Offer to save passwords typed into sign-in forms. */
