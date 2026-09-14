@@ -356,6 +356,12 @@ export class SettingsView {
         (v) => void this.patch({ extendedThinking: v }),
       ),
       checkbox(
+        'Verbose mode',
+        s.verbose,
+        'Shows the reasoning trace and every tool call. Off by default: without it you get a progress line while the assistant works.',
+        (v) => void this.patch({ verbose: v }),
+      ),
+      checkbox(
         'Allow screenshots',
         s.vision,
         'Lets the assistant look at the page visually when layout matters.',
