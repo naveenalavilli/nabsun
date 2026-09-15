@@ -97,6 +97,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vision: true,
   extendedThinking: false,
   verbose: false,
+  presentAsChrome: true,
   blockAds: true,
   bookmarksBarVisible: true,
   savePasswords: true,

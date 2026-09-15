@@ -37,6 +37,7 @@ export class Tab {
     this.view = new WebContentsView({
       webPreferences: {
         preload: preloadPath,
+        additionalArguments: [`--nabsun-chrome-major=${process.versions.chrome.split('.')[0]}`],
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
