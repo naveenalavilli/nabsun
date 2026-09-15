@@ -9,7 +9,30 @@
  * on every page automatically, before the user interacts, whereas the bridge is
  * injected on demand when the assistant is working.
  */
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, webFrame } from 'electron';
+
+const chromeMajor = process.argv.find((a) => a.startsWith('--nabsun-chrome-major='))?.split('=')[1];
+if (chromeMajor) {
+  webFrame.executeJavaScript(`(() => {
+    const s = (performance.timing?.navigationStart || Date.now()) / 1000;
+    window.chrome = window.chrome || {};
+    window.chrome.loadTimes = window.chrome.loadTimes || (() => ({ requestTime: s,
+      startLoadTime: s, commitLoadTime: s, finishDocumentLoadTime: s, finishLoadTime: s,
+      firstPaintTime: s, navigationType: 'Other', wasFetchedViaSpdy: true,
+      wasNpnNegotiated: true, npnNegotiatedProtocol: 'h2', connectionInfo: 'h2' }));
+    window.chrome.csi = window.chrome.csi || (() => ({ startE: Date.now(),
+      onloadT: Date.now(), pageT: performance.now(), tran: 15 }));
+    window.chrome.runtime = window.chrome.runtime || {};
+    window.chrome.app = window.chrome.app || { isInstalled: false };
+    if (navigator.userAgentData) {
+      const b = [{ brand: 'Chromium', version: '${chromeMajor}' },
+                 { brand: 'Google Chrome', version: '${chromeMajor}' },
+                 { brand: 'Not?A_Brand', version: '24' }];
+      try { Object.defineProperty(navigator.userAgentData, 'brands',
+        { get: () => b.slice(), configurable: true }); } catch {}
+    }
+  })()`).catch(() => {});
+}
 
 /* ------------------------------------------------------------- selection -- */
 

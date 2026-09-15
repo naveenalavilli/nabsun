@@ -484,6 +484,18 @@ function configureSession(settings: SettingsStore) {
   ses.setUserAgent(
     `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`,
   );
+
+  const major = chromeVersion.split('.')[0];
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (!settings.get().presentAsChrome) return callback({ requestHeaders: details.requestHeaders });
+    return callback({ requestHeaders: { ...details.requestHeaders,
+      'Sec-CH-UA': `"Chromium";v="${major}", "Google Chrome";v="${major}", "Not?A_Brand";v="24"`,
+      'Sec-CH-UA-Mobile': '?0',
+      'Sec-CH-UA-Platform': '"Windows"' } });
+  });
+
+
+
 }
 
 function zoomActive(deps: IpcDeps, direction: 'in' | 'out' | 'reset') {

@@ -439,6 +439,29 @@ into a CLI and send one message to close the gap.
 
 ---
 
+## Identifying as Chrome
+
+Nabsun reports itself to websites as Google Chrome rather than as what it is, a
+Chromium-based browser built on Electron. Three things do this: the user-agent
+string, the `Sec-CH-UA` client-hint headers, and a small shim that fills in
+`window.chrome` and `navigator.userAgentData.brands` on each page.
+
+It is there because Google refuses sign-in to browsers it identifies as embedded
+frameworks — the "This browser or app may not be secure" page. That check exists
+for a good reason: a native app hosting a web view can read everything typed into
+it, including a password and the code after it. Nabsun does not do that (password
+and one-time-code fields refuse the assistant, and their values are redacted from
+everything the model can read — see [SECURITY.md](SECURITY.md)), but a site has no
+way to tell that from the outside, so the check refuses the whole category.
+
+Two things to be aware of if you build or ship this:
+
+- Sites are being told something that is not strictly true. If you would rather
+  not, turn off **Settings → Assistant → Identify as Google Chrome**. Google
+  sign-in will stop working; everything else is unaffected.
+- It may stop working. Google updates this detection deliberately, and the
+  signals it reads are not published.
+
 ## Known limits
 
 - One window. `AppWindow` is a class, but nothing creates a second one yet.
