@@ -367,6 +367,14 @@ export class SettingsView {
         'Lets the assistant look at the page visually when layout matters.',
         (v) => void this.patch({ vision: v }),
       ),
+      checkbox(
+        'Identify as Google Chrome',
+        s.presentAsChrome,
+        'Some sites refuse to sign you in unless the browser reports itself as Chrome. ' +
+          'On by default. Turning it off makes Nabsun report itself accurately, ' +
+          'and Google sign-in will stop working.',
+        (v) => void this.patch({ presentAsChrome: v }),
+      ),
     );
 
     const steps = el('input', { type: 'number', value: String(s.maxAgentSteps), min: '1', max: '200' });
