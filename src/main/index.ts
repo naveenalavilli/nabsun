@@ -31,6 +31,7 @@ import { PasswordStore } from './passwords';
 import { FORMER_SCHEME, migrateProfile, rewriteInternalUrl } from './rebrand';
 import { applyPermissionPolicy } from './security';
 import { DEFAULT_SETTINGS, SecretStore, SettingsStore } from './store';
+import { SoulStore, soulPath } from './soul';
 
 /**
  * Electron's development security warnings are wrong for a browser.
@@ -95,6 +96,9 @@ async function boot() {
   const questions = new QuestionManager();
   const mcp = new McpManager();
   const plugins = new PluginManager(path.join(userDataPath, 'plugins'));
+  // Write the starter soul.md once, so the path Settings shows is real and
+  // the file is there to edit. Never overwrites an existing one.
+  new SoulStore(userDataPath).ensure();
   const downloads = new DownloadManager();
   const passwords = new PasswordStore();
   const extensions = new ChromeExtensionManager(() => settings.get().chromeExtensions);
@@ -292,6 +296,7 @@ async function boot() {
       USER_DATA: userDataPath,
       CONFIG_FILE: path.join(userDataPath, 'settings.json'),
       PLUGINS_DIR: plugins.directory,
+      SOUL_FILE: soulPath(userDataPath),
       // `</` is escaped so a page title can never close the script element.
       HISTORY_JSON: JSON.stringify(history.search('', 500)).replace(/<\//g, '<\\/'),
       TOP_SITES_JSON: JSON.stringify(favourites(history)).replace(/<\//g, '<\\/'),

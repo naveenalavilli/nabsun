@@ -54,9 +54,54 @@ export class Tab {
     return this.view.webContents;
   }
 
+  /**
+   * The webContents, or null once it has gone away.
+   *
+   * `view.webContents` is typed as always present and is not: a page can end
+   * its own renderer — `window.close()` at the tail of an SSO or logout flow is
+   * the usual way — and Electron then leaves the property undefined. Anything
+   * that can run after that point has to ask here instead of trusting `wc`.
+   */
+  get liveWc(): WebContents | null {
+    const wc = (this.view as { webContents?: WebContents }).webContents;
+    return wc && !wc.isDestroyed() ? wc : null;
+  }
+
+  get alive(): boolean {
+    return this.liveWc !== null;
+  }
+
+  /**
+   * The last state read off a live webContents.
+   *
+   * Kept so a tab whose renderer has gone can still describe itself: the strip
+   * kept its title and address before the page died, and showing those beats
+   * blanking the tab or, as this used to do, throwing inside a getter that the
+   * coalesced update walks 16ms later.
+   */
+  private lastState: TabState | null = null;
+
   get state(): TabState {
-    const wc = this.wc;
-    return {
+    const wc = this.liveWc;
+    if (!wc) {
+      return (
+        this.lastState ?? {
+          id: this.id,
+          url: this.failedUrl ?? '',
+          title: this.failedUrl || 'New Tab',
+          favicon: this.favicon,
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+          audible: false,
+          muted: false,
+          pinned: this.pinned,
+          error: this.error,
+          agentControlled: this.agentControlled,
+        }
+      );
+    }
+    const state: TabState = {
       id: this.id,
       // Show the address that was asked for, even though it never committed.
       url: this.failedUrl ?? wc.getURL(),
@@ -71,6 +116,13 @@ export class Tab {
       error: this.error,
       agentControlled: this.agentControlled,
     };
+    this.lastState = state;
+    return state;
+  }
+
+  /** The tab's address, safe to ask for after the renderer has gone. */
+  get url(): string {
+    return this.liveWc?.getURL() ?? this.lastState?.url ?? this.failedUrl ?? '';
   }
 
   favicon: string | null = null;
@@ -176,7 +228,7 @@ export class TabManager extends EventEmitter {
     if (idx === -1) return;
     const [tab] = this.tabs.splice(idx, 1);
 
-    const url = tab.wc.getURL();
+    const url = tab.url;
     if (/^https?:/i.test(url)) {
       this.closed.push({ url, index: idx });
       if (this.closed.length > 25) this.closed.shift();
@@ -195,7 +247,7 @@ export class TabManager extends EventEmitter {
       if (next) {
         next.view.setVisible(true);
         this.layoutActive();
-        next.wc.focus();
+        next.liveWc?.focus();
       }
     }
     this.emitUpdate();
@@ -209,7 +261,7 @@ export class TabManager extends EventEmitter {
     // Re-adding raises the view above the shell so it is not painted over.
     this.opts.window.contentView.addChildView(tab.view);
     this.layoutActive();
-    tab.wc.focus();
+    tab.liveWc?.focus();
     this.emitUpdate();
   }
 
@@ -224,7 +276,7 @@ export class TabManager extends EventEmitter {
   duplicate(id: string) {
     const tab = this.byId(id);
     if (!tab) return;
-    this.create(tab.wc.getURL());
+    this.create(tab.url);
   }
 
   /** Closed tabs, most recent last, for Ctrl+Shift+T. */
@@ -279,7 +331,7 @@ export class TabManager extends EventEmitter {
   /** URLs worth restoring on the next launch. */
   snapshot(): { urls: string[]; activeIndex: number } {
     const urls = this.tabs
-      .map((t) => t.wc.getURL())
+      .map((t) => t.url)
       .filter((u) => /^(https?|nabsun|smart):/i.test(u));
     return {
       urls,
@@ -366,6 +418,15 @@ export class TabManager extends EventEmitter {
     wc.on('render-process-gone', (_e, details) => {
       tab.error = `Page process ended: ${details.reason}`;
       update();
+    });
+
+    // A page can end its own webContents — `window.close()` at the end of an
+    // SSO or logout flow is the common case, and an expired session is what
+    // usually triggers one. Nothing went through `close()`, so without this the
+    // Tab stays in the list with a webContents that no longer exists, and the
+    // coalesced update walks it 16ms later and throws in the main process.
+    wc.once('destroyed', () => {
+      if (this.tabs.some((t) => t.id === tab.id)) this.close(tab.id);
     });
 
     wc.setWindowOpenHandler(({ url, disposition }) => {

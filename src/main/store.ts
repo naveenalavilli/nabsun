@@ -101,6 +101,8 @@ export const DEFAULT_SETTINGS: Settings = {
   blockAds: true,
   bookmarksBarVisible: true,
   savePasswords: true,
+  personalContext: true,
+  personalContextLocalOnly: true,
   mcpServers: {},
   chromeExtensions: [],
 };
