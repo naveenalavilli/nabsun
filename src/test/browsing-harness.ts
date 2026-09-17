@@ -59,6 +59,13 @@ function startServer(): Promise<{ server: Server; origin: string }> {
     } else if (req.url === '/page2') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<title>Page Two</title><h1>Second page</h1>');
+    } else if (req.url === '/self-closing') {
+      // What an expired session does at the end of an SSO or logout flow.
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(
+        `<title>Session over</title><h1>Signed out</h1>
+         <script>setTimeout(() => window.close(), 50);</script>`,
+      );
     } else if (req.url === '/login') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(
@@ -205,6 +212,32 @@ app.whenReady().then(async () => {
       `loading=${bg.wc.isLoading()} url=${JSON.stringify(bg.wc.getURL())}`,
     );
     tabs.close(bg.id);
+
+    /* ------------------------------------------ a page that closes itself -- */
+
+    // A page ending its own webContents used to leave the Tab in the list with
+    // `view.webContents` undefined. The next coalesced update walked it and
+    // threw "Cannot read properties of undefined (reading 'getURL')" out of a
+    // getter, in the main process, which Electron shows as a fatal dialog.
+    const tabCountBefore = tabs.all.length;
+    const selfClosing = tabs.create(`${origin}/self-closing`);
+    const selfClosingId = selfClosing.id;
+    const wentAway = await until(() => !tabs.all.some((t) => t.id === selfClosingId), 15_000);
+    check('a page that calls window.close() removes its own tab', wentAway, `tabs=${tabs.all.length}`);
+
+    // The crash was in the getter the shell reads on every update, so read it.
+    let statesThrew: string | null = null;
+    try {
+      void tabs.states;
+      // Give the coalesced update the 16ms it waits for, then read again: the
+      // original failure happened on that timer, not on the close itself.
+      await new Promise((r) => setTimeout(r, 80));
+      void tabs.states;
+    } catch (err: unknown) {
+      statesThrew = err instanceof Error ? err.message : String(err);
+    }
+    check('reading tab state after it survives the close', statesThrew === null, String(statesThrew));
+    check('the tab list is back to where it started', tabs.all.length === tabCountBefore, `${tabs.all.length} vs ${tabCountBefore}`);
 
     /* ---------------------------------------------------------- history -- */
 

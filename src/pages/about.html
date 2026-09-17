@@ -99,7 +99,7 @@
   <body>
     <div class="mark">N</div>
     <h1>Nabsun</h1>
-    <p class="version">Version {{APP_VERSION}}</p>
+    <p class="version">Version {{APP_VERSION}} · <a href="https://nabsun.com">nabsun.com</a></p>
     <p class="tagline">
       A browser for AI. The browser supplies the tools, the page state and the
       permissions; an agent is the program that runs in it — asking before it
@@ -134,6 +134,7 @@
         <tr><td>Profile &amp; config</td><td>{{USER_DATA}}</td></tr>
         <tr><td>Config file</td><td>{{CONFIG_FILE}}</td></tr>
         <tr><td>Plugins folder</td><td>{{PLUGINS_DIR}}</td></tr>
+        <tr><td>About you</td><td>{{SOUL_FILE}}</td></tr>
       </table>
     </section>
 
@@ -141,7 +142,8 @@
       Built on Chromium and Electron. Model access is provided by Anthropic,
       OpenAI or a local Ollama server, using credentials you supply — they are
       encrypted with your operating system's keychain and never leave this device
-      except to the provider you selected.
+      except to the provider you selected. More at
+      <a href="https://nabsun.com">nabsun.com</a>.
     </footer>
   </body>
 </html>
