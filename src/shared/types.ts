@@ -165,6 +165,29 @@ export const CLI_PROVIDERS: ProviderId[] = ['claude-cli', 'codex-cli'];
 /** Backends that need no credential: nothing to enter, nothing to store. */
 export const KEYLESS_PROVIDERS: ProviderId[] = ['local', 'ollama'];
 
+/**
+ * Does this backend run on the user's own hardware?
+ *
+ * The built-in model always does. Ollama usually does, but its base URL is
+ * editable — someone pointing it at a box in a datacentre is sending their
+ * prompts over the network, and a feature that promises "this never leaves your
+ * machine" has to notice that rather than trusting the provider name.
+ */
+export function isOnDevice(provider: ProviderId, baseUrls: { ollama: string }): boolean {
+  if (provider === 'local') return true;
+  if (provider !== 'ollama') return false;
+  return isLoopback(baseUrls.ollama);
+}
+
+export function isLoopback(rawUrl: string): boolean {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host === '::1' || /^127\./.test(host);
+  } catch {
+    return false;
+  }
+}
+
 export interface McpServerConfig {
   command: string;
   args: string[];
@@ -218,6 +241,22 @@ export interface Settings {
   bookmarksBarVisible: boolean;
   /** Offer to save passwords typed into sign-in forms. */
   savePasswords: boolean;
+  /**
+   * Give the assistant the contents of `soul.md` as background about the user.
+   *
+   * On by default, which is safe because the file ships with no real content:
+   * until the user writes something into it, nothing is added to the prompt.
+   */
+  personalContext: boolean;
+  /**
+   * Withhold `soul.md` from any model that is not running on this machine.
+   *
+   * On by default. The file is the most personal thing in the profile, so the
+   * safe default is the one that cannot surprise anyone: the built-in model and
+   * a loopback Ollama see it, a cloud provider or a signed-in CLI does not until
+   * the user says otherwise.
+   */
+  personalContextLocalOnly: boolean;
   mcpServers: Record<string, McpServerConfig>;
   /** Unpacked Chrome extensions, re-loaded on every launch. */
   chromeExtensions: ChromeExtensionEntry[];
@@ -228,6 +267,8 @@ export interface ConfigPaths {
   configFile: string;
   pluginsDir: string;
   sessionsDir: string;
+  /** `soul.md` — the user's personal-context file. */
+  soulFile: string;
 }
 
 export interface ConfigActionResult {

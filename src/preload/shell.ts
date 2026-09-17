@@ -84,6 +84,7 @@ const api: ShellApi = {
     reset: () => ipcRenderer.invoke(CH.configReset),
     paths: () => ipcRenderer.invoke(CH.configPaths),
     openFolder: () => ipcRenderer.send(CH.configOpenFolder),
+    openSoul: () => ipcRenderer.send(CH.soulOpen),
     bridge: () => ipcRenderer.invoke(CH.bridgeInfo),
   },
 

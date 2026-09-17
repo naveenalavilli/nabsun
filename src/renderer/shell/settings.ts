@@ -1,4 +1,5 @@
 import type { ProviderId, ProviderStatus, Settings } from '../../shared/types';
+import { isOnDevice } from '../../shared/types';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -407,6 +408,8 @@ export class SettingsView {
       ),
     );
 
+    set.append(this.soulField(s));
+
     if (s.alwaysAllowTools.length) {
       const reset = el('button', {
         className: 'ghost',
@@ -633,6 +636,77 @@ export class SettingsView {
     return set;
   }
 
+  /* --------------------------------------------------------- personal context */
+
+  /**
+   * soul.md — what the assistant knows about the person using it.
+   *
+   * The path is shown rather than hidden behind a button because the honest
+   * answer to "where does this live?" is a path on this machine, and seeing it
+   * is the reassurance. The hint says what actually happens to the contents:
+   * the file stays here, but it reaches whichever model is selected the same
+   * way the rest of the conversation does. Promising more than that would be a
+   * lie the app cannot keep.
+   */
+  private soulField(s: Settings): HTMLElement {
+    const wrap = el('div', {});
+
+    wrap.append(
+      checkbox(
+        'Tell the assistant about you',
+        s.personalContext,
+        'Reads soul.md and gives it to the assistant as background, so you are not introducing yourself every session.',
+        (v) => void this.patch({ personalContext: v }),
+      ),
+    );
+
+    const pathRow = el('div', { className: 'hint' });
+    pathRow.append(el('strong', { textContent: 'File: ' }), document.createTextNode('…'));
+    void window.nabsun.config.paths().then((paths) => {
+      pathRow.textContent = '';
+      pathRow.append(
+        el('strong', { textContent: 'File: ' }),
+        document.createTextNode(paths.soulFile),
+      );
+    });
+
+    const openBtn = el('button', { className: 'ghost', textContent: 'Edit soul.md' });
+    openBtn.addEventListener('click', () => window.nabsun.config.openSoul());
+
+    wrap.append(
+      checkbox(
+        'Only share it with models on this machine',
+        s.personalContextLocalOnly,
+        'The built-in model and a local Ollama server see it. Cloud providers and signed-in CLIs do not.',
+        (v) => void this.patch({ personalContextLocalOnly: v }),
+      ),
+    );
+
+    // Say what is happening right now, for the provider actually selected.
+    // A guarantee nobody can see the effect of is just a sentence.
+    const onDevice = isOnDevice(s.provider, s.baseUrls);
+    const sharing = !s.personalContext
+      ? 'Switched off — the assistant is told nothing about you.'
+      : s.personalContextLocalOnly && !onDevice
+        ? `Withheld from ${s.provider}: it does not run on this machine. Untick the box above to send it anyway.`
+        : `Shared with ${s.provider}${onDevice ? ', which runs on this machine' : ' — it leaves this machine with your turn'}.`;
+    const status = el('div', { className: 'hint', textContent: sharing });
+
+    const note = el('div', {
+      className: 'hint',
+      textContent:
+        'Nothing uploads this file. With the box above ticked it only ever reaches a model running on your own hardware. Keep passwords, card numbers and one-time codes out of it regardless.',
+    });
+
+    wrap.append(
+      field(
+        'Personal context',
+        el('div', {}, [pathRow, status, el('div', { className: 'inline' }, [openBtn]), note]),
+      ),
+    );
+    return wrap;
+  }
+
   /* -------------------------------------------------------------- advanced */
 
   private async advancedSection(): Promise<HTMLElement> {
@@ -697,6 +771,7 @@ export class SettingsView {
       ['Profile folder', paths.userData],
       ['Plugins', paths.pluginsDir],
       ['Chats', paths.sessionsDir],
+      ['About you (soul.md)', paths.soulFile],
     ] as const) {
       const row = el('div', { className: 'hint' });
       row.append(el('strong', { textContent: `${label}: ` }), document.createTextNode(value));
