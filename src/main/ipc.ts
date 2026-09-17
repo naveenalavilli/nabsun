@@ -853,6 +853,15 @@ export function handleCommand(deps: IpcDeps, command: string, arg?: unknown): vo
       win.toggleSidebar(true);
       win.send(CH.overlayCommand, { command: 'open-passwords' });
       break;
+    case 'open-downloads':
+      win.toggleSidebar(true);
+      win.send(CH.overlayCommand, { command: 'open-downloads' });
+      break;
+    // History is a page rather than a panel, so this matches what the menu and
+    // Ctrl+H already do instead of inventing a second place for it to live.
+    case 'open-history':
+      win.tabs.create('nabsun://history');
+      break;
     case 'bookmark-page': {
       const tab = win.tabs.active;
       if (!tab) break;

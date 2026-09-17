@@ -919,6 +919,34 @@ app.whenReady().then(async () => {
     history.removeBookmark(bm.id);
     check('a bookmark can be deleted', !history.bookmarks().some((b) => b.id === bm.id));
 
+    /* ------------------------------------- the palette reaches what it lists */
+
+    // Every command palette entry has to land somewhere. A palette row whose
+    // command no dispatcher handles looks completely normal and silently does
+    // nothing when chosen, which is how "Bookmarks" was unreachable: the entry
+    // did not exist, and the only route was an accelerator on a menu a
+    // frameless window never draws.
+    const overlaySrc = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'src', 'renderer', 'overlay', 'overlay.ts'),
+      'utf8',
+    );
+    const ipcSrc = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'src', 'main', 'ipc.ts'),
+      'utf8',
+    );
+    const listed = [...overlaySrc.matchAll(/command: '([a-z-]+)'/g)].map((m) => m[1]);
+    const unhandled = listed.filter((c) => !ipcSrc.includes(`case '${c}':`));
+    check(
+      'every command palette entry is handled by the dispatcher',
+      listed.length > 0 && unhandled.length === 0,
+      `listed=${listed.length} unhandled=${JSON.stringify(unhandled)}`,
+    );
+    check(
+      'the palette offers a way to manage bookmarks',
+      listed.includes('open-bookmarks'),
+      JSON.stringify(listed),
+    );
+
     /* ------------------------------------------------ chrome is clickable */
 
     // The tab strip doubles as the frameless window's drag handle, and a drag
