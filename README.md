@@ -208,8 +208,9 @@ Passwords are the browser's job, not the model's. If your OS has no working
 keychain, nothing is saved rather than being written somewhere recoverable.
 
 **Bookmarks.** ☆ or **Ctrl+D** to save, with a bookmarks bar under the address
-bar (**Ctrl+Shift+B** to toggle). The ★ button opens the manager: rename, move
-between folders, show or hide on the bar, delete.
+bar (**Ctrl+Shift+B** to toggle). The toolbar ☆ only saves; **★ All bookmarks**
+at the left of the bar opens the manager — rename, move between folders, show
+or hide on the bar, delete — as do **Ctrl+Shift+O** and the command palette.
 
 **Favourites on the new tab page** — bookmarks you keep on the bar, then your
 most-visited sites, one tile per site.

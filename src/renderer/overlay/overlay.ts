@@ -31,6 +31,10 @@ const COMMANDS: { title: string; subtitle: string; command: string; hint?: strin
   { title: 'Reload page', subtitle: 'Reload the current tab', command: 'reload', hint: 'Ctrl+R' },
   { title: 'Find in page', subtitle: 'Search the current page', command: 'find', hint: 'Ctrl+F' },
   { title: 'Toggle AI sidebar', subtitle: 'Show or hide the assistant', command: 'toggle-sidebar', hint: 'Ctrl+Shift+A' },
+  { title: 'Bookmarks', subtitle: 'Rename, move between folders, show on the bar, delete', command: 'open-bookmarks', hint: 'Ctrl+Shift+O' },
+  { title: 'History', subtitle: 'Everywhere you have been', command: 'open-history', hint: 'Ctrl+H' },
+  { title: 'Downloads', subtitle: 'Progress, pause, open, reveal in folder', command: 'open-downloads', hint: 'Ctrl+J' },
+  { title: 'Saved passwords', subtitle: 'Show, copy or delete a saved credential', command: 'open-passwords' },
   { title: 'Settings', subtitle: 'Provider, models, permissions, plugins', command: 'open-settings', hint: 'Ctrl+,' },
   { title: 'Developer tools', subtitle: 'Inspect the current page', command: 'devtools', hint: 'F12' },
 ];

@@ -476,7 +476,7 @@ async function renderSessions() {
 /* ------------------------------------------------------------------ boot -- */
 
 const chat = new ChatView(() => void renderSessions());
-const bookmarksView = new BookmarksView();
+const bookmarksView = new BookmarksView(() => showView('bookmarks'));
 const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
 const settingsView = new SettingsView((next) => {
