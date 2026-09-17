@@ -1,6 +1,6 @@
 # Nabsun
 
-**A browser for AI.**
+**A browser for AI.** — [nabsun.com](https://nabsun.com)
 
 Chromium as an execution environment for agents. The browser is the runtime: it
 supplies the tools, the page state, the permissions and the lifecycle. The agent
@@ -103,6 +103,36 @@ Nabsun hands the CLI this browser as an MCP tool server, so it can snapshot
 pages, click, type and extract here. The CLI's own file and shell tools stay
 disabled, and every browser action still goes through the approval gate.
 
+### Telling it about you — `soul.md`
+
+The assistant reads a Markdown file in your profile folder called `soul.md`:
+your name, your time zone, how you like answers, anything you would otherwise
+retype every session. **Settings → Assistant → Personal context** shows the
+exact path and opens it in your editor; `nabsun://about` lists it too.
+
+It is created empty of real content on first run and nothing rewrites it
+afterwards, so a line you delete stays deleted. The blank scaffolding is
+stripped before the model sees it, so an untouched file costs nothing.
+
+**By default it never leaves this machine.** *Only share it with models on this
+machine* is on out of the box, so `soul.md` reaches the built-in model and a
+local Ollama server and nothing else — a cloud provider or a signed-in CLI is
+given none of it. Settings names the provider and says whether the file is
+being shared or withheld, so the guarantee is visible rather than assumed.
+
+Untick that box and it travels with your turn like the rest of the
+conversation, to whichever provider you selected. Ollama counts as local only
+when its base URL is a loopback address: point it at a machine across the
+network and it is treated as remote, because it is.
+
+Keep passwords, card numbers and one-time codes out of the file regardless —
+the assistant is blocked from typing those into a page in any case, and it is
+told to say what it is filling in before it puts anything from the file into a
+form.
+
+Switch it off in Settings, or delete the file, and nothing is added to the
+prompt.
+
 ### Driving this browser from VS Code
 
 The same connection works in reverse. **Settings → Integrations → Connect an
@@ -178,8 +208,9 @@ Passwords are the browser's job, not the model's. If your OS has no working
 keychain, nothing is saved rather than being written somewhere recoverable.
 
 **Bookmarks.** ☆ or **Ctrl+D** to save, with a bookmarks bar under the address
-bar (**Ctrl+Shift+B** to toggle). The ★ button opens the manager: rename, move
-between folders, show or hide on the bar, delete.
+bar (**Ctrl+Shift+B** to toggle). The toolbar ☆ only saves; **★ All bookmarks**
+at the left of the bar opens the manager — rename, move between folders, show
+or hide on the bar, delete — as do **Ctrl+Shift+O** and the command palette.
 
 **Favourites on the new tab page** — bookmarks you keep on the bar, then your
 most-visited sites, one tile per site.

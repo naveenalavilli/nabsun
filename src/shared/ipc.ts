@@ -94,6 +94,7 @@ export const CH = {
   configReset: 'config:reset',
   configPaths: 'config:paths',
   configOpenFolder: 'config:open-folder',
+  soulOpen: 'soul:open',
 
   // external agent bridge
   bridgeInfo: 'bridge:info',
@@ -265,6 +266,8 @@ export interface ShellApi {
     reset(): Promise<Settings>;
     paths(): Promise<ConfigPaths>;
     openFolder(): void;
+    /** Opens soul.md in the user's editor, creating it first if absent. */
+    openSoul(): void;
     /** Connection details so an external agent can drive this browser. */
     bridge(): Promise<BridgeInfo>;
   };

@@ -17,6 +17,7 @@ import type {
 } from '../shared/types';
 import { CLI_PROVIDERS } from '../shared/types';
 import { DEFAULT_SETTINGS, NoSecureStorageError } from './store';
+import { SoulStore, soulPath } from './soul';
 import type { Agent } from './ai/agent';
 import type { ApprovalManager } from './ai/approvals';
 import type { QuestionManager } from './ai/questions';
@@ -267,10 +268,20 @@ export function registerIpc(deps: IpcDeps): void {
     configFile: path.join(app.getPath('userData'), 'settings.json'),
     pluginsDir: plugins.directory,
     sessionsDir: path.join(app.getPath('userData'), 'sessions'),
+    soulFile: soulPath(app.getPath('userData')),
   });
 
   ipcMain.handle(CH.configPaths, () => configPaths());
   ipcMain.on(CH.configOpenFolder, () => void shell.openPath(app.getPath('userData')));
+
+  // Opening soul.md writes the starter file first: the point of the button is
+  // to land the user in an editor, and opening a path that does not exist does
+  // nothing at all on every platform.
+  ipcMain.on(CH.soulOpen, () => {
+    const soul = new SoulStore(app.getPath('userData'));
+    soul.ensure();
+    void shell.openPath(soul.file);
+  });
 
   ipcMain.handle(CH.configExport, async (): Promise<ConfigActionResult> => {
     const result = await dialog.showSaveDialog(win.window, {
@@ -841,6 +852,15 @@ export function handleCommand(deps: IpcDeps, command: string, arg?: unknown): vo
     case 'open-passwords':
       win.toggleSidebar(true);
       win.send(CH.overlayCommand, { command: 'open-passwords' });
+      break;
+    case 'open-downloads':
+      win.toggleSidebar(true);
+      win.send(CH.overlayCommand, { command: 'open-downloads' });
+      break;
+    // History is a page rather than a panel, so this matches what the menu and
+    // Ctrl+H already do instead of inventing a second place for it to live.
+    case 'open-history':
+      win.tabs.create('nabsun://history');
       break;
     case 'bookmark-page': {
       const tab = win.tabs.active;

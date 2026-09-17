@@ -32,8 +32,11 @@ export class BookmarksView {
   private bar = $('#bookmarks-bar');
   private body = $('#bookmarks-body');
   private items: Bookmark[] = [];
+  /** Opens the manager view. Supplied by the shell, which owns view switching. */
+  private openManager: () => void = () => {};
 
-  constructor() {
+  constructor(openManager?: () => void) {
+    if (openManager) this.openManager = openManager;
     window.nabsun.data.onBookmarksChanged((items) => {
       this.items = items;
       this.renderBar();
@@ -57,6 +60,19 @@ export class BookmarksView {
   private renderBar() {
     this.bar.textContent = '';
     const onBar = this.items.filter((b) => b.onBar !== false);
+
+    // The only visible way into the manager. The window is frameless, so the
+    // menu holding "Bookmarks" is never drawn, and the ☆ in the toolbar saves
+    // rather than opens. Rendered before the early return so it is there even
+    // when nothing is bookmarked yet — which is exactly when someone goes
+    // looking for where bookmarks live.
+    const manage = el('button', {
+      className: 'bm-manage',
+      title: 'Manage bookmarks (Ctrl+Shift+O)',
+      textContent: '★ All bookmarks',
+    });
+    manage.addEventListener('click', () => this.openManager());
+    this.bar.append(manage);
 
     if (!onBar.length) {
       this.bar.append(

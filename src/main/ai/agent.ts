@@ -3,14 +3,17 @@ import type {
   AgentEvent,
   ChatMessage,
   ContentBlock,
+  Settings,
   ToolCallBlock,
   ToolSpec,
 } from '../../shared/types';
+import { isOnDevice } from '../../shared/types';
 import type { HistoryStore } from '../history';
 import type { SettingsStore } from '../store';
 import type { TabManager } from '../tabs';
 import { ApprovalManager } from './approvals';
 import { compactSystemPrompt, systemPrompt, turnContext } from './prompt';
+import { SoulStore } from '../soul';
 import { MissingCredentialsError, type ModelBlock, type ModelMessage, type Provider } from './provider';
 import type { QuestionManager } from './questions';
 import type { SessionStore } from './sessions';
@@ -62,21 +65,33 @@ const CORE_TOOLS = new Set([
  * It previously built its own, which is how a measurement can keep reporting a
  * number the product no longer produces.
  */
+/**
+ * A small context is a latency budget, not only a capacity limit: on a CPU
+ * backend prompt tokens are the dominant wait. Exported so the caller deciding
+ * how much of soul.md to read uses the same threshold the prompt does.
+ */
+export const isLeanBackend = (contextTokens?: number): boolean =>
+  (contextTokens ?? Infinity) <= 16_000;
+
 export function shapeRequest(opts: {
   contextTokens?: number;
   tools: ToolSpec[];
   vision: boolean;
+  /** `soul.md`, when the user keeps one and has not switched it off. */
+  soul?: string | null;
 }): { system: string; tools: ToolSpec[]; lean: boolean } {
-  // A small context is a latency budget, not only a capacity limit: on a CPU
-  // backend prompt tokens are the dominant wait.
-  const lean = (opts.contextTokens ?? Infinity) <= 16_000;
+  const lean = isLeanBackend(opts.contextTokens);
   const tools = opts.tools
     // Screenshots are pure cost where they cannot be seen: the bytes are
     // dropped downstream, and the schema is not free. `supportsVision()`
     // existed and nothing consulted it.
     .filter((t) => t.name !== 'browser_screenshot' || opts.vision)
     .filter((t) => !lean || CORE_TOOLS.has(t.name));
-  return { system: lean ? compactSystemPrompt() : systemPrompt(), tools, lean };
+  return {
+    system: lean ? compactSystemPrompt(opts.soul) : systemPrompt(opts.soul),
+    tools,
+    lean,
+  };
 }
 
 /** Older tool output is truncated when replayed, to bound context growth. */
@@ -130,6 +145,33 @@ export class Agent {
   private runs = new Map<string, Run>();
 
   constructor(private readonly deps: AgentDeps) {}
+
+  /**
+   * Whether soul.md may go to the backend this turn will use.
+   *
+   * Checked per turn rather than per session: switching provider mid-chat has
+   * to change the answer, or the guarantee lasts only until someone changes a
+   * dropdown.
+   */
+  private shareSoulWith(config: Settings): boolean {
+    if (!config.personalContext) return false;
+    if (!config.personalContextLocalOnly) return true;
+    return isOnDevice(config.provider, config.baseUrls);
+  }
+
+  /**
+   * Reads `soul.md` out of the profile folder.
+   *
+   * Built lazily from the path the agent already carries, so harnesses that
+   * construct an Agent keep working unchanged and an absent file simply reads
+   * as null. It cannot be a field initializer: those run before the
+   * constructor assigns `deps`.
+   */
+  private soulStore: SoulStore | null = null;
+  private get soul(): SoulStore {
+    this.soulStore ??= new SoulStore(this.deps.userDataPath);
+    return this.soulStore;
+  }
 
   isRunning(sessionId: string): boolean {
     return this.runs.has(sessionId);
@@ -488,10 +530,15 @@ export class Agent {
       let stepThinking = '';
 
       const model = config.models[config.provider];
+      // A small-context backend gets a correspondingly smaller slice of
+      // soul.md: on a CPU model the file would otherwise eat the budget the
+      // page itself needs.
+      const leanBackend = isLeanBackend(provider.contextTokens);
       const { system, tools: usableTools } = shapeRequest({
         contextTokens: provider.contextTokens,
         tools: this.toolSpecs(),
         vision: config.vision && provider.supportsVision(model),
+        soul: this.shareSoulWith(config) ? this.soul.read({ lean: leanBackend }) : null,
       });
       const budget = fitToContext(
         pruneHistory(working),
