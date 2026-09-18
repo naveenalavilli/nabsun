@@ -37,6 +37,7 @@ what programs running in it can do.
 
 [![verify](https://github.com/naveenalavilli/nabsun/actions/workflows/verify.yml/badge.svg)](https://github.com/naveenalavilli/nabsun/actions/workflows/verify.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![latest release](https://img.shields.io/github/v/release/naveenalavilli/nabsun?label=download&color=ff5b2c)](https://github.com/naveenalavilli/nabsun/releases/latest)
 
 > **Status:** working, and honestly documented. 241 automated checks run against
 > real Electron on every push. A live model turn has not been exercised in CI —
@@ -49,7 +50,37 @@ what programs running in it can do.
 
 ---
 
-## Quick start
+## Download
+
+**[Windows installer and portable build →](https://github.com/naveenalavilli/nabsun/releases/latest)**
+
+| File | What it is |
+|---|---|
+| `Nabsun-<version>-x64-setup.exe` | Installs, with a Start-menu entry and an uninstaller. |
+| `Nabsun-<version>-portable.exe` | One executable. Runs without installing. |
+| `SHA256SUMS.txt` | Checksums for both. |
+
+Both carry the built-in model, so they work offline the moment they start — no
+account, no API key, nothing to download afterwards. That is also why they are
+about 1.3 GB.
+
+Two things to expect:
+
+- **Windows SmartScreen will warn you.** These builds are not code-signed yet,
+  so you get "Windows protected your PC" — choose **More info → Run anyway**.
+  Verify what you downloaded first if you would rather be careful:
+  `Get-FileHash .\Nabsun-<version>-x64-setup.exe -Algorithm SHA256`, and compare
+  it against `SHA256SUMS.txt` on the release.
+- **Windows only, for now.** The macOS and Linux targets are configured but have
+  not been built — see [Known limits](#known-limits).
+
+Every release is built and verified by
+[the same workflow](.github/workflows/verify.yml) that runs on each push, from
+the tagged commit rather than from anyone's laptop.
+
+---
+
+## Build it yourself
 
 ```bash
 npm install
