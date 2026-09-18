@@ -29,7 +29,8 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "fetch:model": "node scripts/fetch-local-model.mjs",
     "verify:local": "node dist/test/local-harness.js",
-    "check:payload": "node scripts/check-release-payload.mjs"
+    "check:payload": "node scripts/check-release-payload.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

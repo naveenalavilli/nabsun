@@ -200,34 +200,47 @@ jobs:
 
       # ------------------------------------------------------------ release --
       # Workflow artifacts expire in 7 days and need a signed-in GitHub account,
-      # so they cannot be what anyone downloads. Pushing a `v*` tag turns the
-      # same verified build into a public Release instead. The installers are
-      # ~1.3 GB each: they are uploaded from the runner that built them, so the
-      # bytes never travel from a developer's machine.
-      - name: Check the tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/v')
+      # so they cannot be what anyone downloads. A release is how people get the
+      # installers, and it happens in exactly one situation: a version that has
+      # never been released lands on main. That means merging a version bump is
+      # the act that ships — there is no separate tag to remember, and nothing
+      # cut from a branch, because this only ever runs on a push to main.
+      #
+      # The installers are ~1.3 GB each and are uploaded from the runner that
+      # built them, so the bytes never travel from a developer's machine.
+      - name: Is this a version that has not shipped?
+        id: gate
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          TAG_NAME: ${{ github.ref_name }}
           PACKAGE_VERSION: ${{ steps.installers.outputs.version }}
         run: |
-          # A tag that disagrees with package.json would publish installers whose
-          # filenames and in-app version contradict the release they hang under.
-          $expected = "v$env:PACKAGE_VERSION"
-          if ($env:TAG_NAME -ne $expected) {
-            throw "Tag $env:TAG_NAME does not match package.json ($expected). Bump the version or retag."
+          $tag = "v$env:PACKAGE_VERSION"
+          # An existing tag means this version already shipped; every later merge
+          # that does not bump the version must not republish it.
+          $existing = git ls-remote --tags origin "refs/tags/$tag"
+          if ($existing) {
+            "$tag already exists - nothing to release. Bump the version to ship." | Write-Host
+            "release=false" >> $env:GITHUB_OUTPUT
+          } else {
+            "$tag is new - releasing." | Write-Host
+            "release=true" >> $env:GITHUB_OUTPUT
+            "tag=$tag" >> $env:GITHUB_OUTPUT
           }
-          "Tag $env:TAG_NAME matches package.json." | Write-Host
 
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.gate.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: Nabsun ${{ github.ref_name }}
+          # The tag is derived from package.json and created here, at the merge
+          # commit, so a tag can never disagree with the version it ships.
+          tag_name: ${{ steps.gate.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Nabsun ${{ steps.gate.outputs.tag }}
           draft: true
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            Windows installers for ${{ github.ref_name }}, built and verified by this workflow.
+            Windows installers for ${{ steps.gate.outputs.tag }}, built and verified by this workflow.
 
             | File | What it is |
             |---|---|
