@@ -39,7 +39,7 @@ what programs running in it can do.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![latest release](https://img.shields.io/github/v/release/naveenalavilli/nabsun?label=download&color=ff5b2c)](https://github.com/naveenalavilli/nabsun/releases/latest)
 
-> **Status:** working, and honestly documented. 241 automated checks run against
+> **Status:** 241 automated checks run against
 > real Electron on every push. A live model turn has not been exercised in CI —
 > see [Verification](#verification). Read [SECURITY.md](SECURITY.md) before
 > pointing it at accounts you care about.
