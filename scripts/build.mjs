@@ -129,17 +129,7 @@ async function main() {
 }
 
 function launchElectron() {
-  const electron = path.join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
-  const bin = fs.existsSync(electron) ? electron : 'electron';
-
-  // VS Code and other Electron hosts export ELECTRON_RUN_AS_NODE=1 to their
-  // child processes. Inherited, it makes electron.exe start as plain Node, so
-  // require('electron') yields the shim's path string instead of the API and
-  // the app dies on the first API call. Strip it for the child.
-  const env = { ...process.env, ELECTRON_ENABLE_LOGGING: '1' };
-  delete env.ELECTRON_RUN_AS_NODE;
-
-  const child = spawn(bin, [root], { stdio: 'inherit', env });
+  const child = spawn(process.execPath, [path.join(root, 'scripts', 'electron-run.mjs')], { stdio: 'inherit' });
   child.on('exit', (code) => process.exit(code ?? 0));
 }
 

@@ -28,7 +28,7 @@ import {
 } from '../main/ai/providers/cli';
 import { inlineCspHash } from '../main/internalPages';
 import type { ModelMessage } from '../main/ai/provider';
-import { parseLoginOutput } from '../main/integrations/cliAccounts';
+import { CliAccountManager, parseLoginOutput } from '../main/integrations/cliAccounts';
 
 let failures = 0;
 let skipped = 0;
@@ -351,6 +351,14 @@ function shipsNativeBinary(binName: string): boolean {
     return false;
   };
 
+  if (process.platform !== 'win32') {
+    let dir = path.dirname(fs.realpathSync(shim));
+    for (let depth = 0; depth < 5; depth++) {
+      if (fs.existsSync(path.join(dir, 'package.json'))) return walk(dir, 0);
+      dir = path.dirname(dir);
+    }
+    return false;
+  }
   return walk(path.join(path.dirname(shim), 'node_modules'), 0);
 }
 
@@ -431,6 +439,46 @@ function checkResolutionWithoutPath() {
   }
 }
 
+/** Finder has no Node on PATH; npm symlinks and bare Node scripts must work. */
+async function checkUnixNodeLaunchers() {
+  if (process.platform === 'win32') return;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-cli-'));
+  const oldPath = process.env.PATH;
+  try {
+    const script = path.join(dir, 'fixture.cjs');
+    fs.writeFileSync(script, '#!/usr/bin/env node\nconsole.log("fixture 1.2.3");\n', { mode: 0o755 });
+    const link = path.join(dir, 'fixture');
+    fs.symlinkSync(script, link);
+    const bare = path.join(dir, 'bare');
+    fs.copyFileSync(script, bare);
+    process.env.PATH = '/usr/bin:/bin';
+    clearBinCache();
+    for (const entry of [link, bare, script]) {
+      const launcher = resolveLauncher('fixture', entry);
+      const result = launcher && await run(launcher.command, [...launcher.args, '--version'], launcher.runAsNode);
+      check(`Unix Node launcher works without Node on PATH: ${path.basename(entry)}`,
+        result?.code === 0 && result.out.includes('fixture 1.2.3'), result?.err);
+    }
+    const loginDone = new Promise<boolean>((resolve) => {
+      const accounts = new CliAccountManager(() => link, event => {
+        if (event.done) resolve(event.ok === true);
+      });
+      void accounts.login('codex-cli', 'browser');
+    });
+    check('account sign-in launches a Node wrapper without Node on PATH', await loginDone);
+    const codex = resolveLauncher('codex', '');
+    if (codex) {
+      const result = await run(codex.command, [...codex.args, '--version'], codex.runAsNode);
+      check('installed Codex launches with Finder PATH', result.code === 0, result.err);
+    }
+  } finally {
+    if (oldPath === undefined) delete process.env.PATH;
+    else process.env.PATH = oldPath;
+    clearBinCache();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   checkLoginParsing();
   checkCodexParsing();
@@ -439,6 +487,7 @@ async function main() {
   checkHostInstructions();
   checkInternalPageCspHashing();
   checkResolutionWithoutPath();
+  await checkUnixNodeLaunchers();
 
   for (const [label, binName] of [
     ['Codex', 'codex'],

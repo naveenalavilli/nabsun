@@ -21,6 +21,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { buildEngineManifest, verifyEngineManifest, assertEngineStarts, preparePayload } from './engine-payload.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const vendor = path.join(root, 'vendor');
@@ -30,13 +31,19 @@ const vendor = path.join(root, 'vendor');
  * and the CUDA builds are an order of magnitude larger for hardware most users
  * do not have. llama.cpp still uses AVX2 where present.
  */
+const engineBuilds = {
+  'win32-x64': { archive: 'win-cpu-x64.zip', sha256: 'ae11c93008fd76943ce190a3f852097220d1237c20564554eec9012493e224d0', bytes: 18426564 },
+  'darwin-arm64': { archive: 'macos-arm64.tar.gz', sha256: '2518bf2deab30035bc4e3719cbde496bbcb2bce2e8ac3afe98e5f8b15cd0a04c', bytes: 11141699 },
+  'darwin-x64': { archive: 'macos-x64.tar.gz', sha256: '9b86171388e00ca22db895a2fa40329995865772a8a28d6e224e7d47fa705cfa', bytes: 11196747 },
+};
+const target = `${process.platform}-${process.arch}`;
+const build = engineBuilds[target];
 const ENGINE = {
   version: 'b10867',
-  url: 'https://github.com/ggml-org/llama.cpp/releases/download/b10867/llama-b10867-bin-win-cpu-x64.zip',
-  sha256: 'ae11c93008fd76943ce190a3f852097220d1237c20564554eec9012493e224d0',
-  bytes: 18426564,
+  ...build,
+  url: build ? `https://github.com/ggml-org/llama.cpp/releases/download/b10867/llama-b10867-bin-${build.archive}` : null,
   dir: path.join(vendor, 'llama'),
-  marker: 'llama-server.exe',
+  marker: process.platform === 'win32' ? 'llama-server.exe' : 'llama-server',
 };
 
 /**
@@ -163,15 +170,18 @@ async function fetchEngine() {
   // carried into a release. The manifest is written after a verified archive is
   // extracted, and re-checked on every run.
   const manifest = await readJson(manifestPath);
-  if (!force && manifest?.version === ENGINE.version) {
-    const drift = await verifyManifest(ENGINE.dir, manifest);
+  if (!force && manifest?.version === ENGINE.version && manifest?.target === target) {
+    const drift = await verifyEngineManifest(ENGINE.dir, manifest);
+    if (!drift.length) {
+      try { assertEngineStarts(server); } catch { drift.push('engine failed to start'); }
+    }
     if (!drift.length) {
       console.log(`engine: verified ${Object.keys(manifest.files).length} files (${ENGINE.version})`);
       return;
     }
     console.log(`engine: cache rejected — ${drift.slice(0, 3).join('; ')}`);
     await fs.rm(ENGINE.dir, { recursive: true, force: true });
-  } else if (manifest && manifest.version !== ENGINE.version) {
+  } else if (manifest && (manifest.version !== ENGINE.version || manifest.target !== target)) {
     console.log(`engine: replacing ${manifest.version} with ${ENGINE.version}`);
     await fs.rm(ENGINE.dir, { recursive: true, force: true });
   } else if (!force && (await exists(server))) {
@@ -207,51 +217,12 @@ async function fetchEngine() {
       await fs.rename(path.join(from, entry), path.join(ENGINE.dir, entry));
     }
   }
-  await fs.writeFile(manifestPath, JSON.stringify(await buildManifest(ENGINE.dir), null, 2), 'utf8');
+  const extracted = await buildEngineManifest(ENGINE.dir, { version: ENGINE.version, target });
+  const problems = await verifyEngineManifest(ENGINE.dir, extracted);
+  if (problems.length) throw new Error(problems.join('\n'));
+  assertEngineStarts(server);
+  await fs.writeFile(manifestPath, JSON.stringify(extracted, null, 2), 'utf8');
   console.log(`engine: ${server}`);
-}
-
-/** Hashes every extracted file, so the cache can be checked rather than trusted. */
-async function buildManifest(dir) {
-  const files = {};
-  for (const rel of await listFiles(dir, dir)) {
-    if (rel === '.manifest.json') continue;
-    const full = path.join(dir, rel);
-    files[rel] = { sha256: await digestOf(full), bytes: (await fs.stat(full)).size };
-  }
-  return { version: ENGINE.version, files };
-}
-
-/** Differences between a manifest and what is on disk. */
-async function verifyManifest(dir, manifest) {
-  const problems = [];
-  for (const [rel, expected] of Object.entries(manifest.files ?? {})) {
-    const full = path.join(dir, rel);
-    let size = -1;
-    try {
-      const stat = await fs.stat(full);
-      size = stat.isFile() ? stat.size : -1;
-    } catch {
-      problems.push(`missing ${rel}`);
-      continue;
-    }
-    if (size !== expected.bytes) {
-      problems.push(`${rel} is ${size} bytes, expected ${expected.bytes}`);
-      continue;
-    }
-    if ((await digestOf(full)) !== expected.sha256) problems.push(`${rel} digest mismatch`);
-  }
-  return problems;
-}
-
-async function listFiles(dir, root) {
-  const out = [];
-  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await listFiles(full, root)));
-    else if (entry.isFile()) out.push(path.relative(root, full).split(path.sep).join('/'));
-  }
-  return out;
 }
 
 async function readJson(file) {
@@ -401,30 +372,15 @@ async function fetchLicenses() {
 async function main() {
   await fs.mkdir(vendor, { recursive: true });
 
-  // The model is portable; the engine is not. Downloading a Windows build on
-  // macOS or Linux and calling it "ready" would produce a browser that fails on
-  // the first turn — the previous version printed a warning and then did
-  // exactly that. Fetch the weights, and be explicit about the missing half.
-  if (process.platform !== 'win32') {
-    await fetchModel();
-    await fetchLicenses();
-    console.log(
-      [
-        '',
-        `The pinned engine build (${ENGINE.version}) is Windows x64 only, so it was not`,
-        'downloaded. The weights above work anywhere.',
-        '',
-        'Install llama.cpp for this platform and set "Engine path" in',
-        'Settings → Models to its llama-server binary.',
-      ].join('\n'),
-    );
+  const complete = await preparePayload({
+    engineAvailable: Boolean(build), fetchEngine, fetchModel, fetchLicenses,
+  });
+  if (!complete) {
+    console.log(`\nModel weights and licences are ready for ${target}. No bundled engine is available.\n` +
+      'Install llama.cpp for this platform and set Engine path in Settings → Models to its llama-server binary.');
     process.exitCode = 1;
     return;
   }
-
-  await fetchEngine();
-  await fetchModel();
-  await fetchLicenses();
   console.log('\nReady. The local model is used by default; no network needed from here.');
 }
 

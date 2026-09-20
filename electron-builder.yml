@@ -34,6 +34,8 @@ extraResources:
 # Destinations use null to disable publishing; "never" is only a CLI policy.
 publish: null
 
+beforePack: ./scripts/check-build-target.cjs
+
 asar: true
 # A child process cannot be spawned from inside an asar archive, and the MCP
 # server is spawned by the agent CLIs, so it ships unpacked.
@@ -65,12 +67,14 @@ nsis:
 portable:
   artifactName: Nabsun-${version}-portable.${ext}
 
+# Build the host architecture; vendor/llama must match it.
 mac:
+  # Ad-hoc signing is required for a runnable local Apple silicon build.
+  # Override with a Developer ID identity for notarized distribution.
+  identity: "-"
   target:
     - target: dmg
-      arch: [x64, arm64]
     - target: zip
-      arch: [x64, arm64]
   icon: build/icon.png
   category: public.app-category.productivity
   artifactName: Nabsun-${version}-${arch}.${ext}
