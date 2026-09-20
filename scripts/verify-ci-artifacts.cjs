@@ -52,14 +52,25 @@ test('successful package jobs must upload both installers and checksums on every
   assert.ok(job.steps.indexOf(installers) < job.steps.indexOf(upload));
 });
 
-test('the workflow generates correct checksums for both installers', t => {
+/** Everything a release ships, as the checksum step expects to find it. */
+const ARTIFACTS = [
+  'Nabsun-0.0.0-ci-x64-setup.exe',
+  'Nabsun-0.0.0-ci-portable.exe',
+  // Built on the macOS runner and downloaded into release/ before this step.
+  'Nabsun-0.0.0-ci-arm64.zip',
+];
+
+test('the workflow generates correct checksums for every artifact it ships', t => {
   const dir = fixture(t);
-  for (const suffix of ['x64-setup', 'portable']) fs.writeFileSync(path.join(dir, `release/Nabsun-0.0.0-ci-${suffix}.exe`), suffix);
+  for (const name of ARTIFACTS) fs.writeFileSync(path.join(dir, 'release', name), name);
   const result = runStep(dir, installers);
   assert.equal(result.status, 0, result.stderr || String(result.error));
   const hashes = fs.readFileSync(path.join(dir, 'release/SHA256SUMS.txt'), 'utf8');
-  for (const suffix of ['x64-setup', 'portable']) {
-    assert.ok(hashes.includes(`${createHash('sha256').update(suffix).digest('hex')}  Nabsun-0.0.0-ci-${suffix}.exe`));
+  for (const name of ARTIFACTS) {
+    assert.ok(
+      hashes.includes(`${createHash('sha256').update(name).digest('hex')}  ${name}`),
+      `no checksum for ${name} in:\n${hashes}`,
+    );
   }
   assert.match(fs.readFileSync(path.join(dir, 'outputs.txt'), 'utf8'), /version=0\.0\.0-ci/);
 });
@@ -74,6 +85,20 @@ test('a missing or empty portable installer fails even if setup exists', t => {
     assert.match(result.stderr, empty ? /Installer is empty/ : /Expected installer missing/);
     assert.equal(fs.existsSync(path.join(dir, 'outputs.txt')), false);
   }
+});
+
+test('a missing macOS archive fails the release, like a missing installer', t => {
+  // The archive is built on another runner and downloaded in. If that job is
+  // removed or its upload silently stops matching, the release must fail rather
+  // than quietly go out Windows-only.
+  const dir = fixture(t);
+  for (const name of ARTIFACTS.filter(n => n.endsWith('.exe'))) {
+    fs.writeFileSync(path.join(dir, 'release', name), name);
+  }
+  const result = runStep(dir, installers);
+  assert.equal(result.status, 1, String(result.error));
+  assert.match(result.stderr, /Expected installer missing/);
+  assert.match(result.stderr, /arm64\.zip/);
 });
 
 test('the summary links successful uploads and reports failed uploads honestly', t => {
