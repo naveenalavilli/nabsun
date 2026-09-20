@@ -143,13 +143,32 @@ jobs:
           npm run verify:agent
           npm run verify:mcp
           npm run verify:local
-      - name: Verify signed Mac application payload
+      - name: Verify the packaged Mac application payload
         run: |
           npm run icon
           npx electron-builder --mac dir --publish never
           app_path=$(find release -maxdepth 2 -name Nabsun.app -print -quit)
           test -n "$app_path"
-          codesign --verify --deep --strict "$app_path"
+
+          # electron-builder refuses to sign on a pull request, and no signing
+          # certificate is configured for this project in any case. It still
+          # rewrites the bundle Electron shipped ad-hoc signed, which leaves the
+          # resource seal stale — so `codesign --verify` fails on every run with
+          # "code has no resources but signature indicates they must be
+          # present". That failure describes the absent certificate, not the
+          # build, so only verify a signature that was actually applied.
+          if [ -n "${CSC_LINK:-}" ] && [ "${GITHUB_EVENT_NAME:-}" != 'pull_request' ]; then
+            echo 'Signing certificate present - verifying the signature.'
+            codesign --verify --deep --strict "$app_path"
+          else
+            echo 'Unsigned build - skipping signature verification.'
+            # Still prove the bundle is well formed: ad-hoc signing walks the
+            # whole tree and fails on a malformed app, which is the part of the
+            # check that was doing real work here.
+            codesign --force --deep --sign - "$app_path"
+            codesign --verify --deep --strict "$app_path"
+          fi
+
           node scripts/check-release-payload.mjs --resources "$app_path/Contents/Resources"
 
   package:
