@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { BrowserWindow, Menu, app, ipcMain, protocol, session, shell } from 'electron';
+import { Menu, app, ipcMain, protocol, session, shell } from 'electron';
 import { CH } from '../shared/ipc';
 import type { ProviderId } from '../shared/types';
 import { Agent } from './ai/agent';
@@ -67,6 +67,8 @@ if (!app.requestSingleInstanceLock()) {
 app.setName('Nabsun');
 
 let appWindow: AppWindow | null = null;
+let quitting = false;
+app.on('before-quit', () => { quitting = true; });
 
 /*
  * Before Electron initialises the profile, not merely before the stores open.
@@ -200,6 +202,14 @@ async function boot() {
 
   const win = new AppWindow(settings, history);
   appWindow = win;
+  // Keep the runtime and its IPC handlers alive when the Mac window closes.
+  // Dock activation restores the same window instead of booting a second runtime.
+  win.window.on('close', (event) => {
+    if (process.platform === 'darwin' && !quitting) {
+      event.preventDefault();
+      win.window.hide();
+    }
+  });
 
   approvals.setEmitter((req) => win.send(CH.agentApprovalRequest, req));
   questions.setEmitter((q) => win.send(CH.agentQuestion, q));
@@ -524,6 +534,7 @@ function switchTab(deps: IpcDeps, change: () => void): void {
 function buildMenu(deps: IpcDeps) {
   const run = (command: string) => () => handleCommand(deps, command);
   const menu = Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
     {
       label: 'File',
       submenu: [
@@ -649,7 +660,7 @@ function buildMenu(deps: IpcDeps) {
         { type: 'separator' },
         {
           label: 'History',
-          accelerator: 'CmdOrCtrl+H',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Y' : 'Ctrl+H',
           click: () => deps.win.tabs.create('nabsun://history'),
         },
         {
@@ -734,7 +745,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (!appWindow && BrowserWindow.getAllWindows().length === 0) void boot();
+  if (appWindow) {
+    appWindow.window.show();
+    appWindow.window.focus();
+  }
 });
 
 

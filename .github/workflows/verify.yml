@@ -1,4 +1,4 @@
-﻿name: verify
+name: verify
 
 on:
   push:
@@ -41,6 +41,8 @@ jobs:
         run: ./scripts/ci-run.ps1 typecheck
       - name: Verify CI configuration and artifacts
         run: node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
+      - name: Verify engine payload validation
+        run: npm run verify:payload
       - name: Build
         run: ./scripts/ci-run.ps1 build
       - name: Verify CLI launching
@@ -99,9 +101,79 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  verify-macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm run verify:payload
+      - run: npm run build
+      - name: Verify Unix CLI launching with Node and Electron
+        run: |
+          npm run verify:cli
+          node scripts/electron-run.mjs dist/test/cli-harness.js
+      - uses: actions/cache@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs', 'scripts/engine-payload.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Fetch and verify native payload
+        timeout-minutes: 20
+        run: |
+          npm run fetch:model
+          npm run check:payload
+      - name: Verify browser, agents and local inference
+        timeout-minutes: 15
+        env:
+          NABSUN_REQUIRE_LOCAL: '1'
+        run: |
+          npm run verify:browse
+          npm run verify:page
+          npm run verify:agent
+          npm run verify:mcp
+          npm run verify:local
+      - name: Verify the packaged Mac application payload
+        run: |
+          npm run icon
+          npx electron-builder --mac dir --publish never
+          app_path=$(find release -maxdepth 2 -name Nabsun.app -print -quit)
+          test -n "$app_path"
+
+          # electron-builder refuses to sign on a pull request, and no signing
+          # certificate is configured for this project in any case. It still
+          # rewrites the bundle Electron shipped ad-hoc signed, which leaves the
+          # resource seal stale — so `codesign --verify` fails on every run with
+          # "code has no resources but signature indicates they must be
+          # present". That failure describes the absent certificate, not the
+          # build, so only verify a signature that was actually applied.
+          if [ -n "${CSC_LINK:-}" ] && [ "${GITHUB_EVENT_NAME:-}" != 'pull_request' ]; then
+            echo 'Signing certificate present - verifying the signature.'
+            codesign --verify --deep --strict "$app_path"
+          else
+            echo 'Unsigned build - skipping signature verification.'
+            # Still prove the bundle is well formed: ad-hoc signing walks the
+            # whole tree and fails on a malformed app, which is the part of the
+            # check that was doing real work here.
+            codesign --force --deep --sign - "$app_path"
+            codesign --verify --deep --strict "$app_path"
+          fi
+
+          node scripts/check-release-payload.mjs --resources "$app_path/Contents/Resources"
+
   package:
     runs-on: windows-2022
-    needs: verify
+    needs: [verify, verify-macos]
     timeout-minutes: 60
     # Only this job may write, and only the release step below uses it. The
     # workflow default stays `contents: read`.

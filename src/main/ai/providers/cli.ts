@@ -209,6 +209,19 @@ export function resolveLauncher(binName: string, override: string): Launcher | n
   if (!direct || !fs.existsSync(direct)) return null;
 
   return cachedLauncher(direct, () => {
+    // Unix npm commands are extensionless symlinks to a Node script. Finder's
+    // PATH omits Node, so executing that symlink fails at /usr/bin/env node.
+    // Resolve the script first, then reuse native discovery or our own runtime.
+    if (process.platform !== 'win32') {
+      const target = fs.realpathSync(direct);
+      if (isScript(target) || hasNodeShebang(target)) {
+        return nativeBinaryFor(target, binName) ?? {
+          command: process.execPath, args: [target], runAsNode: true,
+        };
+      }
+      return { command: direct, args: [], runAsNode: false };
+    }
+
     const ext = path.extname(direct).toLowerCase();
     if (ext === '.exe' || ext === '') return { command: direct, args: [], runAsNode: false };
 
@@ -233,6 +246,23 @@ export function resolveLauncher(binName: string, override: string): Launcher | n
 }
 
 const isScript = (file: string) => /\.(js|cjs|mjs)$/i.test(file);
+
+/** Read only the header: a native CLI can be hundreds of megabytes. */
+function hasNodeShebang(file: string): boolean {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const head = Buffer.alloc(256);
+    const length = fs.readSync(fd, head, 0, head.length, 0);
+    const line = head.subarray(0, length).toString('utf8').split(/\r?\n/, 1)[0];
+    return /^#!\s*(?:\/usr\/bin\/env\s+(?:-S\s+)?node|\/[^\s]*\/node)(?:\s|$)/.test(line);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 
 /**
  * Resolution now searches a package tree and runs what it finds, which is far

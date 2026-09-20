@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyEngineManifest, assertEngineStarts } from './engine-payload.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const allowMissing = process.argv.includes('--allow-missing-model');
@@ -31,6 +32,7 @@ const asar = resources ? await import('@electron/asar') : null;
 
 /** Things whose absence changes what the product is, not merely how it looks. */
 const REQUIRED = [
+  ...(process.platform === 'win32' ? [
   {
     // A ~9 KB launcher: this build splits the server into a stub plus a DLL,
     // so a size threshold here would only encode a wrong assumption. The
@@ -49,6 +51,11 @@ const REQUIRED = [
     why: 'the ggml runtime the engine loads',
     minBytes: 100_000,
   },
+  ] : [
+    { file: 'vendor/llama/llama-server', why: 'the native inference engine launcher', minBytes: 1_000 },
+    { file: 'vendor/llama/libllama-server-impl.dylib', why: 'the native server implementation', minBytes: 1_000_000 },
+    { file: 'vendor/llama/libggml-base.dylib', why: 'the native ggml runtime', minBytes: 100_000 },
+  ]),
   {
     file: 'vendor/models/Qwen3-1.7B-Q4_K_M.gguf',
     why: 'the default model weights',
@@ -77,6 +84,16 @@ const REQUIRED = [
 ];
 
 const problems = [];
+try {
+  const manifest = JSON.parse(fs.readFileSync(path.join(resources ?? root, 'vendor/llama/.manifest.json'), 'utf8'));
+  const engineDir = path.join(resources ?? root, 'vendor/llama');
+  // Signing changes Mach-O bytes; check links here and probe the signed loader.
+  problems.push(...await verifyEngineManifest(engineDir, manifest, { linksOnly: true }));
+  if (manifest.target !== `${process.platform}-${process.arch}`) problems.push('engine architecture does not match this build; run npm run fetch:model');
+  if (process.platform !== 'win32') fs.accessSync(path.join(resources ?? root, 'vendor/llama/llama-server'), fs.constants.X_OK);
+} catch {
+  problems.push('missing engine manifest or non-executable engine; run npm run fetch:model');
+}
 for (const item of REQUIRED) {
   const full = path.join(resources ?? root, item.file);
   let size = -1;
@@ -93,6 +110,14 @@ for (const item of REQUIRED) {
   if (size < 0) problems.push(`missing  ${item.file}  — ${item.why}`);
   else if (size < item.minBytes) {
     problems.push(`too small ${item.file}  (${size} bytes) — ${item.why}`);
+  }
+}
+
+if (!problems.length) {
+  try {
+    assertEngineStarts(path.join(resources ?? root, 'vendor/llama', process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'));
+  } catch (err) {
+    problems.push(`inference engine cannot start: ${err.message}`);
   }
 }
 

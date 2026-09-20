@@ -1,7 +1,7 @@
 {
   "name": "nabsun",
   "productName": "Nabsun",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
   "main": "dist/main/index.js",
   "author": "Naveen Kumar Alavilli",
@@ -14,7 +14,7 @@
     "start": "npm run build && node scripts/electron-run.mjs",
     "setup": "node node_modules/electron/install.js",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run build && npm run verify:cli && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
+    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
     "verify:browse": "node scripts/electron-run.mjs dist/test/browsing-harness.js",
     "verify:cli": "node dist/test/cli-harness.js",
     "verify:page": "node scripts/electron-run.mjs scripts/verify-bridge.cjs",
@@ -24,13 +24,14 @@
     "dist": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder",
     "dist:win": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --win",
     "dist:win:ci": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --win --config electron-builder.ci.yml --publish never",
-    "dist:mac": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --mac",
+    "dist:mac": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --mac --publish never",
     "dist:linux": "node scripts/check-release-payload.mjs && npm run build && npm run icon && electron-builder --linux",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "fetch:model": "node scripts/fetch-local-model.mjs",
     "verify:local": "node dist/test/local-harness.js",
     "check:payload": "node scripts/check-release-payload.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "verify:payload": "node --test scripts/verify-engine-payload.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

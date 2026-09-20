@@ -21,7 +21,7 @@ const local = path.join(
   'node_modules',
   'electron',
   'dist',
-  process.platform === 'win32' ? 'electron.exe' : 'electron',
+  process.platform === 'win32' ? 'electron.exe' : process.platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron' : 'electron',
 );
 if (!fs.existsSync(local)) {
   console.error(
@@ -34,4 +34,5 @@ const env = { ...process.env, ELECTRON_ENABLE_LOGGING: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 
 const child = spawn(local, [entry, ...process.argv.slice(3)], { stdio: 'inherit', env });
-child.on('exit', (code) => process.exit(code ?? 0));
+child.on('error', (err) => { console.error(err); process.exit(1); });
+child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

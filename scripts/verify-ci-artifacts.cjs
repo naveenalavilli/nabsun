@@ -34,7 +34,15 @@ function runStep(dir, step, env = {}) {
 }
 
 test('successful package jobs must upload both installers and checksums on every trigger', () => {
-  assert.equal(job.needs, 'verify');
+  // `needs` is a bare string with one dependency and a list with several, so
+  // adding a platform to the gate changed its type and failed a test that is
+  // really about uploads. What matters is that packaging waits for the
+  // verification jobs, not how many there are.
+  const needs = [job.needs].flat();
+  assert.ok(
+    needs.includes('verify'),
+    `package must wait for the verify job; needs = ${JSON.stringify(job.needs)}`,
+  );
   assert.equal(upload.if, undefined);
   assert.notEqual(upload['continue-on-error'], true);
   assert.equal(upload.with['if-no-files-found'], 'error');

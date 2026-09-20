@@ -71,8 +71,8 @@ Two things to expect:
   Verify what you downloaded first if you would rather be careful:
   `Get-FileHash .\Nabsun-<version>-x64-setup.exe -Algorithm SHA256`, and compare
   it against `SHA256SUMS.txt` on the release.
-- **Windows only, for now.** The macOS and Linux targets are configured but have
-  not been built — see [Known limits](#known-limits).
+- **macOS:** a native Apple silicon build can be created locally using the
+  instructions below. Linux packaging remains unverified.
 
 Every release is built and verified by
 [the same workflow](.github/workflows/verify.yml) that runs on each push, from
@@ -445,17 +445,39 @@ servers are loaded, and every path the app writes to.
 
 ```bash
 npm run dist:win     # NSIS installer + portable .exe
-npm run dist:mac     # DMG + ZIP, x64 and arm64
+npm run dist:mac     # DMG + ZIP for the current Mac architecture
 npm run dist:linux   # AppImage
 ```
 
-Output lands in `release/`. Builds are unsigned; Windows SmartScreen and macOS
-Gatekeeper will warn until you add signing certificates to
-`electron-builder.yml`.
+Output lands in `release/`. Windows builds are unsigned. Mac builds use local
+ad-hoc signing; public distribution still requires a Developer ID certificate
+and notarization.
 
 **macOS builds must run on macOS** — the DMG and codesigning steps need Apple
-tooling, so `dist:mac` cannot be produced from Windows or Linux. The
-configuration is complete, including hardened-runtime entitlements.
+tooling, so `dist:mac` cannot be produced from Windows or Linux. Run:
+
+```bash
+npm ci
+npm run setup
+npm run fetch:model
+npm run dist:mac
+```
+
+On Apple silicon this creates `release/Nabsun-0.1.6-arm64.dmg` and `.zip`,
+including the offline model. Open the DMG, drag Nabsun to Applications, and
+launch it. The unpacked app is also at `release/mac-arm64/Nabsun.app`.
+If macOS blocks a downloaded copy, use **System Settings → Privacy & Security →
+Open Anyway**. These local builds are not Apple-notarized.
+
+On Linux, `fetch:model` downloads the portable weights and licences, then exits
+with code 1 because no bundled Linux engine is configured. Install llama.cpp
+separately and set **Engine path** in **Settings → Models**. Linux release
+packaging remains unsupported.
+
+The engine download is pinned and verified for the host architecture. Build Intel
+artifacts on an Intel Mac; packaging refuses a mismatched engine. Intel support
+is configured but has not been runtime-tested. Closing the Mac window keeps the
+app running; click its Dock icon to reopen it, or use Command-Q to quit.
 
 ---
 
@@ -487,7 +509,8 @@ Five harnesses, 99 checks, no API key required:
 
 ### Not yet verified
 
-**A live model turn has not been exercised end to end.** This machine has no
+**The bundled local model has passed live tool-call tests on Apple silicon.**
+Cloud-provider turns remain unverified. The original verification machine had no
 provider credentials, no local Ollama, and no `claude` CLI, so the network paths —
 streaming, each provider's tool schema, prompt caching — are written against the
 current SDKs and type-checked but never run. The Codex CLI is installed here, but
@@ -527,8 +550,8 @@ Two things to be aware of if you build or ship this:
 ## Known limits
 
 - One window. `AppWindow` is a class, but nothing creates a second one yet.
-- Builds are unsigned, and there is no auto-update.
-- macOS installers are configured but have not been built (needs macOS).
+- Windows builds are unsigned; Mac builds are ad-hoc signed without notarization. There is no auto-update.
+- Apple silicon macOS builds are locally tested; Intel macOS and Linux remain unverified.
 - Chrome extensions (`chrome.*`) are not supported; use plugins or MCP.
 - No tab groups, split view, profiles, sync, or private/incognito windows.
 - Autofill covers passwords only — not addresses or payment methods.
