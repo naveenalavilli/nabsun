@@ -31,6 +31,16 @@ export function nativeInstaller(id: NativeCliId, platform = process.platform) {
   };
 }
 
+/** Windows PowerShell must not inherit incompatible PowerShell 7 modules via Node. */
+export function nativeInstallerEnv(source: NodeJS.ProcessEnv = process.env, platform = process.platform): NodeJS.ProcessEnv {
+  const env = { ...source };
+  if (platform === 'win32') {
+    // Let powershell.exe rebuild its own defaults. Environment names are case-insensitive.
+    for (const key of Object.keys(env)) if (key.toLowerCase() === 'psmodulepath') delete env[key];
+  }
+  return env;
+}
+
 /** Download only vendor-hosted bootstrap scripts, including every redirect. */
 export async function downloadInstaller(url: string, signal: AbortSignal, fetcher: typeof fetch = fetch): Promise<string> {
   const hosts = new Set(['chatgpt.com', 'releases.openai.com', 'claude.ai', 'downloads.claude.ai']);
@@ -113,7 +123,7 @@ export async function installNativeCli(id: NativeCliId, signal: AbortSignal, pro
         windowsHide: true, detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {
-          ...process.env, CODEX_NON_INTERACTIVE: '1', NO_COLOR: '1', FORCE_COLOR: '0',
+          ...nativeInstallerEnv(), CODEX_NON_INTERACTIVE: '1', NO_COLOR: '1', FORCE_COLOR: '0',
           // Ignore inherited installer overrides: setup and selection must agree.
           ...(id === 'codex-cli' ? { CODEX_INSTALL_DIR: path.dirname(executable), CODEX_RELEASE: 'latest' } : {}),
         },

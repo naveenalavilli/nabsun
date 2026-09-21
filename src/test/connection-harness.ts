@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { CliAccountManager, isSignInUrl, type AccountRunEvent } from '../main/integrations/cliAccounts';
-import { downloadInstaller, nativeInstaller, stopCliProcess } from '../main/integrations/nativeCli';
+import { downloadInstaller, nativeInstaller, nativeInstallerEnv, stopCliProcess } from '../main/integrations/nativeCli';
 import { clearBinCache, resolveBin, type Launcher } from '../main/ai/providers/cli';
 import { listAgentExtensions } from '../main/integrations/agentExtensions';
 
@@ -19,6 +20,11 @@ async function main() {
     }
     pass(platform + ' uses official native setup without npm');
   }
+  const inherited = { PSModulePath: 'PowerShell 7 modules', psmodulepath: 'alternate casing', PATH: 'keep', HTTPS_PROXY: 'keep-proxy' };
+  assert.deepEqual(nativeInstallerEnv(inherited, 'win32'), { PATH: 'keep', HTTPS_PROXY: 'keep-proxy' });
+  assert.deepEqual(nativeInstallerEnv(inherited, 'linux'), inherited);
+  assert.equal(inherited.PSModulePath, 'PowerShell 7 modules');
+  pass('installer environment isolates Windows module paths without changing parent or Unix environments');
   const signal = new AbortController().signal;
   const mockFetch = (fn: (url: string) => Response) => (async (url: unknown) => fn(String(url))) as typeof fetch;
   assert.equal(await downloadInstaller('https://claude.ai/install.sh', signal, mockFetch(() => new Response('#!/bin/bash\necho fixture'))), '#!/bin/bash\necho fixture');
@@ -33,6 +39,28 @@ async function main() {
   pass('only exact provider HTTPS sign-in origins accepted');
 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nabsun-connect-test-'));
+  if (process.platform === 'win32') {
+    const modules = path.join(dir, 'Modules');
+    const utility = path.join(modules, 'Microsoft.PowerShell.Utility');
+    const manifest = path.join(utility, 'Microsoft.PowerShell.Utility.psd1');
+    const payload = path.join(dir, 'hash-fixture.txt');
+    await fs.mkdir(utility, { recursive: true });
+    // Simulate a newer PowerShell module shadowing the Windows PowerShell cmdlets.
+    await fs.writeFile(manifest, "@{ ModuleVersion = '99.0'; PowerShellVersion = '99.0'; FunctionsToExport = @('Get-FileHash') }");
+    await fs.writeFile(payload, 'checksum fixture');
+    const inheritedEnv = { ...process.env, PSModulePath: modules + path.delimiter + (process.env.PSModulePath ?? '') };
+    const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', "$ErrorActionPreference='Stop'; (Get-FileHash -LiteralPath $env:NABSUN_HASH_FIXTURE -Algorithm SHA256).Hash"];
+    const options = { windowsHide: true, timeout: 30_000, encoding: 'utf8' as const, env: { ...inheritedEnv, NABSUN_HASH_FIXTURE: payload } };
+    try {
+      assert.throws(() => execFileSync(nativeInstaller('codex-cli').command, args, { ...options, stdio: 'pipe' }));
+      const result = execFileSync(nativeInstaller('codex-cli').command, args, { ...options, env: nativeInstallerEnv(options.env) });
+      assert.equal(result.trim().toLowerCase(), createHash('sha256').update('checksum fixture').digest('hex'));
+      pass('Windows installer can verify checksums despite incompatible inherited modules');
+    } finally {
+      await fs.unlink(manifest); await fs.unlink(payload);
+      await fs.rmdir(utility); await fs.rmdir(modules);
+    }
+  }
   const fixture = path.join(dir, 'cli.cjs');
   const state = path.join(dir, 'signed-in');
   if (process.platform === 'win32') {
