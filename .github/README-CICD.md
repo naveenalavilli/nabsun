@@ -1,63 +1,63 @@
-# CI
+# CI and releases
 
-`verify.yml` runs on main/master pushes, pull requests, `v*` tags and manual
-dispatches. Both jobs use Windows Server 2022 and Node 22. The `package` job
-requires `verify` to succeed; neither job publishes a GitHub release.
+[verify.yml](workflows/verify.yml) runs on main/master pushes, pull requests,
+`v*` tags, and manual dispatches. Jobs use Node.js 22.
 
-The verification job installs dependencies and Electron, then runs typechecking,
-the build and each of the six harnesses as separate steps. The local inference
-step requires the bundled model; missing weights fail rather than skip.
+## Verification and packaging
 
-The publishing regression tests capture electron-builder's logger in memory.
-Its Unicode stdout markers can trigger Node 22's test-worker deserialization
-bug (nodejs/node#65934). Assertions and test-runner failure output remain active;
-the capture also checks the expected invalid-publisher diagnostic.
+| Job | Purpose |
+| --- | --- |
+| `verify-connections` | CLI installation, authentication interface, cleanup, and UI checks on Windows, macOS, and Linux |
+| `verify` | Windows build, type checking, regression checks, and local inference |
+| `verify-macos` | macOS verification, local inference, and packaged application checks |
+| `package-macos` | Apple silicon ZIP; requires macOS and connection checks |
+| `package` | Windows setup/portable builds and combined artifacts; requires Windows, macOS, Mac packaging, and connection checks |
 
-Only model weights are cached. The fetch script verifies their pinned digest
-after restoration. The smaller engine archive is fetched afresh and verified
-against its pinned digest in each job. Verified weights are saved before the
-inference test so a test failure does not force a second large download.
+The native connection checks run official installers but do not initiate OAuth
+or sign out. They do not prove account consent or a live cloud model response.
+Local inference must run with the bundled model; missing resources fail the CI step.
 
-The package job uses `dist:win:ci`, which fixes `--publish never` in the build
-command and loads `electron-builder.ci.yml`. That configuration explicitly sets
-publish destinations to YAML `null` at application, Windows and installer levels.
-Do not use `publish: never` in configuration: it names a publisher plugin called
-`never`, rather than disabling publishing. PR publishing remains disabled.
-The job builds both Windows installers, then
-checks the shipped resources, including runtime DLLs and notices in `app.asar`.
-Every successful package job uploads the setup installer, portable executable
-and `SHA256SUMS.txt`, including PRs, main/master pushes, version tags and manual
-runs. Both installers must exist and be nonempty before upload. Upload failures
-fail the job; a green package job must mean downloadable files were uploaded.
-Artifacts are kept for seven days and named with the version, run number and
-attempt. The installers are already compressed, so artifact compression is disabled.
+Model weights are cached and verified after restoration. Native engines use
+pinned downloads. Packaging checks the shipped engine, weights, and licenses.
+Linux connection checks do not imply Linux release support.
 
-To download: open the repository's **Actions** tab, select the **verify** run,
-then use the **Windows packages** link in its summary or the **Artifacts** list.
-Sign in with repository access. These are Actions artifacts, not entries in the
-GitHub Packages registry or GitHub Releases. Manual runs need no upload option.
-Each upload is approximately 2.6 GB; the repository needs sufficient Actions
-artifact storage. A storage-quota failure must be resolved before upload can succeed.
+## Download artifacts
 
-For failures, open the named failing step. `scripts/ci-run.ps1` streams npm
-output to the Actions log and `ci-logs/`, preserving the npm exit code. Small
-failure-log artifacts are attempted with seven-day retention; an upload quota
-error cannot replace the original test result. Installation errors remain in
-their own Actions step logs. No credentials or paid provider accounts are
-required by the workflow.
+Open a successful **verify** run in GitHub Actions and use its **Artifacts** list.
+The combined upload contains Windows setup and portable executables, the Mac
+arm64 ZIP, and `SHA256SUMS.txt`. Artifacts require GitHub access and expire after
+seven days. Failed uploads fail the package job.
 
-Local reproduction on Windows with PowerShell 7:
+These artifacts are separate from public GitHub Releases.
 
-```powershell
-npm ci --include=dev
-npm run setup
+## Release behavior
+
+electron-builder runs with `--publish never`; publish destinations are YAML
+`null`. Do not set `publish: never` in builder configuration: it is interpreted
+as a publisher name.
+
+After successful packaging, a push to `main` whose package version has no
+existing tag creates that tag and a **draft GitHub release** with the artifacts.
+A maintainer must publish the draft. Pull requests, ordinary tag-triggered runs,
+and manual workflow runs do not take this release path.
+
+`scripts/release.mjs` prepares a version-bump branch and pull request. Inspect
+its `--dry-run` output before using it; local installer generation alone does
+not create a release.
+
+## Troubleshooting
+
+Open the failing step first. Windows commands use `scripts/ci-run.ps1` to retain
+the native exit code and stream logs to Actions and `ci-logs/`.
+Failure-log uploads are best-effort; artifact storage quota may prevent uploads.
+
+For local reproduction, follow [Contributing](../CONTRIBUTING.md), run the failing
+npm script, and check CI configuration with:
+
+```bash
 node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
-./scripts/ci-run.ps1 typecheck
-./scripts/ci-run.ps1 build
-./scripts/ci-run.ps1 verify:browse # substitute the failing harness
-./scripts/ci-run.ps1 fetch:model
-$env:NABSUN_REQUIRE_LOCAL = '1'
-./scripts/ci-run.ps1 verify:local
-./scripts/ci-run.ps1 dist:win:ci
-node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
 ```
+
+On Windows these CI script checks require PowerShell 7. Validate packaged resources
+with `node scripts/check-release-payload.mjs --resources release/win-unpacked/resources`
+(adjust the resources path for macOS or a custom output directory).
