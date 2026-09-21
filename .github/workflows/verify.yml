@@ -417,19 +417,29 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            Windows installers for ${{ steps.gate.outputs.tag }}, built and verified by this workflow.
+            Windows and macOS builds for ${{ steps.gate.outputs.tag }}, built and verified by this workflow.
 
             | File | What it is |
             |---|---|
-            | `Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe` | Installer. Adds a Start-menu entry and an uninstaller. |
-            | `Nabsun-${{ steps.installers.outputs.version }}-portable.exe` | Single executable. Runs without installing. |
-            | `SHA256SUMS.txt` | Checksums. Verify with `Get-FileHash <file> -Algorithm SHA256`. |
+            | `Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe` | Windows installer. Start-menu entry and an uninstaller. |
+            | `Nabsun-${{ steps.installers.outputs.version }}-portable.exe` | Windows, single executable. Runs without installing. |
+            | `Nabsun-${{ steps.installers.outputs.version }}-arm64.zip` | macOS, Apple silicon. Unzip and move to Applications. |
+            | `SHA256SUMS.txt` | Checksums for all three. |
 
-            Both include the built-in model, so they work offline with no account and no API key. That is why they are around 1.3 GB.
+            All include the built-in model, so they work offline with no account and no API key. That is why each is around 1.3 GB.
 
-            **These builds are not code-signed.** Windows SmartScreen will warn with
-            "Windows protected your PC" — choose **More info -> Run anyway**, after
-            checking the download against `SHA256SUMS.txt` above.
+            **Nothing here is code-signed.**
+
+            - **Windows:** SmartScreen warns with "Windows protected your PC" - choose
+              **More info -> Run anyway**.
+            - **macOS:** Gatekeeper says Apple cannot verify the app. Either right-click
+              the app and choose **Open**, or run
+              `xattr -dr com.apple.quarantine /Applications/Nabsun.app`
+
+            Verify a download first if you prefer: `Get-FileHash <file> -Algorithm SHA256`
+            on Windows, `shasum -a 256 <file>` on macOS.
+
+            **macOS is Apple silicon only** for now - there is no Intel build yet.
           files: |
             release/Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe
             release/Nabsun-${{ steps.installers.outputs.version }}-portable.exe
