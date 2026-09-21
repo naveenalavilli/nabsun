@@ -5,6 +5,7 @@ import { CH } from '../shared/ipc';
 import type { HistoryStore } from './history';
 import type { SettingsStore } from './store';
 import { TabManager } from './tabs';
+import { lockUiNavigation } from './uiSecurity';
 
 /** Height of the tab strip plus the toolbar, in CSS pixels. */
 const TOP_CHROME_H = 76;
@@ -71,10 +72,11 @@ export class AppWindow {
         preload: path.join(__dirname, '..', 'preload', 'shell.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
       },
     });
     this.window.contentView.addChildView(this.shell);
+    lockUiNavigation(this.shell.webContents);
     void this.shell.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'));
 
     // A thrown exception in the shell silently kills the browser chrome — no
@@ -96,11 +98,12 @@ export class AppWindow {
         preload: path.join(__dirname, '..', 'preload', 'overlay.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
         transparent: true,
       },
     });
     this.overlay.setBackgroundColor('#00000000');
+    lockUiNavigation(this.overlay.webContents);
     void this.overlay.webContents.loadFile(
       path.join(__dirname, '..', 'renderer', 'overlay', 'index.html'),
     );
@@ -118,7 +121,16 @@ export class AppWindow {
     this.window.on('resize', () => this.layout());
     this.window.on('maximize', () => this.layout());
     this.window.on('unmaximize', () => this.layout());
-    this.window.on('closed', () => this.tabs.destroyAll());
+    this.window.on('closed', () => {
+      this.tabs.destroyAll();
+      this.hideExtensionPopup();
+      // BaseWindow does not own the lifetime of its WebContentsViews.
+      for (const view of [this.shell, this.overlay]) {
+        const contents = view.webContents;
+        if (contents && !contents.isDestroyed()) contents.close();
+      }
+      this.pendingLogin = null;
+    });
 
     this.layout();
   }
@@ -320,10 +332,11 @@ export class AppWindow {
     this.popup = null;
     try {
       this.window.contentView.removeChildView(view);
-      view.webContents.close();
     } catch {
       /* already gone */
     }
+    const contents = view.webContents;
+    if (contents && !contents.isDestroyed()) contents.close();
   }
 
   applySettings(next: Settings) {

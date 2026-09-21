@@ -45,12 +45,19 @@ export class QuestionManager {
     };
 
     return new Promise<string | null>((resolve) => {
-      this.pending.set(req.id, { resolve });
-      const onAbort = () => {
-        if (this.pending.delete(req.id)) resolve(null);
+      const finish = (answer: string | null) => {
+        this.pending.delete(req.id);
+        signal.removeEventListener('abort', onAbort);
+        resolve(signal.aborted ? null : answer);
       };
+      const onAbort = () => finish(null);
+      this.pending.set(req.id, { resolve: finish });
       signal.addEventListener('abort', onAbort, { once: true });
-      this.emit(req);
+      try {
+        this.emit(req);
+      } catch {
+        finish(null);
+      }
     });
   }
 

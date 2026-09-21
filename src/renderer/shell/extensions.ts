@@ -1,4 +1,4 @@
-import type { AgentExtension, ExtensionStatus } from '../../shared/types';
+import type { AccountStatus, AgentExtension, ExtensionStatus, ProviderId } from '../../shared/types';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -22,8 +22,37 @@ export class ExtensionsView {
   private root = document.querySelector<HTMLElement>('#extensions-body')!;
   private agents: AgentExtension[] = [];
   private browserExts: ExtensionStatus[] = [];
+  private accounts = new Map<ProviderId, AccountStatus>();
+  private accountErrors = new Map<ProviderId, string>();
+  private connections = new Map<ProviderId, { busy: boolean; signingOut?: boolean; message: string; url?: string; code?: string; error?: string }>();
+  private generation = 0;
 
   constructor(private readonly onProviderChanged: () => void) {
+    // Subscribe once: repainting must not open duplicate sign-in tabs.
+    window.nabsun.accounts.onEvent(event => {
+      const state = this.connections.get(event.provider) ?? { busy: true, message: '' };
+      if (event.message) state.message = event.message;
+      if (event.error) state.error = event.error;
+      if (event.code) state.code = event.code;
+      if (event.url && event.url !== state.url) {
+        state.url = event.url;
+        void this.openSignIn(event.provider, event.url);
+      }
+      if (event.done) {
+        state.busy = false;
+        state.url = undefined;
+        state.code = undefined;
+        if (event.ok) {
+          state.error = undefined;
+          state.message = '';
+          this.accounts.set(event.provider, { provider: event.provider, supported: true, connected: true, detail: 'Connected' });
+          this.onProviderChanged();
+        }
+        void this.render();
+      }
+      this.connections.set(event.provider, state);
+      this.paint();
+    });
     window.nabsun.extensions.onChanged((items) => {
       this.browserExts = items;
       if (this.root.offsetParent !== null) this.paint();
@@ -31,9 +60,56 @@ export class ExtensionsView {
   }
 
   async render(): Promise<void> {
-    this.agents = await window.nabsun.agentExtensions.list();
-    this.browserExts = await window.nabsun.extensions.list();
+    const generation = ++this.generation;
+    let agents: AgentExtension[], extensions: ExtensionStatus[];
+    try {
+      [agents, extensions] = await Promise.all([
+        window.nabsun.agentExtensions.list(), window.nabsun.extensions.list(),
+      ]);
+    } catch {
+      if (generation !== this.generation) return;
+      this.root.textContent = 'Could not load extensions. ';
+      const retry = el('button', { textContent: 'Try again' });
+      retry.addEventListener('click', () => void this.render());
+      this.root.append(retry);
+      return;
+    }
+    if (generation !== this.generation) return;
+    this.agents = agents;
+    this.browserExts = extensions;
     this.paint();
+    // A slow or broken CLI must not hide the other assistant or the whole panel.
+    await Promise.all((['codex-cli', 'claude-cli'] as const).map(async id => {
+      let status: AccountStatus;
+      let error: string | undefined;
+      try { status = await window.nabsun.accounts.status(id); }
+      catch {
+        error = 'Could not check this account. Try connecting again.';
+        status = { provider: id, supported: true, connected: false, detail: error };
+      }
+      if (generation !== this.generation) return;
+      if (error) this.accountErrors.set(id, error); else this.accountErrors.delete(id);
+      this.accounts.set(id, status);
+      this.paint();
+    }));
+  }
+
+  private async openSignIn(id: ProviderId, url: string): Promise<void> {
+    try {
+      await window.nabsun.tabs.create(url);
+      const state = this.connections.get(id);
+      if (state?.url === url && state.error?.startsWith('Could not open sign-in.')) {
+        state.error = undefined;
+        this.paint();
+      }
+    }
+    catch {
+      const state = this.connections.get(id);
+      if (state?.busy && state.url === url) {
+        state.error = 'Could not open sign-in. Use Open sign-in page to try again.';
+        this.paint();
+      }
+    }
   }
 
   private paint() {
@@ -50,7 +126,7 @@ export class ExtensionsView {
       el('div', {
         className: 'hint',
         textContent:
-          'The backend the sidebar assistant runs on. CLI ones use the login you already have in that tool — no API key is kept here.',
+          'Choose an assistant and connect your account. Nabsun handles Codex and Claude setup for you.',
       }),
     );
 
@@ -61,7 +137,9 @@ export class ExtensionsView {
   }
 
   private agentCard(agent: AgentExtension): HTMLElement {
-    const card = el('div', { className: `ext-card${agent.active ? ' active' : ''}` });
+    const connected = this.accounts.get(agent.id)?.connected ?? false;
+    const active = agent.active && (agent.kind !== 'cli' || connected);
+    const card = el('div', { className: `ext-card${active ? ' active' : ''}` });
 
     const head = el('div', { className: 'ext-head' });
     const icon = el('div', { className: 'ext-icon', textContent: agent.name.charAt(0) });
@@ -72,8 +150,10 @@ export class ExtensionsView {
     );
     head.append(icon, titles);
 
-    if (agent.active) {
+    if (active) {
       head.append(el('span', { className: 'ext-badge on', textContent: 'Active' }));
+    } else if (connected) {
+      head.append(el('span', { className: 'ext-badge on', textContent: 'Connected' }));
     } else if (agent.installed) {
       head.append(el('span', { className: 'ext-badge', textContent: 'Installed' }));
     }
@@ -92,11 +172,11 @@ export class ExtensionsView {
     card.append(status);
 
     // Account connect/disconnect, for CLI backends that expose it.
-    if (agent.kind === 'cli' && agent.installed) card.append(this.accountBlock(agent));
+    if (agent.kind === 'cli') card.append(this.accountBlock(agent));
 
     const actions = el('div', { className: 'inline' });
 
-    if (agent.installed) {
+    if (agent.installed && agent.kind !== 'cli') {
       if (!agent.active) {
         const use = el('button', { className: 'primary', textContent: 'Use this assistant' });
         use.addEventListener('click', async () => {
@@ -137,129 +217,71 @@ export class ExtensionsView {
 
   /* ----------------------------------------------------------- accounts -- */
 
-  /**
-   * Sign-in lives with the CLI, not with us — we never see the credentials.
-   * Connecting runs that tool's own login command and shows what it prints,
-   * which is how the device-code flow becomes usable from inside the browser.
-   */
   private accountBlock(agent: AgentExtension): HTMLElement {
     const box = el('div', { className: 'ext-account' });
-    const status = el('div', { className: 'status-line' }, [
-      el('span', { className: 'dot' }),
-      el('span', { className: 'muted', textContent: 'Checking account…' }),
-    ]);
-
-    // Where the sign-in URL and device code surface once the CLI prints them.
-    const signin = el('div', { className: 'ext-signin' });
-    signin.hidden = true;
-
-    const output = el('pre', { className: 'ext-output' });
-    output.hidden = true;
+    const state = this.connections.get(agent.id);
+    const connected = this.accounts.get(agent.id)?.connected ?? false;
+    const busy = state?.busy ?? false;
+    const text = state?.error || this.accountErrors.get(agent.id) || (busy ? state?.message : connected ? 'Connected' : state?.message)
+      || this.accounts.get(agent.id)?.detail || 'Connect to get started';
+    box.append(el('div', { className: 'status-line', role: 'status', ariaLive: 'polite' }, [
+      el('span', { className: 'dot ' + (connected ? 'on' : 'off') }), el('span', { textContent: text }),
+    ]));
     const actions = el('div', { className: 'inline' });
-    box.append(status, signin, output, actions);
-
-    const setStatus = (connected: boolean | null, text: string) => {
-      const dot = status.querySelector('.dot')!;
-      dot.className = `dot ${connected === null ? '' : connected ? 'on' : 'off'}`;
-      status.querySelector('.muted')!.textContent = text;
-    };
-
-    const refresh = async () => {
-      const acct = await window.nabsun.accounts.status(agent.id);
-      if (!acct.supported) {
-        setStatus(null, acct.detail);
-        actions.textContent = '';
-        return;
+    if (busy) {
+      const cancel = el('button', { className: 'ghost', textContent: 'Cancel' });
+      cancel.addEventListener('click', () => window.nabsun.accounts.cancel(agent.id));
+      actions.append(el('button', { className: 'primary', disabled: true, textContent: state?.signingOut ? 'Signing out...' : 'Connecting...' }));
+      if (!state?.signingOut) actions.append(cancel);
+      if (state?.url) {
+        const open = el('button', { className: 'ghost', textContent: 'Open sign-in page' });
+        open.addEventListener('click', () => void this.openSignIn(agent.id, state.url!));
+        actions.append(open);
       }
-      setStatus(acct.connected, acct.connected ? `Connected — ${acct.detail}` : acct.detail);
-      actions.textContent = '';
-
-      if (acct.connected) {
-        const disconnect = el('button', { className: 'ghost', textContent: 'Disconnect account' });
+      if (state?.code) box.append(el('div', { className: 'signin-code', textContent: 'Enter this code: ' + state.code }));
+    } else {
+      const repair = el('button', { className: 'ghost', textContent: 'Repair / update', title: 'Install the latest official CLI and use it for this assistant.' });
+      repair.addEventListener('click', () => {
+        ++this.generation;
+        this.accountErrors.delete(agent.id);
+        this.connections.set(agent.id, { busy: true, message: 'Updating your assistant...' });
+        this.paint();
+        window.nabsun.accounts.connect(agent.id, 'repair');
+      });
+      actions.append(repair);
+      if (!connected || !agent.active) {
+        const connect = el('button', {
+          className: 'primary',
+          textContent: connected ? 'Use ' + agent.name : state?.error ? 'Retry connection' : 'Connect ' + agent.name,
+        });
+        connect.addEventListener('click', () => {
+          ++this.generation;
+          this.accountErrors.delete(agent.id);
+          this.connections.set(agent.id, { busy: true, message: 'Preparing your connection...' });
+          this.paint();
+          window.nabsun.accounts.connect(agent.id, 'browser');
+        });
+        actions.append(connect);
+      }
+      if (connected) {
+        const disconnect = el('button', { className: 'ghost', textContent: 'Sign out', title: 'Signs the CLI out on this device, including other apps that use it.' });
         disconnect.addEventListener('click', async () => {
-          disconnect.disabled = true;
-          const res = await window.nabsun.accounts.disconnect(agent.id);
-          if (!res.ok) setStatus(false, res.error ?? 'Sign-out failed');
-          await refresh();
+          ++this.generation;
+          this.connections.set(agent.id, { busy: true, signingOut: true, message: 'Signing out...' });
+          this.paint();
+          try {
+            const result = await window.nabsun.accounts.disconnect(agent.id);
+            this.connections.set(agent.id, { busy: false, message: result.ok ? 'Signed out' : '', error: result.error });
+          } catch { this.connections.set(agent.id, { busy: false, message: '', error: 'Sign-out failed. Try again.' }); }
+          await this.render();
         });
         actions.append(disconnect);
-      } else {
-        const begin = (mode: 'browser' | 'device', note: string) => {
-          signin.hidden = true;
-          signin.textContent = '';
-          output.hidden = false;
-          output.textContent = `${note}\n`;
-          window.nabsun.accounts.connect(agent.id, mode);
-        };
-
-        const connect = el('button', { className: 'primary', textContent: `Sign in to ${agent.publisher}` });
-        connect.addEventListener('click', () => begin('browser', 'Starting sign-in…'));
-
-        // The device flow prints a code and a URL, which we can present far
-        // better than a terminal can.
-        const device = el('button', { className: 'ghost', textContent: 'Sign in with a code' });
-        device.addEventListener('click', () => begin('device', 'Requesting a sign-in code…'));
-
-        const withKey = el('button', { className: 'ghost', textContent: 'Use an API key' });
-        withKey.addEventListener('click', () => {
-          const key = prompt(`Paste an API key for ${agent.name}. It is sent to the CLI, not stored here.`);
-          if (!key) return;
-          output.hidden = false;
-          output.textContent = 'Signing in with the key…\n';
-          window.nabsun.accounts.connect(agent.id, 'apiKey', key);
-        });
-
-        actions.append(connect, device, withKey);
       }
-    };
-
-    window.nabsun.accounts.onEvent((event) => {
-      if (event.provider !== agent.id) return;
-
-      // A device code the user has to type on the sign-in page.
-      if (event.code) {
-        signin.hidden = false;
-        const codeRow = el('div', { className: 'signin-code' });
-        const value = el('code', { textContent: event.code });
-        const copy = el('button', { className: 'ghost', textContent: 'Copy code' });
-        copy.addEventListener('click', async () => {
-          await navigator.clipboard.writeText(event.code!);
-          copy.textContent = 'Copied';
-        });
-        codeRow.append(el('span', { textContent: 'Enter this code:' }), value, copy);
-        signin.append(codeRow);
-      }
-
-      // This is a browser, so sign in here rather than handing the user off to
-      // whatever their default browser happens to be. The CLI's callback is a
-      // local server, so it does not care which browser completes the flow.
-      if (event.url) {
-        signin.hidden = false;
-        const open = el('button', { className: 'primary', textContent: 'Open the sign-in page' });
-        const openTab = () => void window.nabsun.tabs.create(event.url!);
-        open.addEventListener('click', openTab);
-
-        const link = el('div', { className: 'signin-url', textContent: event.url });
-        signin.append(el('div', { className: 'inline' }, [open]), link);
-        openTab();
-      }
-
-      if (event.chunk) {
-        output.hidden = false;
-        output.textContent += event.chunk;
-        output.scrollTop = output.scrollHeight;
-      }
-      if (event.done) {
-        if (event.error) output.textContent += `\n${event.error}\n`;
-        if (event.ok) {
-          signin.hidden = true;
-          signin.textContent = '';
-        }
-        void refresh();
-      }
-    });
-
-    void refresh();
+    }
+    box.append(actions);
+    if (!connected && !busy) box.append(el('div', {
+      className: 'hint', textContent: 'Downloads the official native CLI if needed. Your account must include access to this assistant.',
+    }));
     return box;
   }
 

@@ -1,7 +1,10 @@
 import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import path from 'node:path';
-import { net } from 'electron';
+import http from 'node:http';
+import https from 'node:https';
+import { isIP } from 'node:net';
+import { Readable } from 'node:stream';
 import type { PageSnapshot } from '../../../shared/types';
 import { resolveNavigationInput, searchUrlFor } from '../../history';
 import { bool, defineTool, num, str, type Tool, type ToolContext } from './types';
@@ -172,10 +175,10 @@ const FETCH_TIMEOUT_MS = 30_000;
  * here before anything is classified.
  */
 export function toIpv4(address: string): string | null {
-  const ip = address.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  const ip = normalizeAddress(address);
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return ip;
 
-  const mapped = /^(?:::ffff:|::)([0-9a-f:]+)$/.exec(ip);
+  const mapped = /^(?:::ffff:|::)([0-9a-f:.]+)$/.exec(ip);
   if (!mapped) return null;
   const tail = mapped[1];
 
@@ -203,16 +206,22 @@ export function isPrivateAddress(address: string): boolean {
       a >= 224                              // multicast and reserved
     );
   }
-  const ip6 = address.toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  const ip6 = normalizeAddress(address);
   if (ip6 === '::1' || ip6 === '::') return true;
   if (/^f[cd]/.test(ip6)) return true;      // unique-local
-  return /^fe[89ab]/.test(ip6);             // link-local
+  return /^fe[89ab]/.test(ip6) || ip6.startsWith('ff'); // link-local or multicast
+}
+
+function normalizeAddress(address: string): string {
+  const ip = address.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  if (!ip.includes(':')) return ip;
+  try { return new URL(`http://[${ip}]/`).hostname.slice(1, -1); } catch { return ip; }
 }
 
 export async function assertFetchAllowed(
   raw: string,
   lookup: (host: string) => Promise<string[]> = defaultLookup,
-): Promise<void> {
+): Promise<string[]> {
   let url: URL;
   try {
     url = new URL(raw);
@@ -231,7 +240,7 @@ export async function assertFetchAllowed(
     throw new Error(`fetch_url will not reach ${url.hostname}: it is a private address.`);
   }
 
-  const addresses = await lookup(host);
+  const addresses = isIP(host) ? [host] : await lookup(host);
   // Fail closed. An empty result means the name could not be checked, not that
   // it is safe, and a resolver error is exactly what an attacker would induce.
   // A literal address needs no lookup, so only names are affected.
@@ -241,12 +250,54 @@ export async function assertFetchAllowed(
     );
   }
   for (const address of addresses) {
-    if (isPrivateAddress(address)) {
+    if (!isIP(address) || isPrivateAddress(address)) {
       throw new Error(
         `fetch_url will not reach ${url.hostname}: it resolves to the private address ${address}.`,
       );
     }
   }
+  return addresses;
+}
+
+/** Pin the socket to the addresses we checked, keeping the original Host and TLS name. */
+export async function fetchPublicUrl(raw: string, signal: AbortSignal,
+  lookup: (host: string) => Promise<string[]> = defaultLookup): Promise<Response> {
+  signal.throwIfAborted();
+  const addresses = await new Promise<string[]>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    void assertFetchAllowed(raw, lookup).then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', abort));
+  });
+  signal.throwIfAborted();
+  const url = new URL(raw);
+  return new Promise<Response>((resolve, reject) => {
+    const req = (url.protocol === 'https:' ? https : http).request(url, {
+      signal, agent: false,
+      headers: { 'user-agent': 'Nabsun/0.1 (+agent fetch)', 'accept-encoding': 'identity' },
+      lookup: (_host, options, callback) => {
+        const records = addresses.map((address) => ({ address, family: isIP(address) }));
+        if (options.all) callback(null, records);
+        else callback(null, records[0].address, records[0].family);
+      },
+    }, (res) => {
+      try {
+        const headers = new Headers();
+        for (let i = 0; i < res.rawHeaders.length; i += 2) headers.append(res.rawHeaders[i], res.rawHeaders[i + 1]);
+        const status = res.statusCode ?? 502;
+        const empty = [204, 205, 304].includes(status);
+        if (empty) res.resume();
+        resolve(new Response(empty ? null : Readable.toWeb(res) as ReadableStream<Uint8Array>, {
+          status, statusText: res.statusMessage, headers,
+        }));
+      } catch (error) {
+        res.destroy();
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 async function defaultLookup(host: string): Promise<string[]> {
@@ -344,19 +395,13 @@ export function webTools(): Tool[] {
       },
       async (input, ctx) => {
         const url = str(input.url);
-        await assertFetchAllowed(url);
         ctx.status(`Fetching ${url}`);
         // A slow response must not hold a turn open indefinitely.
         const deadline = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-        const res = await net.fetch(url, {
-          signal: ctx.signal ? AbortSignal.any([ctx.signal, deadline]) : deadline,
-          headers: { 'user-agent': 'Nabsun/0.1 (+agent fetch)' },
-          // A redirect is a second destination choice, and it is not the
-          // model's to make: follow it manually so it is checked too.
-          redirect: 'manual',
-        });
+        const res = await fetchPublicUrl(url, AbortSignal.any([ctx.signal, deadline]));
         if (res.status >= 300 && res.status < 400) {
           const location = res.headers.get('location') ?? '(none)';
+          await res.body?.cancel();
           return `${res.status} redirect to ${location}. Call fetch_url again with that URL if you want to follow it.`;
         }
         const type = res.headers.get('content-type') ?? '';

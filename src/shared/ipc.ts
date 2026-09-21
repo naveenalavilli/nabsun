@@ -288,6 +288,7 @@ export interface ShellApi {
   accounts: {
     onEvent(cb: (e: {
       provider: ProviderId;
+      message?: string;
       chunk?: string;
       /** A sign-in URL the browser should open in a tab. */
       url?: string;
@@ -298,7 +299,7 @@ export interface ShellApi {
       error?: string;
     }) => void): () => void;
     status(provider: ProviderId): Promise<AccountStatus>;
-    connect(provider: ProviderId, mode: 'browser' | 'device' | 'apiKey', apiKey?: string): void;
+    connect(provider: ProviderId, mode: 'browser' | 'device' | 'apiKey' | 'repair', apiKey?: string): void;
     disconnect(provider: ProviderId): Promise<{ ok: boolean; error?: string }>;
     cancel(provider: ProviderId): void;
   };

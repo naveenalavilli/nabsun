@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WebContentsView, type BaseWindow, type WebContents, shell } from 'electron';
+import { WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { requestExternalLink } from './externalLinks';
 import type { TabState } from '../shared/types';
 import type { HistoryStore } from './history';
 
@@ -392,6 +393,7 @@ export class TabManager extends EventEmitter {
       update();
     });
     wc.on('did-navigate', (_e, url) => {
+      if (this.findTabId === tab.id) this.findTabId = null;
       this.opts.history.record(url, wc.getTitle());
       this.emit('tab-navigated', tab);
       update();
@@ -430,6 +432,10 @@ export class TabManager extends EventEmitter {
     });
 
     wc.setWindowOpenHandler(({ url, disposition }) => {
+      if (!/^(https?|file|about|data|nabsun|smart|view-source|chrome):/i.test(url)) {
+        void requestExternalLink(this.opts.window, wc, url);
+        return { action: 'deny' };
+      }
       if (disposition === 'new-window' || disposition === 'foreground-tab' || disposition === 'background-tab') {
         this.create(url, { background: disposition === 'background-tab' });
         return { action: 'deny' };
@@ -439,7 +445,7 @@ export class TabManager extends EventEmitter {
       if (/^https?:/.test(url)) {
         this.create(url);
       } else {
-        void shell.openExternal(url);
+        void requestExternalLink(this.opts.window, wc, url);
       }
       return { action: 'deny' };
     });
@@ -448,7 +454,7 @@ export class TabManager extends EventEmitter {
     wc.on('will-navigate', (event, url) => {
       if (!/^(https?|file|about|data|nabsun|smart|view-source|chrome):/i.test(url)) {
         event.preventDefault();
-        void shell.openExternal(url);
+        void requestExternalLink(this.opts.window, wc, url);
       }
     });
   }
@@ -468,17 +474,26 @@ export class TabManager extends EventEmitter {
 
   /* ---------------------------------------------------------- find --------*/
 
+  private findQuery = '';
+  private findTabId: string | null = null;
+
   find(query: string, forward = true, findNext = false) {
     const tab = this.active;
     if (!tab) return;
-    if (!query) {
+    if (!findNext) this.findQuery = query;
+    const text = findNext ? this.findQuery : query;
+    if (!text) {
       tab.wc.stopFindInPage('clearSelection');
       return;
     }
-    tab.wc.findInPage(query, { forward, findNext });
+    // Electron's flag starts a new session when true, despite its name.
+    tab.wc.findInPage(text, { forward, findNext: !findNext || this.findTabId !== tab.id });
+    this.findTabId = tab.id;
   }
 
   stopFind() {
+    this.findQuery = '';
+    this.findTabId = null;
     this.active?.wc.stopFindInPage('clearSelection');
   }
 

@@ -264,6 +264,7 @@ export class LocalProvider implements Provider {
       );
     }
 
+    child.stdout?.resume();
     child.stderr?.on('data', (b: Buffer) => {
       // Bounded: llama.cpp is chatty, and this is only ever a failure message.
       this.lastStderr = `${this.lastStderr}${b.toString('utf8')}`.slice(-4000);

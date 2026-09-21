@@ -23,10 +23,10 @@ There is no bug bounty. Expect a best-effort response from one person.
 
 | Asset | Protection |
 |---|---|
-| API keys | Encrypted with the OS keychain (DPAPI / Keychain / libsecret) via Electron `safeStorage`; falls back to obfuscated-at-rest only when no keychain exists, and says so |
-| Saved passwords | Same mechanism. Never written in plaintext. Autofill matches the **full origin** — scheme, host and port |
-| Page content | Sent only to the provider you configured. With Ollama it never leaves the machine |
-| Telemetry | There is none. Nothing is reported anywhere |
+| API keys | Encrypted with the OS keychain (DPAPI / Keychain / libsecret) via Electron `safeStorage`; kept in memory for the current session when secure storage is unavailable |
+| Saved passwords | Same mechanism; saving is refused when secure storage is unavailable. Never written in plaintext. Autofill matches the **full origin** — scheme, host and port |
+| Page content | Sent only to the provider you configured. Bundled local inference stays on-device; Ollama stays on-device only when its endpoint is local |
+| Browser telemetry | The browser has no product analytics. The separate marketing website uses Google Analytics |
 | Web pages | Sandboxed, `contextIsolation`, `nodeIntegration: false`, normal web security. The agent reads them through a separate isolated world rather than by weakening the page |
 | Model output | Never assigned to `innerHTML`. Markdown is rendered by building DOM nodes; the only attribute set from model output is a scheme-checked `href` |
 | State-changing actions | Default-deny. `write` and `dangerous` tools ask every time until you say otherwise |

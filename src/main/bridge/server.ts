@@ -46,6 +46,7 @@ export class BrowserBridgeServer {
 
     this.server = createServer((req, res) => {
       const send = (status: number, body: unknown) => {
+        if (res.destroyed || res.writableEnded) return;
         const payload = JSON.stringify(body);
         res.writeHead(status, {
           'content-type': 'application/json',
@@ -61,32 +62,56 @@ export class BrowserBridgeServer {
       }
 
       if (req.method === 'GET' && req.url === '/tools') {
-        send(200, {
-          tools: this.deps.listTools().map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-            risk: t.risk,
-          })),
-        });
+        try {
+          send(200, {
+            tools: this.deps.listTools().map((t) => ({
+              name: t.name,
+              description: t.description,
+              inputSchema: t.inputSchema,
+              risk: t.risk,
+            })),
+          });
+        } catch {
+          send(500, { error: 'could not list browser tools' });
+        }
         return;
       }
 
       if (req.method === 'POST' && req.url === '/call') {
-        let body = '';
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        let oversized = false;
+        req.on('error', () => { chunks.length = 0; });
         req.on('data', (chunk: Buffer) => {
-          body += chunk.toString('utf8');
-          // A runaway body would otherwise buffer without bound.
-          if (body.length > 4_000_000) req.destroy();
+          if (oversized) return;
+          bytes += chunk.length;
+          if (bytes > 4_000_000) {
+            oversized = true;
+            chunks.length = 0;
+            send(413, { error: 'request body too large' });
+            return;
+          }
+          chunks.push(chunk);
         });
         req.on('end', () => {
+          if (oversized) return;
+          let parsed: { name: string; arguments?: Record<string, unknown> };
+          try {
+            // Decode once: a TCP chunk can end in the middle of a UTF-8 character.
+            parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            if (!parsed || typeof parsed.name !== 'string' || !parsed.name.trim() ||
+                (parsed.arguments !== undefined && (parsed.arguments === null ||
+                  typeof parsed.arguments !== 'object' || Array.isArray(parsed.arguments)))) {
+              throw new Error('invalid tool call');
+            }
+          } catch {
+            send(400, { error: 'expected a tool name and an arguments object' });
+            return;
+          } finally {
+            chunks.length = 0;
+          }
           void (async () => {
             try {
-              const parsed = JSON.parse(body) as { name?: string; arguments?: Record<string, unknown> };
-              if (!parsed.name) {
-                send(400, { error: 'missing tool name' });
-                return;
-              }
               // Identifies the connected agent, so its tab selection survives
               // between calls without leaking into another client's run.
               const clientId = String(req.headers['x-nabsun-client'] ?? '').slice(0, 64) || 'anonymous';

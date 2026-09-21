@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, dialog, ipcMain, session, shell } from 'electron';
+import { app, dialog, session, shell } from 'electron';
+import { pathToFileURL } from 'node:url';
+import { uiIpc } from './uiSecurity';
 import { CH } from '../shared/ipc';
 import type {
   ApprovalDecision,
@@ -58,6 +60,17 @@ export interface IpcDeps {
 export function registerIpc(deps: IpcDeps): void {
   const { win, settings, secrets, history, sessions, agent, approvals, questions, mcp, plugins, providers, downloads, extensions, accounts, passwords } =
     deps;
+  const ipcMain = uiIpc([
+    {
+      contents: win.shell.webContents,
+      url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'shell', 'index.html')).href,
+    },
+    {
+      contents: win.overlay.webContents,
+      url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'overlay', 'index.html')).href,
+      channels: new Set([CH.omniboxSuggest, CH.overlayCommand, CH.overlayClose]),
+    },
+  ]);
 
   /* ---------------------------------------------------------------- tabs */
 
@@ -421,7 +434,7 @@ export function registerIpc(deps: IpcDeps): void {
   /* -------------------------------------------------------------- accounts */
 
   ipcMain.handle(CH.acctStatus, (_e, id: ProviderId) => accounts.status(id));
-  ipcMain.on(CH.acctLogin, (_e, id: ProviderId, mode: 'browser' | 'device' | 'apiKey', key?: string) => {
+  ipcMain.on(CH.acctLogin, (_e, id: ProviderId, mode: 'browser' | 'device' | 'apiKey' | 'repair', key?: string) => {
     void accounts.login(id, mode, key);
   });
   ipcMain.handle(CH.acctLogout, (_e, id: ProviderId) => accounts.logout(id));

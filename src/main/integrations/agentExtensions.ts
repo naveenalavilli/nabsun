@@ -1,5 +1,7 @@
 ﻿import type { AgentExtension, ProviderId, Settings } from '../../shared/types';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
+import { stopCliProcess } from './nativeCli';
 import type { Provider } from '../ai/provider';
 import { launcherEnv, type Launcher } from '../ai/providers/cli';
 import type { SecretStore } from '../store';
@@ -20,14 +22,12 @@ const CATALOG: Omit<AgentExtension, 'installed' | 'active' | 'detail'>[] = [
     publisher: 'OpenAI',
     kind: 'cli',
     summary:
-      'Runs the Codex CLI as the assistant, using the account you are already signed into there. No API key is stored in the browser.',
+      'Connect your OpenAI account to use Codex in Nabsun. Setup is automatic; no terminal commands needed.',
     capabilities: [
-      'Uses your existing Codex login (ChatGPT plan or API key)',
-      'Gets this browser as an MCP tool server â€” read pages, click, type, extract',
-      'Its own shell tools stay sandboxed read-only',
-      'Every page action still goes through the approval gate',
+      'Sign in with your ChatGPT account',
+      'Read pages, click, type, and extract information',
+      'Browser actions follow your approval settings',
     ],
-    installCommand: 'npm install -g @openai/codex',
     docsUrl: 'https://developers.openai.com/codex/cli',
   },
   {
@@ -36,14 +36,12 @@ const CATALOG: Omit<AgentExtension, 'installed' | 'active' | 'detail'>[] = [
     publisher: 'Anthropic',
     kind: 'cli',
     summary:
-      'Runs the Claude Code CLI as the assistant, using the login you already have there. No API key is stored in the browser.',
+      'Connect your Anthropic account to use Claude Code in Nabsun. Setup is automatic; no terminal commands needed.',
     capabilities: [
-      'Uses your existing Claude Code login (subscription or API key)',
-      'Gets this browser as an MCP tool server',
-      'Its file and shell tools stay disabled',
-      'Every page action still goes through the approval gate',
+      'Sign in with your Claude account',
+      'Read pages, click, type, and extract information',
+      'Browser actions follow your approval settings',
     ],
-    installCommand: 'npm install -g @anthropic-ai/claude-code',
     docsUrl: 'https://code.claude.com/docs',
   },
   {
@@ -91,42 +89,39 @@ const CATALOG: Omit<AgentExtension, 'installed' | 'active' | 'detail'>[] = [
  * an old Codex is rejected outright by newer accounts â€” so the panel shows the
  * version rather than leaving the user to guess.
  */
-const versionCache = new Map<ProviderId, { value: string | null; at: number }>();
+const versionCache = new Map<ProviderId, { key: string; value: Promise<string | null>; at: number }>();
 const VERSION_TTL_MS = 60_000;
 
-function cliVersion(id: ProviderId, provider: Provider | undefined): string | null {
-  const cached = versionCache.get(id);
-  if (cached && Date.now() - cached.at < VERSION_TTL_MS) return cached.value;
-
-  let value: string | null = null;
+function cliVersion(id: ProviderId, provider: Provider | undefined): Promise<string | null> {
   const launcher = (provider as { launcher?: Launcher | null } | undefined)?.launcher;
-  if (launcher) {
-    try {
-      const res = spawnSync(launcher.command, [...launcher.args, '--version'], {
-        encoding: 'utf8',
-        timeout: 10_000,
-        windowsHide: true,
-        env: {
-          ...process.env,
-          ...launcherEnv(launcher),
-        },
-      });
-      const text = `${res.stdout ?? ''}${res.stderr ?? ''}`;
-      value = /(\d+\.\d+\.\d+)/.exec(text)?.[1] ?? null;
-    } catch {
-      value = null;
-    }
-  }
-  versionCache.set(id, { value, at: Date.now() });
+  if (!launcher) return Promise.resolve(null);
+  const key = JSON.stringify(launcher);
+  const cached = versionCache.get(id);
+  if (cached?.key === key && Date.now() - cached.at < VERSION_TTL_MS) return cached.value;
+  const value = new Promise<string | null>(resolve => {
+    const child = spawn(launcher.command, [...launcher.args, '--version'], {
+      cwd: os.tmpdir(), windowsHide: true, detached: process.platform !== 'win32',
+      env: { ...process.env, ...launcherEnv(launcher) },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let text = '';
+    const timer = setTimeout(() => stopCliProcess(child), 5000);
+    const finish = (ok: boolean) => { clearTimeout(timer); resolve(ok ? /([0-9]+\.[0-9]+\.[0-9]+)/.exec(text)?.[1] ?? null : null); };
+    const collect = (chunk: Buffer) => { text = (text + chunk.toString('utf8')).slice(-2048); };
+    child.stdout.on('data', collect); child.stderr.on('data', collect);
+    child.on('error', () => finish(false));
+    child.on('close', code => finish(code === 0));
+  }).catch(() => null);
+  versionCache.set(id, { key, value, at: Date.now() });
   return value;
 }
 
-export function listAgentExtensions(
+export async function listAgentExtensions(
   settings: Settings,
   providers: Map<ProviderId, Provider>,
   secrets: SecretStore,
-): AgentExtension[] {
-  return CATALOG.map((entry) => {
+): Promise<AgentExtension[]> {
+  return Promise.all(CATALOG.map(async (entry) => {
     const provider = providers.get(entry.id);
     let installed = false;
     let detail: string | undefined;
@@ -135,8 +130,8 @@ export function listAgentExtensions(
       // "Installed" means the binary is actually on this machine.
       const binary = provider?.binaryPath ?? null;
       installed = Boolean(binary);
-      const version = binary ? cliVersion(entry.id, provider) : null;
-      detail = binary ? (version ? `${version} â€” ${binary}` : binary) : 'Not found on PATH';
+      const version = binary ? await cliVersion(entry.id, provider) : null;
+      detail = binary ? (version ? `Version ${version}` : 'Ready on this device') : 'Set up automatically when you connect';
     } else if (entry.kind === 'local') {
       installed = true;
       detail = settings.baseUrls.ollama;
@@ -151,6 +146,6 @@ export function listAgentExtensions(
       active: settings.provider === entry.id,
       detail,
     };
-  });
+  }));
 }
 

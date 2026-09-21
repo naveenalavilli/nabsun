@@ -26,6 +26,7 @@ export class ApprovalManager {
 
   /** Resolves to true when the call may proceed. */
   async request(tool: Tool, input: Record<string, unknown>, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) return false;
     const settings = this.settings.get();
     if (settings.alwaysAllowTools.includes(tool.name)) return true;
     if (settings.autoApprove[tool.risk]) return true;
@@ -40,15 +41,22 @@ export class ApprovalManager {
     };
 
     const decision = await new Promise<ApprovalDecision>((resolve) => {
-      this.pending.set(req.id, { resolve });
-      // An aborted turn must not leave a dialog waiting for an answer.
-      const onAbort = () => {
-        if (this.pending.delete(req.id)) resolve('deny');
+      const finish = (decision: ApprovalDecision) => {
+        this.pending.delete(req.id);
+        signal.removeEventListener('abort', onAbort);
+        resolve(signal.aborted ? 'deny' : decision);
       };
+      const onAbort = () => finish('deny');
+      this.pending.set(req.id, { resolve: finish });
       signal.addEventListener('abort', onAbort, { once: true });
-      this.emit(req);
+      try {
+        this.emit(req);
+      } catch {
+        finish('deny');
+      }
     });
 
+    if (signal.aborted) return false;
     if (decision === 'allow_always') {
       const current = this.settings.get().alwaysAllowTools;
       if (!current.includes(tool.name)) {

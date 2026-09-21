@@ -105,8 +105,8 @@ as a fallback if you prefer environment variables.
 | Anthropic | `claude-opus-5` | API key |
 | OpenAI / Codex | `gpt-5.1` | API key |
 | Ollama | `llama3.1` | a local Ollama server, no key |
-| **Claude Code (CLI)** | the CLI's own default | `claude` installed and signed in |
-| **Codex (CLI)** | the CLI's own default | `codex` installed and signed in |
+| **Claude Code (CLI)** | the CLI's own default | Connect Claude Code in Extensions |
+| **Codex (CLI)** | the CLI's own default | Connect Codex in Extensions |
 
 The built-in model is small — 1.7B parameters. It handles ordinary navigation
 and page questions and costs nothing to run, and it will lose the thread on long
@@ -117,18 +117,36 @@ configurable, so any GGUF you already have drops in.
 The model field is free text, so any id your account can reach works even if it
 is not in the dropdown.
 
-### Using Claude Code or Codex, like the VS Code extensions
+### Connect Codex or Claude Code
 
-If you already use the Claude Code or Codex CLI, pick it as your provider and
-Nabsun will run it for each request — **using the login you already have
-there, so no API key is stored in the browser.** This is the same arrangement as
-those tools' VS Code extensions: the CLI brings its own agent loop and its own
-auth, and the editor (here, the browser) supplies the tools.
+Open **Extensions** and click **Connect Codex** or **Connect Claude Code**.
+Nabsun downloads the provider's official native CLI if it is missing, opens
+account sign-in in a browser tab, verifies the login, and selects the assistant.
+No npm package, Node.js installation, API key, or terminal command is required
+for this flow. Existing installations and signed-in accounts are reused.
+Your provider account must include access to the selected assistant.
 
-```bash
-npm i -g @anthropic-ai/claude-code   # then: claude   (sign in once)
-npm i -g @openai/codex               # then: codex    (sign in once)
-```
+Setup shows progress and supports cancellation and retry. Credentials stay in
+the provider CLI's credential store. **Sign out** signs that CLI out on this
+device, including sessions used outside Nabsun. Advanced executable and model
+overrides remain available in Settings.
+
+If an older CLI does not support browser sign-in, Nabsun updates it automatically.
+**Repair / update** is also available on each assistant card: it installs the
+latest official native CLI, verifies that it starts, selects that exact executable,
+and reconnects. This also repairs a missing custom executable without requiring
+terminal commands. Existing credentials are reused; failed setup does not replace
+the previously selected executable.
+
+CI checks native installation, account command compatibility, cancellation, and
+the connection UI on Windows, macOS, and Linux before packaging a release.
+For a development machine, `npm run verify:connections:native` explicitly runs
+the real native installers and read-only authentication checks. It does not
+start OAuth or sign out of accounts; ordinary connection tests use fixtures.
+
+Codex uses its [embedded app-server login](https://developers.openai.com/codex/app-server/).
+Claude uses its [official auth command](https://code.claude.com/docs/en/cli-reference)
+and may also open the system browser as part of its own sign-in flow.
 
 Nabsun hands the CLI this browser as an MCP tool server, so it can snapshot
 pages, click, type and extract here. The CLI's own file and shell tools stay
