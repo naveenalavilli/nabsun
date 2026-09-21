@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { Menu, app, ipcMain, protocol, session, shell } from 'electron';
+import { Menu, app, ipcMain, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { CH } from '../shared/ipc';
 import type { ProviderId } from '../shared/types';
 import { Agent } from './ai/agent';
@@ -106,7 +106,16 @@ async function boot() {
   const extensions = new ChromeExtensionManager(() => settings.get().chromeExtensions);
   const accounts = new CliAccountManager(
     (id) => (id === 'claude-cli' || id === 'codex-cli' ? settings.get().cliPaths[id] : ''),
-    (event) => win.send(CH.acctEvent, event),
+    (event) => {
+      if (event.done && event.ok) {
+        settings.set({ provider: event.provider });
+        win.applySettings(settings.get());
+      }
+      win.send(CH.acctEvent, event);
+    },
+    undefined,
+    undefined,
+    (id, executable) => settings.set({ cliPaths: { ...settings.get().cliPaths, [id]: executable } }),
   );
 
   // Declared before the agent so providers can capture it; started once the
@@ -317,20 +326,30 @@ async function boot() {
 
   // These come from the page preload, so the sender's own URL decides the
   // origin — never a value the page could choose for itself.
+  const passwordOrigin = (event: IpcMainEvent | IpcMainInvokeEvent) => {
+    if (event.sender.isDestroyed() || !event.senderFrame || event.senderFrame !== event.sender.mainFrame ||
+        !win.tabs.all.some((tab) => tab.liveWc === event.sender)) return null;
+    return PasswordStore.originOf(event.senderFrame.url);
+  };
   ipcMain.handle('pw:for-origin', (event) => {
     if (!settings.get().savePasswords) return null;
-    const origin = PasswordStore.originOf(event.sender.getURL());
+    const origin = passwordOrigin(event);
     if (!origin) return null;
     const found = passwords.forOrigin(origin);
     return found.length ? found : null;
   });
 
-  ipcMain.on('pw:used', (_e, id: string) => passwords.markUsed(id));
+  ipcMain.on('pw:used', (event, id: string) => {
+    const origin = passwordOrigin(event);
+    if (settings.get().savePasswords && origin && typeof id === 'string' &&
+        passwords.forOrigin(origin).some((credential) => credential.id === id)) passwords.markUsed(id);
+  });
 
   ipcMain.on('pw:capture', (event, payload: { username: string; password: string }) => {
     if (!settings.get().savePasswords) return;
-    const origin = PasswordStore.originOf(event.sender.getURL());
-    if (!origin || !payload?.password) return;
+    const origin = passwordOrigin(event);
+    if (!origin || typeof payload?.password !== 'string' || !payload.password ||
+        (payload.username !== undefined && typeof payload.username !== 'string')) return;
     // Nothing to ask about if we already hold exactly this credential.
     if (passwords.isKnown(origin, payload.username ?? '', payload.password)) return;
 
@@ -410,6 +429,7 @@ async function boot() {
   });
 
   app.on('before-quit', () => {
+    accounts.cancelAll();
     agent.abortAll();
     approvals.denyAll();
     questions.cancelAll();

@@ -66,14 +66,14 @@ function startServer(): Promise<{ server: Server; origin: string }> {
         `<title>Session over</title><h1>Signed out</h1>
          <script>setTimeout(() => window.close(), 50);</script>`,
       );
-    } else if (req.url === '/login') {
+    } else if (req.url?.startsWith('/login')) {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(
         `<title>Sign in</title><h1>Sign in</h1>
          <form id="f" action="/done" method="get">
            <label for="email">Email</label>
-           <input id="email" name="email" type="text" />
-           <input id="pw" name="password" type="password" />
+           <input id="email" name="email" type="text" value="${req.url.includes('other-user') ? 'other@example.com' : ''}" />
+           <input id="pw" name="password" type="password" autocomplete="${req.url.includes('signup') ? 'new-password' : 'current-password'}" />
            <button type="submit">Log in</button>
          </form>`,
       );
@@ -151,6 +151,24 @@ app.whenReady().then(async () => {
     const tab = tabs.create(`${origin}/`);
     await until(() => tab.wc.getTitle() === 'Home Page');
     check('a page loads over HTTP', tab.wc.getTitle() === 'Home Page', tab.wc.getTitle());
+
+    await until(() => !tab.wc.isLoading());
+    await tab.wc.executeJavaScript('document.body.insertAdjacentHTML("beforeend", "<p>findneedle findneedle findneedle</p>")');
+    const findResult = () => new Promise<{ activeMatchOrdinal: number; matches: number }>((resolve, reject) => {
+      const timeout = setTimeout(() => { tab.wc.removeListener('found-in-page', listener); reject(new Error('find result timed out')); }, 5000);
+      const listener = (_event: unknown, result: { finalUpdate: boolean; activeMatchOrdinal: number; matches: number }) => {
+        if (!result.finalUpdate) return;
+        clearTimeout(timeout); tab.wc.removeListener('found-in-page', listener); resolve(result);
+      };
+      tab.wc.on('found-in-page', listener);
+    });
+    let found = findResult(); tabs.find('findneedle');
+    check('find locates all matches', (await found).matches === 3);
+    found = findResult(); tabs.find('', true, true);
+    check('find next retains the original query', (await found).activeMatchOrdinal === 2);
+    found = findResult(); tabs.find('', false, true);
+    check('find previous retains the original query', (await found).activeMatchOrdinal === 1);
+    tabs.stopFind();
 
     /* ------------------------------------------------- site permissions -- */
     // Capabilities are denied by default. The old handler named six permissions
@@ -886,6 +904,14 @@ app.whenReady().then(async () => {
     );
 
     tabs.close(loginTab.id);
+    for (const variant of ['signup', 'other-user']) {
+      const protectedTab = tabs.create(`${origin}/login?${variant}`);
+      await until(() => protectedTab.wc.getTitle() === 'Sign in' && !protectedTab.wc.isLoading());
+      await delay(1500); // Includes the preload's delayed scan.
+      const value = await protectedTab.wc.executeJavaScript('document.getElementById("pw").value');
+      check(`autofill leaves ${variant} passwords empty`, value === '');
+      tabs.close(protectedTab.id);
+    }
     ipcMain.removeHandler('pw:for-origin');
     passwords.clearAll();
     check('saved passwords can be cleared', passwords.list().length === 0);

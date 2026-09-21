@@ -64,7 +64,12 @@ export class DownloadManager extends EventEmitter {
     const base = path.basename(filename, ext) || 'download';
     let candidate = path.join(dir, `${base}${ext}`);
     let n = 2;
-    while (fs.existsSync(candidate)) {
+    // A second download can arrive before Chromium creates the first file.
+    // Reserve paths already handed to a DownloadItem as well as files on disk.
+    while (fs.existsSync(candidate) || [...this.items.values()].some(({ entry }) =>
+      process.platform === 'win32'
+        ? entry.savePath.toLowerCase() === candidate.toLowerCase()
+        : entry.savePath === candidate)) {
       candidate = path.join(dir, `${base} (${n++})${ext}`);
     }
     return candidate;

@@ -558,30 +558,36 @@ export class Agent {
         conversationKey: sessionId,
       });
 
-      for await (const event of stream) {
-        switch (event.type) {
-          case 'text':
-            stepText += event.delta;
-            emit({ type: 'text_delta', messageId, delta: event.delta });
-            break;
-          case 'thinking':
-            stepThinking += event.delta;
-            emit({ type: 'thinking_delta', messageId, delta: event.delta });
-            break;
-          case 'tool_use':
-            pendingCalls.push({ id: event.id, name: event.name, input: event.input });
-            break;
-          case 'usage':
-            emit({ type: 'usage', messageId, usage: event.usage });
-            break;
-          case 'stop':
-            stopReason = event.reason;
-            break;
+      try {
+        for await (const event of stream) {
+          switch (event.type) {
+            case 'text':
+              stepText += event.delta;
+              emit({ type: 'text_delta', messageId, delta: event.delta });
+              break;
+            case 'thinking':
+              stepThinking += event.delta;
+              emit({ type: 'thinking_delta', messageId, delta: event.delta });
+              break;
+            case 'tool_use':
+              pendingCalls.push({ id: event.id, name: event.name, input: event.input });
+              break;
+            case 'usage':
+              emit({ type: 'usage', messageId, usage: event.usage });
+              break;
+            case 'stop':
+              stopReason = event.reason;
+              break;
+          }
         }
-      }
 
-      if (stepThinking) assistantBlocks.push({ type: 'thinking', text: stepThinking });
-      if (stepText) assistantBlocks.push({ type: 'text', text: stepText });
+      } finally {
+        // Preserve text already shown in the sidebar if the provider fails or
+        // the user stops while a response is still streaming.
+        if (stepThinking) assistantBlocks.push({ type: 'thinking', text: stepThinking });
+        if (stepText) assistantBlocks.push({ type: 'text', text: stepText });
+        journal();
+      }
 
       const assistantContent: ModelBlock[] = [];
       if (stepText) assistantContent.push({ type: 'text', text: stepText });

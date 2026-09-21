@@ -58,6 +58,8 @@ class FailAfterToolProvider implements Provider {
       this.toolRan = true;
       return;
     }
+    yield { type: 'thinking', delta: 'The tab is open.' };
+    yield { type: 'text', delta: 'Here is the partial response.' };
     throw new Error('the provider went away mid-turn');
   }
 }
@@ -1133,6 +1135,11 @@ app.whenReady().then(async () => {
       toolCalls.length === 1 && failing.toolRan,
       `blocks=${toolCalls.length} ran=${failing.toolRan}`,
     );
+    const partialBlocks = failReloaded?.messages.flatMap((message) => message.blocks) ?? [];
+    check('a streaming failure preserves text already shown to the user',
+      partialBlocks.some((block) => block.type === 'text' && block.text === 'Here is the partial response.'));
+    check('a streaming failure preserves its reasoning block too',
+      partialBlocks.some((block) => block.type === 'thinking' && block.text === 'The tab is open.'));
 
     // Journalling once per *batch* was not enough: with two calls in a batch,
     // the first committing and the second interrupted, the whole batch — the

@@ -124,6 +124,7 @@ function installDirs(): string[] {
   // npm's global prefix on Windows *is* the bin directory, not a parent of one.
   if (process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, 'npm'));
   if (process.env.LOCALAPPDATA) {
+    dirs.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'OpenAI', 'Codex', 'bin'));
     dirs.push(path.join(process.env.LOCALAPPDATA, 'npm'));
     dirs.push(path.join(process.env.LOCALAPPDATA, 'pnpm'));
   }
@@ -616,6 +617,7 @@ abstract class CliProvider implements Provider {
   }
 
   async *stream(req: StreamRequest): AsyncGenerator<StreamEvent> {
+    req.signal.throwIfAborted();
     const launcher = this.launcher;
     if (!launcher) {
       throw new Error(
@@ -1069,7 +1071,7 @@ export class CodexProvider extends CliProvider {
   protected override failureHint(): string | null {
     if (!this.lastError) return null;
     const upgrade = /requires a newer version|upgrade to the latest/i.test(this.lastError)
-      ? '\n\nUpdate the CLI with:  npm install -g @openai/codex@latest'
+      ? '\n\nOpen Extensions and choose Repair / update for Codex.'
       : '';
     // The id points at the CLI's own session log, which holds the detail.
     const session = this.threadId ? `\n\nCodex session: ${this.threadId}` : '';

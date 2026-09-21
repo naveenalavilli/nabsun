@@ -13,6 +13,15 @@ const installers = job.steps.find(step => step.id === 'installers');
 const upload = job.steps.find(step => step.id === 'upload-installers');
 const summary = job.steps.find(step => step.name === 'Show package download');
 
+test('releases wait for real native connection checks on all supported operating systems', () => {
+  const connections = workflow.jobs['verify-connections'];
+  assert.deepEqual(connections.strategy.matrix.os, ['windows-2022', 'macos-latest', 'ubuntu-latest']);
+  assert(connections.steps.some(step => step.run === 'npm run verify:connections:native'));
+  assert(connections.steps.some(step => step.run?.includes('connection-harness.js')));
+  assert(connections.steps.some(step => step.run?.includes('xvfb-run')));
+  for (const name of ['package', 'package-macos']) assert([workflow.jobs[name].needs].flat().includes('verify-connections'));
+});
+
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-artifact-test-'));
   t.after(() => {

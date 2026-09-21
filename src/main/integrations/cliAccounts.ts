@@ -1,296 +1,257 @@
-﻿import { spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import os from 'node:os';
 import type { AccountStatus, ProviderId } from '../../shared/types';
-import { launcherEnv, resolveLauncher, type Launcher } from '../ai/providers/cli';
+import { clearBinCache, launcherEnv, resolveLauncher, type Launcher } from '../ai/providers/cli';
+import { installNativeCli, isNativeCli, stopCliProcess } from './nativeCli';
+import { loginCodex, UnsupportedCodexLogin } from './codexLogin';
 
-interface CliSpec {
-  binName: string;
-  /** Argument sets for each account operation, or null when unsupported. */
-  status: string[] | null;
-  loginBrowser: string[] | null;
-  loginDevice: string[] | null;
-  loginApiKey: string[] | null;
-  logout: string[] | null;
-}
-
-const SPECS: Partial<Record<ProviderId, CliSpec>> = {
-  'codex-cli': {
-    binName: 'codex',
-    status: ['login', 'status'],
-    loginBrowser: ['login'],
-    // Device flow prints a URL and a code, which we can show in the panel.
-    loginDevice: ['login', '--device-auth'],
-    loginApiKey: ['login', '--with-api-key'],
-    logout: ['logout'],
-  },
-  'claude-cli': {
-    binName: 'claude',
-    // Claude Code manages auth through its own interactive `/login`; there is
-    // no documented non-interactive status command, so we only report presence.
-    status: null,
-    loginBrowser: null,
-    loginDevice: null,
-    loginApiKey: null,
-    logout: null,
-  },
-};
-
-export type LoginMode = 'browser' | 'device' | 'apiKey';
-
+export type LoginMode = 'browser' | 'device' | 'apiKey' | 'repair';
 export interface AccountRunEvent {
   provider: ProviderId;
-  /** Streamed CLI output, so a device code or URL is visible in the panel. */
+  message?: string;
   chunk?: string;
-  /** A sign-in URL found in the output, so the browser can open it in a tab. */
   url?: string;
-  /** A device code found in the output, shown prominently to be typed. */
   code?: string;
   done?: boolean;
   ok?: boolean;
   error?: string;
 }
 
-/**
- * Pulls the sign-in URL and device code out of whatever the CLI prints.
- *
- * The exact wording differs between tools and versions, so this matches shape
- * rather than phrasing: the first http(s) URL, and a grouped code of the
- * `ABCD-EFGH` form that device flows use. Deliberately tolerant â€” a missed code
- * just means the user reads it from the streamed output instead.
- */
 export function parseLoginOutput(text: string): { url?: string; code?: string } {
-  const out: { url?: string; code?: string } = {};
-
-  // Trailing punctuation is common when a URL ends a sentence.
   const url = /https?:\/\/[^\s"'<>)\]]+/.exec(text)?.[0]?.replace(/[.,;:]+$/, '');
-  if (url) out.url = url;
-
   const grouped = /\b[A-Z0-9]{4,8}-[A-Z0-9]{4,8}\b/.exec(text)?.[0];
   const labelled = /(?:code|enter)\D{0,20}?\b([A-Z0-9]{6,10})\b/i.exec(text)?.[1];
   const code = grouped ?? labelled;
-  // A code that is just part of the URL is not a code.
-  if (code && !(out.url ?? '').includes(code)) out.code = code;
-
-  return out;
+  return { ...(url ? { url } : {}), ...(code && !url?.includes(code) ? { code } : {}) };
 }
 
-/**
- * Connect / disconnect for CLI-backed assistants.
- *
- * The CLI owns the credentials â€” we never see them â€” so "connecting an account"
- * means running that tool's own login command and showing the user what it
- * prints. `codex login` opens a browser; `--device-auth` prints a code to type
- * elsewhere, which is the flow that works when the browser cannot be handed
- * over cleanly.
- */
-export class CliAccountManager {
-  /** provider -> the login process currently running, so it can be cancelled. */
-  private running = new Map<ProviderId, ReturnType<typeof spawn>>();
+export function isSignInUrl(id: ProviderId, value: string): boolean {
+  try {
+    const url = new URL(value);
+    const hosts = id === 'codex-cli' ? ['auth.openai.com', 'auth0.openai.com', 'chatgpt.com']
+      : id === 'claude-cli' ? ['claude.ai', 'platform.claude.com', 'console.anthropic.com', 'auth.anthropic.com'] : [];
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port && hosts.includes(url.hostname);
+  } catch { return false; }
+}
 
+/** The native CLI owns credentials. Nabsun handles setup, sign-in and verification. */
+export class CliAccountManager {
+  private operations = new Map<ProviderId, AbortController>();
+  private completions = new Map<ProviderId, Promise<void>>();
+  private shutdown = new AbortController();
+  private signouts = new Map<ProviderId, Promise<{ ok: boolean; error?: string }>>();
+  private installedPaths = new Map<ProviderId, { path: string; setting: string }>();
   constructor(
     private readonly getOverride: (id: ProviderId) => string,
     private readonly emit: (event: AccountRunEvent) => void,
+    private readonly install: (id: 'codex-cli' | 'claude-cli', signal: AbortSignal, progress: (message: string) => void) => Promise<string | void> = installNativeCli,
+    private readonly resolve = resolveLauncher,
+    private readonly selectExecutable: (id: 'codex-cli' | 'claude-cli', executable: string) => void = () => {},
   ) {}
 
-  private launcherFor(id: ProviderId): { spec: CliSpec; launcher: Launcher } | null {
-    const spec = SPECS[id];
-    if (!spec) return null;
-    const launcher = resolveLauncher(spec.binName, this.getOverride(id));
-    return launcher ? { spec, launcher } : null;
+  private launcher(id: ProviderId): Launcher | null {
+    const override = this.getOverride(id);
+    const installed = this.installedPaths.get(id);
+    const selected = installed?.setting === override ? installed.path : override;
+    return isNativeCli(id) ? this.resolve(id === 'codex-cli' ? 'codex' : 'claude', selected) : null;
   }
 
-  supports(id: ProviderId): boolean {
-    return Boolean(SPECS[id]?.status);
-  }
+  supports(id: ProviderId): boolean { return isNativeCli(id); }
 
-  /** Runs the CLI's status command and reports whether an account is connected. */
-  async status(id: ProviderId): Promise<AccountStatus> {
-    const resolved = this.launcherFor(id);
-    if (!resolved) {
-      return { provider: id, supported: false, connected: false, detail: 'CLI not installed' };
+  async status(id: ProviderId, signal?: AbortSignal): Promise<AccountStatus> {
+    const launcher = this.launcher(id);
+    if (!launcher) return { provider: id, supported: this.supports(id), connected: false, detail: 'Ready to connect' };
+    const result = await this.run(launcher, id === 'codex-cli' ? ['login', 'status'] : ['auth', 'status'],
+      AbortSignal.any([this.shutdown.signal, AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]));
+    let connected = false;
+    if (result.code === 0) {
+      if (id === 'claude-cli') {
+        try { connected = JSON.parse(result.stdout).loggedIn === true; } catch { /* Older CLIs cannot verify sign-in. */ }
+      } else {
+        const text = `${result.stdout}\n${result.stderr}`.trim();
+        connected = text.length > 0 && !/not logged in|no credentials|logged out|please run .*login/i.test(text);
+      }
     }
-    const { spec, launcher } = resolved;
-    if (!spec.status) {
-      return {
-        provider: id,
-        supported: false,
-        connected: false,
-        detail: 'This CLI manages sign-in interactively.',
-      };
-    }
-
-    const result = await this.run(launcher, spec.status, { timeoutMs: 15_000 });
-    const text = `${result.stdout}\n${result.stderr}`.trim();
-
-    // Treat an explicit "not logged in" as authoritative; otherwise a zero exit
-    // with an account line means connected.
-    const notLoggedIn = /not logged in|no credentials|logged out|please run .*login/i.test(text);
-    const connected = result.code === 0 && !notLoggedIn && text.length > 0;
-
-    return {
-      provider: id,
-      supported: true,
-      connected,
-      detail: summarise(text) || (connected ? 'Connected' : 'Not connected'),
-    };
+    return { provider: id, supported: true, connected, detail: connected ? 'Connected' : 'Not connected' };
   }
 
-  /**
-   * Starts a login. Output is streamed so the panel can show a device code or a
-   * URL while it is happening.
-   */
   async login(id: ProviderId, mode: LoginMode, apiKey?: string): Promise<void> {
-    const resolved = this.launcherFor(id);
-    if (!resolved) {
-      this.emit({ provider: id, done: true, ok: false, error: 'That CLI is not installed.' });
-      return;
-    }
-    const { spec, launcher } = resolved;
-    const args =
-      mode === 'device' ? spec.loginDevice : mode === 'apiKey' ? spec.loginApiKey : spec.loginBrowser;
-    if (!args) {
-      this.emit({ provider: id, done: true, ok: false, error: 'That sign-in method is not supported.' });
-      return;
-    }
-
-    this.cancel(id);
-
-    let child: ReturnType<typeof spawn>;
-    try {
-      child = spawn(launcher.command, [...launcher.args, ...args], {
-        cwd: os.tmpdir(),
-        env: {
-          ...process.env,
-          NO_COLOR: '1',
-          FORCE_COLOR: '0',
-          ...launcherEnv(launcher),
-        },
-        windowsHide: true,
-      });
-    } catch (err) {
-      // spawn() throws synchronously for EINVAL/ENOENT.
-      this.emit({
-        provider: id,
-        done: true,
-        ok: false,
-        error: `Could not start the CLI: ${err instanceof Error ? err.message : String(err)}`,
-      });
-      return;
-    }
-    this.running.set(id, child);
-
-    // An API key arrives on stdin so it never appears in a command line or in
-    // any process listing.
-    if (mode === 'apiKey') {
-      child.stdin?.on('error', () => {});
-      child.stdin?.end(`${apiKey ?? ''}\n`, 'utf8');
-    }
-
-    // Output arrives in arbitrary chunks, so scan the accumulated text and only
-    // announce a URL or code the first time it appears.
-    let seen = '';
-    let sentUrl: string | undefined;
-    let sentCode: string | undefined;
-
-    const forward = (buf: Buffer) => {
-      const chunk = buf.toString('utf8');
-      seen += chunk;
-      const found = parseLoginOutput(seen);
-      const event: AccountRunEvent = { provider: id, chunk };
-      if (found.url && found.url !== sentUrl) {
-        sentUrl = found.url;
-        event.url = found.url;
+    const signout = this.signouts.get(id);
+    if (signout) await signout.catch(() => {});
+    const previous = this.operations.get(id);
+    if (previous) {
+      if (previous.signal.aborted) {
+        await this.completions.get(id);
+        return this.login(id, mode, apiKey);
       }
-      if (found.code && found.code !== sentCode) {
-        sentCode = found.code;
-        event.code = found.code;
-      }
-      this.emit(event);
+      return;
+    }
+    if (this.shutdown.signal.aborted) return;
+    if (!isNativeCli(id) || !['browser', 'device', 'apiKey', 'repair'].includes(mode) || (id === 'claude-cli' && !['browser', 'repair'].includes(mode))) {
+      this.emit({ provider: id, done: true, ok: false, error: 'This sign-in method is not supported.' }); return;
+    }
+    const controller = new AbortController();
+    let settle!: () => void;
+    this.completions.set(id, new Promise<void>(resolve => { settle = resolve; }));
+    this.operations.set(id, controller);
+    let originalOverride = this.getOverride(id);
+    const { signal } = controller;
+    const notify = (event: Omit<AccountRunEvent, 'provider'>) => {
+      if (this.operations.get(id) === controller && !signal.aborted) this.emit({ provider: id, ...event });
     };
-
-    child.stdout?.on('data', forward);
-    child.stderr?.on('data', forward);
-
-    child.on('error', (err) => {
-      this.running.delete(id);
-      this.emit({ provider: id, done: true, ok: false, error: err.message });
-    });
-    child.on('close', (code) => {
-      this.running.delete(id);
-      this.emit({
-        provider: id,
-        done: true,
-        ok: code === 0,
-        error: code === 0 ? undefined : `Sign-in exited with code ${code}.`,
-      });
-    });
-  }
-
-  async logout(id: ProviderId): Promise<{ ok: boolean; error?: string }> {
-    const resolved = this.launcherFor(id);
-    if (!resolved?.spec.logout) return { ok: false, error: 'Sign-out is not supported for this CLI.' };
-    const result = await this.run(resolved.launcher, resolved.spec.logout, { timeoutMs: 20_000 });
-    return result.code === 0
-      ? { ok: true }
-      : { ok: false, error: summarise(`${result.stdout}\n${result.stderr}`) || 'Sign-out failed.' };
-  }
-
-  /** Stops a login that is waiting on the user. */
-  cancel(id: ProviderId) {
-    const child = this.running.get(id);
-    if (child) {
-      child.kill();
-      this.running.delete(id);
+    try {
+      notify({ message: 'Preparing your connection...' });
+      let launcher = this.launcher(id);
+      let preparedThisAttempt = false;
+      const setup = async () => {
+        const executable = await this.install(id, signal, message => notify({ message }));
+        clearBinCache();
+        signal.throwIfAborted();
+        if (this.getOverride(id) !== originalOverride) throw new Error('The executable setting changed during setup. Connect again with the new setting.');
+        if (executable) {
+          const prepared = this.resolve(id === 'codex-cli' ? 'codex' : 'claude', executable);
+          if (!prepared) throw new Error('The updated CLI could not be found. Try Repair / update again.');
+          const version = await this.run(prepared, ['--version'], AbortSignal.any([signal, AbortSignal.timeout(15_000)]));
+          signal.throwIfAborted();
+          if (version.code !== 0 || !/\d+\.\d+\.\d+/.test(version.stdout + version.stderr)) throw new Error('The updated CLI could not start. Try Repair / update again.');
+          if (this.getOverride(id) !== originalOverride) throw new Error('The executable setting changed during setup. Connect again with the new setting.');
+          this.selectExecutable(id, executable);
+          originalOverride = this.getOverride(id);
+          this.installedPaths.set(id, { path: executable, setting: originalOverride });
+        }
+        launcher = this.launcher(id);
+        if (!launcher) throw new Error('Setup finished, but the CLI could not be found. Try connecting again.');
+        preparedThisAttempt = true;
+      };
+      if (!launcher || mode === 'repair') {
+        if (!launcher && originalOverride && mode !== 'repair') throw new Error('The custom executable was not found. Choose Repair / update to set it up automatically.');
+        await setup();
+      }
+      let existing = await this.status(id, signal);
+      signal.throwIfAborted();
+      if (!existing.connected || mode === 'apiKey') {
+        // Old CLIs report unknown-command for their account interface. Upgrade
+        // only that case; network/account failures should never cause reinstall loops.
+        if (mode !== 'repair') {
+          const help = await this.run(launcher!, id === 'codex-cli' ? ['app-server', '--help'] : ['auth', 'login', '--help'],
+            AbortSignal.any([signal, AbortSignal.timeout(15_000)]));
+          signal.throwIfAborted();
+          const helpText = help.stdout + help.stderr;
+          const commandUsage = id === 'codex-cli' ? /usage:[^\r\n]*\bapp-server\b/i : /usage:[^\r\n]*\bauth\s+login\b/i;
+          const unsupported = (help.code !== 0 && /unknown|unrecognized|unexpected argument|invalid (?:command|subcommand)/i.test(helpText))
+            || (help.code === 0 && /usage:/i.test(helpText) && !commandUsage.test(helpText));
+          if (unsupported && !preparedThisAttempt) {
+            notify({ message: 'Updating this assistant for browser sign-in...' });
+            await setup();
+            existing = await this.status(id, signal);
+            signal.throwIfAborted();
+          }
+        }
+        if (!existing.connected || mode === 'apiKey') {
+          notify({ message: 'Starting secure sign-in...' });
+          const sentUrls = new Set<string>();
+          const onUrl = (url: string) => {
+            if (!isSignInUrl(id, url)) throw new Error('The CLI returned an unrecognized sign-in address.');
+            if (!sentUrls.has(url)) { sentUrls.add(url); notify({ url, message: 'Finish signing in on the account page.' }); }
+          };
+          if (id === 'codex-cli' && (mode === 'browser' || mode === 'repair')) {
+            try { await loginCodex(launcher!, signal, onUrl); }
+            catch (error) {
+              signal.throwIfAborted();
+              if (!(error instanceof UnsupportedCodexLogin) || preparedThisAttempt) throw error;
+              notify({ message: 'Updating Codex for browser sign-in...' });
+              await setup();
+              if (!(await this.status(id, signal)).connected) await loginCodex(launcher!, signal, onUrl);
+            }
+          } else {
+            const args = id === 'claude-cli' ? ['auth', 'login'] : mode === 'device' ? ['login', '--device-auth'] : ['login', '--with-api-key'];
+            const output = { stdout: '', stderr: '' };
+            let sentCode = '';
+            const result = await this.run(launcher!, args, AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]), (chunk, stream) => {
+              // stderr progress can arrive between two halves of a stdout URL.
+              const seen = output[stream] = (output[stream] + chunk).slice(-32_000);
+              // Wait for a delimiter; a URL can arrive split across multiple chunks.
+              for (const match of seen.matchAll(/https:\/\/[^\s"'<>)\]]+(?=[\s"'<>)\]])/g)) {
+                const url = match[0].replace(/[.,;:]+$/, '');
+                if (isSignInUrl(id, url)) onUrl(url);
+              }
+              const code = mode === 'device' ? parseLoginOutput(seen).code : undefined;
+              if (code && code !== sentCode) { sentCode = code; notify({ code }); }
+            }, mode === 'apiKey' ? `${apiKey ?? ''}\n` : undefined);
+            signal.throwIfAborted();
+            if (result.code !== 0) throw new Error('Sign-in did not finish. Try again, or choose Repair / update.');
+          }
+        }
+      }
+      signal.throwIfAborted();
+      notify({ message: 'Checking your connection...' });
+      if (this.getOverride(id) !== originalOverride) throw new Error('The executable setting changed during sign-in. Connect again with the new setting.');
+      if (!(await this.status(id, signal)).connected) throw new Error('Sign-in could not be verified. Try connecting again.');
+      signal.throwIfAborted();
+      if (this.getOverride(id) !== originalOverride) throw new Error('The executable setting changed during sign-in. Connect again with the new setting.');
+      notify({ done: true, ok: true, message: 'Connected and ready to use.' });
+    } catch (error) {
+      notify({ done: true, ok: false, error: error instanceof Error ? error.message : 'Connection failed. Try again.' });
+    } finally {
+      if (this.operations.get(id) === controller) this.operations.delete(id);
+      this.completions.delete(id);
+      if (signal.aborted) this.emit({ provider: id, done: true, ok: false, message: 'Connection cancelled.' });
+      settle();
     }
   }
 
-  private run(
-    launcher: Launcher,
-    args: string[],
-    opts: { timeoutMs: number },
-  ): Promise<{ code: number | null; stdout: string; stderr: string }> {
-    return new Promise((resolve) => {
+  logout(id: ProviderId): Promise<{ ok: boolean; error?: string }> {
+    const pending = this.signouts.get(id);
+    if (pending) return pending;
+    const work = this.signOut(id);
+    this.signouts.set(id, work);
+    return work.finally(() => { if (this.signouts.get(id) === work) this.signouts.delete(id); });
+  }
+
+  private async signOut(id: ProviderId): Promise<{ ok: boolean; error?: string }> {
+    this.cancel(id);
+    await this.completions.get(id);
+    const launcher = this.launcher(id);
+    if (!launcher) return { ok: true };
+    const result = await this.run(launcher, id === 'codex-cli' ? ['logout'] : ['auth', 'logout'],
+      AbortSignal.any([this.shutdown.signal, AbortSignal.timeout(20_000)]));
+    return result.code === 0 ? { ok: true } : { ok: false, error: 'Sign-out failed. Try again.' };
+  }
+
+  cancel(id: ProviderId): void {
+    const operation = this.operations.get(id);
+    if (!operation) return;
+    if (operation.signal.aborted) return;
+    operation.abort();
+    this.emit({ provider: id, message: 'Cancelling connection...' });
+  }
+
+  cancelAll(): void {
+    this.shutdown.abort();
+    for (const id of this.operations.keys()) this.cancel(id);
+  }
+
+  private run(launcher: Launcher, args: string[], signal: AbortSignal, onOutput?: (chunk: string, stream: 'stdout' | 'stderr') => void, input?: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
+    return new Promise(resolve => {
+      if (signal.aborted) { resolve({ code: -1, stdout: '', stderr: '' }); return; }
       let child: ReturnType<typeof spawn>;
       try {
         child = spawn(launcher.command, [...launcher.args, ...args], {
-          cwd: os.tmpdir(),
-          env: {
-            ...process.env,
-            NO_COLOR: '1',
-            FORCE_COLOR: '0',
-            ...launcherEnv(launcher),
-          },
-          windowsHide: true,
+          cwd: os.tmpdir(), windowsHide: true, detached: process.platform !== 'win32',
+          env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', ...launcherEnv(launcher) },
         });
-      } catch (err) {
-        resolve({ code: -1, stdout: '', stderr: err instanceof Error ? err.message : String(err) });
-        return;
-      }
-
-      let stdout = '';
-      let stderr = '';
-      child.stdout?.on('data', (b: Buffer) => (stdout += b.toString('utf8')));
-      child.stderr?.on('data', (b: Buffer) => (stderr += b.toString('utf8')));
-
-      // A status command that hangs must not hang the settings panel.
-      const timer = setTimeout(() => child.kill(), opts.timeoutMs);
-      child.on('error', (err) => {
-        clearTimeout(timer);
-        resolve({ code: -1, stdout, stderr: `${stderr}${err.message}` });
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        resolve({ code, stdout, stderr });
-      });
+      } catch { resolve({ code: -1, stdout: '', stderr: '' }); return; }
+      let stdout = '', stderr = '';
+      const abort = () => stopCliProcess(child);
+      signal.addEventListener('abort', abort, { once: true });
+      child.stdout?.setEncoding('utf8'); child.stderr?.setEncoding('utf8');
+      child.stdout?.on('data', (chunk: string) => { stdout = (stdout + chunk).slice(-32_000); onOutput?.(chunk, 'stdout'); });
+      child.stderr?.on('data', (chunk: string) => { stderr = (stderr + chunk).slice(-32_000); onOutput?.(chunk, 'stderr'); });
+      child.stdin?.on('error', () => {});
+      if (input !== undefined) child.stdin?.end(input, 'utf8');
+      const finish = (code: number | null) => { signal.removeEventListener('abort', abort); resolve({ code, stdout, stderr }); };
+      child.on('error', () => finish(-1));
+      child.on('close', code => finish(code));
     });
   }
-}
-
-/** First meaningful line of CLI output, for a one-line status. */
-function summarise(text: string): string {
-  const line = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  return line ? line.slice(0, 160) : '';
 }

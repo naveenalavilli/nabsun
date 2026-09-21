@@ -22,6 +22,34 @@ env:
   CI: 'true'
 
 jobs:
+  verify-connections:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Connection and process cleanup regressions
+        run: node dist/test/connection-harness.js
+      - name: Connection UI on Windows and macOS
+        if: runner.os != 'Linux'
+        run: node scripts/electron-run.mjs scripts/verify-connections-ui.cjs
+      - name: Connection UI on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-connections-ui.cjs --no-sandbox
+      - name: Fresh official native installation and auth protocol
+        run: npm run verify:connections:native
+
   verify:
     runs-on: windows-2022
     timeout-minutes: 60
@@ -178,7 +206,7 @@ jobs:
   # Add `--x64` and a dmg target here if Intel users ask.
   package-macos:
     runs-on: macos-latest
-    needs: verify-macos
+    needs: [verify-macos, verify-connections]
     timeout-minutes: 60
     defaults:
       run:
@@ -239,7 +267,7 @@ jobs:
 
   package:
     runs-on: windows-2022
-    needs: [verify, verify-macos, package-macos]
+    needs: [verify, verify-macos, package-macos, verify-connections]
     timeout-minutes: 60
     # Only this job may write, and only the release step below uses it. The
     # workflow default stays `contents: read`.

@@ -11,7 +11,7 @@ including a fork.
 ## llama.cpp
 
 - **Upstream:** https://github.com/ggml-org/llama.cpp
-- **Version:** `b10867` (Windows CPU x64 build)
+- **Version:** `b10867` (native Windows and macOS builds)
 - **Licence:** MIT
 - **Copyright:** © 2023-present Georgi Gerganov and llama.cpp contributors
 - **How it is used:** the `llama-server` executable and its `ggml` libraries are

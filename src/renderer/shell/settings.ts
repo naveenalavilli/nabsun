@@ -122,17 +122,15 @@ export class SettingsView {
         field(
           'Status',
           status,
-          current.hasCredentials
-            ? 'Nabsun runs this CLI for each request, so it uses the login you already have there. No API key is stored here.'
-            : `Install it and sign in, then reopen this panel. ${
-                current.id === 'claude-cli'
-                  ? 'npm i -g @anthropic-ai/claude-code'
-                  : 'npm i -g @openai/codex'
-              }`,
+          'Connect in Extensions. Nabsun handles setup and account sign-in for you.',
         ),
         field('Executable path', pathInput, 'Only needed when the CLI is not on your PATH.'),
         field('Model override', modelInput),
       );
+
+      const connect = el('button', { className: 'primary', textContent: 'Manage connection' });
+      connect.addEventListener('click', () => document.querySelector<HTMLElement>('#extensions-btn')?.click());
+      set.append(connect);
 
       set.append(
         field(

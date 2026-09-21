@@ -111,6 +111,9 @@ export class SessionStore {
     session.updatedAt = Date.now();
     const target = this.file(session.id);
     const tmp = `${target}.tmp`;
+    // Retain the complete conversation before any filesystem operation can
+    // fail, including opening/writing the temporary file (e.g. a full disk).
+    this.unsaved.set(session.id, session);
     fs.writeFileSync(tmp, JSON.stringify(session, null, 2), 'utf8');
 
     let lastError: unknown;
@@ -141,7 +144,8 @@ export class SessionStore {
   }
 
   append(id: string, message: ChatMessage): ChatSession {
-    const session = this.load(id) ?? { ...this.create(), id };
+    this.file(id);
+    const session = this.load(id) ?? this.blank(id);
     session.messages.push(message);
     // Name the session after the first thing the user asked, like an editor
     // naming an untitled file once it has content.
@@ -179,6 +183,8 @@ export class SessionStore {
       if (kept?.messages.some((m) => m.id === message.id)) return kept;
       const session = kept ?? this.blank(id);
       session.messages.push(message);
+      this.file(id);
+      this.unsaved.set(id, session);
       return session;
     }
   }
@@ -192,7 +198,8 @@ export class SessionStore {
    * anything had happened — the worst possible state to retry from.
    */
   upsert(id: string, message: ChatMessage): ChatSession {
-    const session = this.load(id) ?? { ...this.create(), id };
+    this.file(id);
+    const session = this.load(id) ?? this.blank(id);
     const at = session.messages.findIndex((m) => m.id === message.id);
     if (at === -1) session.messages.push(message);
     else session.messages[at] = message;
@@ -211,15 +218,21 @@ export class SessionStore {
         /* skip unreadable session files rather than failing the whole list */
       }
     }
-    return out.sort((a, b) => b.updatedAt - a.updatedAt);
+    const latest = new Map(out.map((s) => [s.id, s]));
+    for (const s of this.unsaved.values()) {
+      if (s.messages.length) latest.set(s.id, { id: s.id, title: s.title, updatedAt: s.updatedAt });
+    }
+    return [...latest.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   remove(id: string) {
+    const file = this.file(id);
     try {
-      fs.unlinkSync(this.file(id));
-    } catch {
-      /* already gone */
+      fs.unlinkSync(file);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
+    this.unsaved.delete(id);
   }
 
   rename(id: string, title: string) {

@@ -116,30 +116,42 @@ function setValue(input: HTMLInputElement, value: string) {
 }
 
 let filledOnce = false;
+let filling = false;
 
 async function tryAutofill() {
-  if (filledOnce) return;
-  const fields = findLoginFields();
+  if (filledOnce || filling) return;
+  const fields = findLoginFields().filter(({ password }) =>
+    !password.autocomplete.split(/\s+/).includes('new-password') && !password.disabled && !password.readOnly);
   if (!fields.length) return;
 
-  const credentials = (await ipcRenderer.invoke('pw:for-origin')) as
-    | { id: string; username: string; password: string }[]
-    | null;
-  if (!credentials?.length) return;
+  filling = true;
+  try {
+    const credentials = (await ipcRenderer.invoke('pw:for-origin')) as
+      | { id: string; username: string; password: string }[]
+      | null;
+    if (!credentials?.length) return;
 
-  // With several saved logins we cannot know which is wanted, so fill the
-  // first only when there is exactly one; otherwise leave it to the user.
-  if (credentials.length !== 1) return;
-  const [credential] = credentials;
+    // With several saved logins we cannot know which is wanted, so fill the
+    // first only when there is exactly one; otherwise leave it to the user.
+    if (credentials.length !== 1) return;
+    const [credential] = credentials;
 
-  for (const field of fields) {
-    // Never overwrite something the user has already typed.
-    if (field.password.value) continue;
-    if (field.username && !field.username.value) setValue(field.username, credential.username);
-    setValue(field.password, credential.password);
-    filledOnce = true;
+    for (const field of fields) {
+      // Never overwrite something the user has already typed.
+      if (!isVisible(field.password) || field.password.value || field.password.disabled || field.password.readOnly ||
+          field.password.autocomplete.split(/\s+/).includes('new-password')) continue;
+      if (field.username && (!isVisible(field.username) || field.username.disabled || field.username.readOnly ||
+          (field.username.value && field.username.value !== credential.username))) continue;
+      if (field.username && !field.username.value) setValue(field.username, credential.username);
+      setValue(field.password, credential.password);
+      filledOnce = true;
+    }
+    if (filledOnce) ipcRenderer.send('pw:used', credential.id);
+  } catch {
+    // The window or credential store may disappear while a lookup is pending.
+  } finally {
+    filling = false;
   }
-  if (filledOnce) ipcRenderer.send('pw:used', credential.id);
 }
 
 /** Reports a submitted credential so the main process can offer to save it. */
