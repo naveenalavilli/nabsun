@@ -56,6 +56,13 @@ function startServer(): Promise<{ server: Server; origin: string }> {
     if (req.url === '/' || req.url === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<title>Home Page</title><h1>Home</h1><a id="next" href="/page2">Go to page two</a>');
+    } else if (req.url === '/popup-post') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.end(`<title>Popup POST</title><pre>${JSON.stringify({ method: req.method, body, referrer: req.headers.referer })}</pre>`);
+      });
     } else if (req.url === '/page2') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<title>Page Two</title><h1>Second page</h1>');
@@ -169,6 +176,75 @@ app.whenReady().then(async () => {
     found = findResult(); tabs.find('', false, true);
     check('find previous retains the original query', (await found).activeMatchOrdinal === 1);
     tabs.stopFind();
+
+    /* ---------------------------------------------------- login popups -- */
+    const popupCount = tabs.all.length;
+    const popupReference = await tab.wc.executeJavaScript(`(() => {
+      window.loginResult = null;
+      window.addEventListener('message', event => {
+        if (event.origin === location.origin && event.data === 'login-complete') window.loginResult = event.data;
+      });
+      window.loginPopup = window.open('/page2', 'login-popup', 'width=600,height=700,nodeIntegration=yes,contextIsolation=no,sandbox=no,webSecurity=no');
+      return window.loginPopup !== null;
+    })()`, true);
+    await until(() => tabs.all.length === popupCount + 1);
+    const loginPopup = tabs.all[popupCount];
+    check('login popup returns a live window reference', popupReference === true);
+    if (loginPopup) {
+      await until(() => loginPopup.liveWc?.getTitle() === 'Page Two');
+      const hasOpener = await loginPopup.wc.executeJavaScript('window.opener !== null');
+      check('login popup retains its opener', hasOpener === true);
+      await loginPopup.wc.executeJavaScriptInIsolatedWorld(999, [{ code: 'window.isolationFixture = true' }]);
+      check('login popup cannot expose Node or isolated-world state', await loginPopup.wc.executeJavaScript("typeof require === 'undefined' && typeof process === 'undefined' && window.isolationFixture === undefined"));
+      check('login popup shares browser cookies', loginPopup.wc.session === tab.wc.session);
+      await loginPopup.wc.executeJavaScript(`window.opener?.postMessage('login-complete', location.origin)`);
+      await delay(100);
+      check('login popup can return the result to the original app', await tab.wc.executeJavaScript("window.loginResult === 'login-complete'"));
+      await loginPopup.wc.executeJavaScript('window.close()').catch(() => {});
+      await until(() => !tabs.byId(loginPopup.id));
+      check('login popup closes without closing its app', !tabs.byId(loginPopup.id) && tab.alive);
+      if (tabs.byId(loginPopup.id)) tabs.close(loginPopup.id);
+    } else check('login popup is managed as a browser tab', false);
+    tabs.activate(tab.id);
+
+    await tab.wc.executeJavaScript(`(() => {
+      const form = document.createElement('form');
+      form.method = 'POST'; form.action = '/popup-post'; form.target = '_blank';
+      const input = document.createElement('input'); input.name = 'state'; input.value = 'fixture-state';
+      form.append(input); document.body.append(form); form.submit(); form.remove();
+    })()`, true);
+    await until(() => tabs.all.length === popupCount + 1);
+    const postPopup = tabs.all[popupCount];
+    if (postPopup) {
+      await until(() => postPopup.liveWc?.getTitle() === 'Popup POST');
+      const posted = await postPopup.wc.executeJavaScript('JSON.parse(document.querySelector("pre").textContent)');
+      check('popup form keeps POST body and referrer', posted.method === 'POST' && posted.body === 'state=fixture-state' && posted.referrer === `${origin}/`);
+      tabs.close(postPopup.id);
+    } else check('popup form opens', false);
+
+    await tab.wc.executeJavaScript("window.open('/page2', '_blank', 'noopener')", true);
+    await until(() => tabs.all.length === popupCount + 1);
+    const isolatedPopup = tabs.all[popupCount];
+    if (isolatedPopup) {
+      await until(() => isolatedPopup.liveWc?.getTitle() === 'Page Two');
+      check('explicit noopener still isolates the popup', await isolatedPopup.wc.executeJavaScript('window.opener === null'));
+      tabs.close(isolatedPopup.id);
+    } else check('noopener popup opens', false);
+    tabs.activate(tab.id);
+
+    const temporaryOpener = tabs.create(`${origin}/`);
+    await until(() => temporaryOpener.liveWc?.getTitle() === 'Home Page');
+    await temporaryOpener.wc.executeJavaScript("window.open('/page2', '_blank'); void 0", true);
+    await until(() => tabs.all.length === popupCount + 2);
+    const independentTab = tabs.all[popupCount + 1];
+    if (independentTab) {
+      await until(() => independentTab.liveWc?.getTitle() === 'Page Two');
+      tabs.close(temporaryOpener.id);
+      await delay(100);
+      check('closing the opener keeps its opened tab alive', independentTab.alive);
+      tabs.close(independentTab.id);
+    } else { check('independent tab opens', false); tabs.close(temporaryOpener.id); }
+    tabs.activate(tab.id);
 
     /* ------------------------------------------------- site permissions -- */
     // Capabilities are denied by default. The old handler named six permissions
