@@ -1,10 +1,10 @@
 {
   "name": "nabsun",
   "productName": "Nabsun",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
   "main": "dist/main/index.js",
-  "author": "Naveen Kumar Alavilli",
+  "author": "Naveen Alavilli",
   "homepage": "https://nabsun.com",
   "license": "MIT",
   "private": true,

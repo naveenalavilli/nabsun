@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WebContentsView, type BaseWindow, type WebContents } from 'electron';
+import { WebContentsView, type BaseWindow, type WebContents, type WebContentsViewConstructorOptions } from 'electron';
 import { requestExternalLink } from './externalLinks';
 import type { TabState } from '../shared/types';
 import type { HistoryStore } from './history';
@@ -34,9 +34,11 @@ export class Tab {
   /** Set when the tab was created by the agent, so it can be cleaned up. */
   createdByAgent = false;
 
-  constructor(preloadPath: string, partition: string) {
+  constructor(preloadPath: string, partition: string, popupOptions?: WebContentsViewConstructorOptions) {
     this.view = new WebContentsView({
+      ...(popupOptions?.webContents ? { webContents: popupOptions.webContents } : {}),
       webPreferences: {
+        ...popupOptions?.webPreferences,
         preload: preloadPath,
         additionalArguments: [`--nabsun-chrome-major=${process.versions.chrome.split('.')[0]}`],
         contextIsolation: true,
@@ -194,7 +196,11 @@ export class TabManager extends EventEmitter {
   }
 
   create(url?: string, opts: { background?: boolean; byAgent?: boolean } = {}): Tab {
-    const tab = new Tab(this.opts.preloadPath, this.opts.partition);
+    return this.createTab(url, opts);
+  }
+
+  private createTab(url: string | undefined, opts: { background?: boolean; byAgent?: boolean }, popupOptions?: WebContentsViewConstructorOptions): Tab {
+    const tab = new Tab(this.opts.preloadPath, this.opts.partition, popupOptions);
     tab.createdByAgent = Boolean(opts.byAgent);
     this.wire(tab);
     this.tabs.push(tab);
@@ -202,8 +208,9 @@ export class TabManager extends EventEmitter {
     tab.view.setVisible(false);
     this.emit('tab-created', tab);
 
-    const target = url || this.opts.homepage;
-    void this.loadUrl(tab, target);
+    // Electron navigates native popups with their original referrer and POST body.
+    // Loading the URL ourselves would discard that context and break OAuth.
+    if (!popupOptions) void this.loadUrl(tab, url || this.opts.homepage);
 
     if (!opts.background || this.tabs.length === 1) this.activate(tab.id);
     else this.emitUpdate();
@@ -436,18 +443,21 @@ export class TabManager extends EventEmitter {
         void requestExternalLink(this.opts.window, wc, url);
         return { action: 'deny' };
       }
-      if (disposition === 'new-window' || disposition === 'foreground-tab' || disposition === 'background-tab') {
-        this.create(url, { background: disposition === 'background-tab' });
-        return { action: 'deny' };
-      }
-      // Anything else (e.g. `save-to-disk`) goes to the OS handler rather than
-      // silently opening an unmanaged Electron window.
-      if (/^https?:/.test(url)) {
-        this.create(url);
-      } else {
-        void requestExternalLink(this.opts.window, wc, url);
-      }
-      return { action: 'deny' };
+      // Preserve Chromium's opener, window proxy, referrer and POST navigation.
+      // OAuth popups need these to report completion to the original app.
+      return {
+        action: 'allow',
+        outlivesOpener: true,
+        overrideBrowserWindowOptions: {
+          webPreferences: {
+            preload: this.opts.preloadPath, partition: this.opts.partition,
+            nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
+          },
+        },
+        createWindow: options => this.createTab(undefined, {
+          background: disposition === 'background-tab',
+        }, options).wc,
+      };
     });
 
     // External schemes (mailto:, tel:, custom app links) leave the browser.
