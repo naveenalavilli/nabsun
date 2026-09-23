@@ -20,7 +20,7 @@ import { systemPrompt } from '../main/ai/prompt';
 import { DEFAULT_SETTINGS } from '../main/store';
 import { browserTools } from '../main/ai/tools/browser';
 import type { Tool } from '../main/ai/tools/types';
-import { tabTools, webTools } from '../main/ai/tools/workspace';
+import { tabTools, webTools, memoryTools } from '../main/ai/tools/workspace';
 import type { StreamEvent } from '../main/ai/provider';
 import type { ToolSpec } from '../shared/types';
 
@@ -176,6 +176,7 @@ async function main() {
     ...browserTools().map(toSpec),
     ...tabTools().map(toSpec),
     ...webTools().map(toSpec),
+    ...memoryTools().map(toSpec),
   ];
   // Shaped as the agent shapes it. Building the request by hand measured
   // something the app never sends — and on this backend the full catalogue plus

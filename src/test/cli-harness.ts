@@ -32,6 +32,9 @@ import { CliAccountManager, parseLoginOutput } from '../main/integrations/cliAcc
 
 let failures = 0;
 let skipped = 0;
+const cachedUsage = parseCodexLine(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 100, cached_input_tokens: 75, output_tokens: 8 } }));
+check('Codex cached tokens are a subset of reported input, not added twice', cachedUsage.usage?.inputTokens === 100 && cachedUsage.usage?.cacheReadTokens === 75);
+
 
 function check(name: string, ok: boolean, detail?: string) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${detail}`}`);

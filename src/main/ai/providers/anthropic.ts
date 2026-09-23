@@ -69,8 +69,10 @@ export class AnthropicProvider implements Provider {
     const params: Anthropic.MessageStreamParams = {
       model: req.model,
       max_tokens: req.maxTokens,
+      // Extend caching through the last cacheable conversation block as well.
+      cache_control: { type: 'ephemeral' },
       // The system prompt is stable across a session, so caching it keeps the
-      // per-step cost of a long agent loop close to output-only.
+      // reusable prefix stable; actual savings depend on model thresholds.
       system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
       messages: toAnthropicMessages(req.messages),
       ...(req.tools.length ? { tools: toAnthropicTools(req.tools) } : {}),
@@ -81,9 +83,13 @@ export class AnthropicProvider implements Provider {
     }
 
     const stream = client.messages.stream(params, { signal: req.signal });
+    const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
     for await (const event of stream) {
       switch (event.type) {
+        case 'message_start':
+          Object.assign(usage, event.message.usage);
+          break;
         case 'content_block_delta':
           if (event.delta.type === 'text_delta') {
             yield { type: 'text', delta: event.delta.text };
@@ -93,13 +99,17 @@ export class AnthropicProvider implements Provider {
           break;
         case 'message_delta':
           if (event.usage) {
+            for (const key of Object.keys(usage) as (keyof typeof usage)[]) {
+              const value = event.usage[key];
+              if (typeof value === 'number') usage[key] = value;
+            }
             yield {
               type: 'usage',
               usage: {
-                inputTokens: event.usage.input_tokens ?? 0,
-                outputTokens: event.usage.output_tokens ?? 0,
-                cacheReadTokens: event.usage.cache_read_input_tokens ?? 0,
-                cacheWriteTokens: event.usage.cache_creation_input_tokens ?? 0,
+                inputTokens: usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens,
+                outputTokens: usage.output_tokens,
+                cacheReadTokens: usage.cache_read_input_tokens,
+                cacheWriteTokens: usage.cache_creation_input_tokens,
               },
             };
           }

@@ -34,6 +34,8 @@ export interface ToolContext {
   ask?(question: string, options: string[]): Promise<string | null>;
   signal: AbortSignal;
   userDataPath: string;
+  /** Host decision; absent means no permission to disclose saved notes. */
+  memoryAllowed?: boolean;
 }
 
 export interface Tool extends ToolSpec {

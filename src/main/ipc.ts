@@ -561,6 +561,8 @@ export function sanitizeSettings(incoming: Partial<Settings>): Partial<Settings>
     if (!(key in incoming)) continue;
     const value = (incoming as Record<string, unknown>)[key];
     if (value === null || value === undefined) continue;
+    // Imported configuration cannot authorize disclosure of existing local notes.
+    if (key === 'memoryLocalOnly' && value !== true) continue;
 
     if (key === 'mcpServers') {
       clean[key] = sanitizeMcpServers(value);

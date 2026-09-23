@@ -39,6 +39,7 @@ export type StreamEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
+  /** Cumulative usage for this stream, not an incremental token delta. Input includes cached input. */
   | { type: 'usage'; usage: TokenUsage }
   | { type: 'stop'; reason: string };
 

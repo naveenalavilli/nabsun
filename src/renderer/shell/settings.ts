@@ -385,6 +385,22 @@ export class SettingsView {
     );
 
     set.append(el('legend', { textContent: 'Permissions' }));
+    const inputBudget = el('input', { type: 'number', value: String(s.inputTokenBudget), min: '8000', max: '128000', step: '1000' });
+    inputBudget.addEventListener('change', () => void this.patch({ inputTokenBudget: Math.max(8000, Math.min(128000, Number(inputBudget.value) || 24000)) }));
+    set.append(field('Input token budget per request', inputBudget, 'Estimated limit for hosted API requests. Stops oversized requests without silently forgetting your instructions. Native CLI agents manage their own context.'));
+    set.append(checkbox('Use saved agent notes', s.memoryEnabled,
+      'Retrieve short relevant notes from agent-notes.json in your profile. Ask the assistant to remember, find, or delete a note.',
+      v => void this.patch({ memoryEnabled: v })));
+    set.append(checkbox('Keep agent notes local', s.memoryLocalOnly,
+      'Only on-device models can read or change saved notes. Turn off to share relevant notes with cloud models and external agents. This is separate from soul.md sharing.',
+      v => void this.patch({ memoryLocalOnly: v })));
+    const memoryPath = el('div', { className: 'hint' });
+    set.append(memoryPath);
+    void window.nabsun.config.paths().then(paths => {
+      const separator = paths.userData.includes('\\') ? '\\' : '/';
+      memoryPath.textContent = `Saved notes: ${paths.userData}${separator}agent-notes.json`;
+    }).catch(() => { memoryPath.textContent = 'Saved notes are in agent-notes.json in your profile folder.'; });
+
     set.append(
       checkbox(
         'Run read-only actions automatically',

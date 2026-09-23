@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 import os from 'node:os';
 import path from 'node:path';
-import type { ProviderId } from '../../../shared/types';
+import type { ProviderId, TokenUsage } from '../../../shared/types';
 import type { ModelMessage, Provider, StreamEvent, StreamRequest } from '../provider';
 
 export interface CliBridgeInfo {
@@ -778,7 +778,7 @@ interface ClaudeStreamLine {
     content_block?: { type: string; name?: string };
   };
   message?: { content?: { type: string; name?: string; text?: string }[] };
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
   total_cost_usd?: number;
 }
 
@@ -864,8 +864,10 @@ export class ClaudeCodeProvider extends CliProvider {
         out.push({
           type: 'usage',
           usage: {
-            inputTokens: data.usage.input_tokens ?? 0,
+            inputTokens: (data.usage.input_tokens ?? 0) + (data.usage.cache_read_input_tokens ?? 0) + (data.usage.cache_creation_input_tokens ?? 0),
             outputTokens: data.usage.output_tokens ?? 0,
+            cacheReadTokens: data.usage.cache_read_input_tokens ?? 0,
+            cacheWriteTokens: data.usage.cache_creation_input_tokens ?? 0,
           },
         });
       }
@@ -954,7 +956,7 @@ export interface CodexLine {
   reasoning?: string;
   tool?: string;
   error?: string;
-  usage?: { inputTokens: number; outputTokens: number };
+  usage?: TokenUsage;
 }
 
 /**
@@ -1012,6 +1014,7 @@ export function parseCodexLine(line: string): CodexLine {
     out.usage = {
       inputTokens: usage.input_tokens ?? usage.prompt_tokens ?? 0,
       outputTokens: usage.output_tokens ?? usage.completion_tokens ?? 0,
+      cacheReadTokens: usage.cached_input_tokens ?? 0,
     };
   }
 

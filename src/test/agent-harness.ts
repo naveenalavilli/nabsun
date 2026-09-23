@@ -1,3 +1,7 @@
+import http from 'node:http';
+import { AnthropicProvider } from '../main/ai/providers/anthropic';
+import { MemoryStore } from '../main/ai/memory';
+import { memoryTools } from '../main/ai/tools/workspace';
 /**
  * Drives the real agent loop against a real Chromium tab, with a scripted stub
  * standing in for the model. This covers everything between "the model emitted
@@ -13,7 +17,7 @@ import path from 'node:path';
 import { BaseWindow, app } from 'electron';
 import type { AgentEvent, AgentQuestion, ProviderId, ToolSpec } from '../shared/types';
 import type { ModelMessage } from '../main/ai/provider';
-import { Agent, estimateTokens, fitToContext } from '../main/ai/agent';
+import { Agent, estimateTokens, fitToContext, pruneHistory, addUsage } from '../main/ai/agent';
 import { ApprovalManager } from '../main/ai/approvals';
 import { QuestionManager } from '../main/ai/questions';
 import type { Provider, StreamEvent, StreamRequest } from '../main/ai/provider';
@@ -953,6 +957,137 @@ app.whenReady().then(async () => {
         String(outcome),
       );
     }
+
+    // Exercise the actual SDK wire adapter: initial input usage must survive
+    // a final delta which contains only cumulative output usage.
+    let wireRequest: Record<string, unknown> = {};
+    const usageServer = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        wireRequest = JSON.parse(body);
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        const events = [
+          { type: 'message_start', message: { id: 'probe', type: 'message', role: 'assistant', model: 'probe', content: [], stop_reason: null, stop_sequence: null,
+            usage: { input_tokens: 12, output_tokens: 0, cache_read_input_tokens: 30, cache_creation_input_tokens: 4 } } },
+          { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+          { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Done.' } },
+          { type: 'content_block_stop', index: 0 },
+          { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 5 } },
+          { type: 'message_stop' },
+        ];
+        for (const event of events) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+        res.end();
+      });
+    });
+    await new Promise<void>(resolve => usageServer.listen(0, '127.0.0.1', resolve));
+    try {
+      const port = (usageServer.address() as { port: number }).port;
+      const adapter = new AnthropicProvider(() => 'test-key', () => `http://127.0.0.1:${port}`);
+      const wireEvents: StreamEvent[] = [];
+      for await (const event of adapter.stream({ model: 'probe', system: 'test', messages: [{ role: 'user', content: [{ type: 'text', text: 'test' }] }],
+        tools: [], maxTokens: 100, thinking: false, signal: AbortSignal.timeout(10000) })) wireEvents.push(event);
+      const usageEvent = wireEvents.find(e => e.type === 'usage');
+      check('Anthropic retains initial input and cache counters when final delta omits them', usageEvent?.type === 'usage' && usageEvent.usage.inputTokens === 46 && usageEvent.usage.outputTokens === 5 && usageEvent.usage.cacheReadTokens === 30 && usageEvent.usage.cacheWriteTokens === 4);
+      check('Anthropic request enables conversation caching', (wireRequest.cache_control as { type: string })?.type === 'ephemeral');
+    } finally { usageServer.closeAllConnections(); await new Promise<void>(resolve => usageServer.close(() => resolve())); }
+
+    // Token reduction must preserve instructions, action receipts and call pairs.
+    const observationHistory: ModelMessage[] = [
+      { role: 'user', content: [{ type: 'text', text: 'Never submit the form.' }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'observe', name: 'browser_snapshot', input: {} }] },
+      { role: 'user', content: [{ type: 'tool_result', toolUseId: 'observe', content: 'x'.repeat(24000), images: [{ mediaType: 'image/png', data: 'old-image' }] }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'write', name: 'browser_click', input: { ref: 'old-1' } }] },
+      { role: 'user', content: [{ type: 'tool_result', toolUseId: 'write', content: 'uncertain outcome '.repeat(1000) }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'screen', name: 'browser_screenshot', input: {} }] },
+      { role: 'user', content: [{ type: 'tool_result', toolUseId: 'screen', content: 'Screenshot', images: [{ mediaType: 'image/png', data: 'short-caption-image' }] }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'latest', name: 'browser_snapshot', input: {} }] },
+      { role: 'user', content: [{ type: 'tool_result', toolUseId: 'latest', content: 'current-refs' }] },
+    ];
+    const original = JSON.stringify(observationHistory);
+    const compact = pruneHistory(observationHistory);
+    check('compaction preserves tool pairs, current refs, user constraints and full action receipts',
+      compact.length === observationHistory.length && JSON.stringify(compact[0]) === JSON.stringify(observationHistory[0]) &&
+      JSON.stringify(compact[4]) === JSON.stringify(observationHistory[4]) && compact[8] === observationHistory[8]);
+    check('compaction removes stale images even with a short caption', !JSON.stringify(compact).includes('short-caption-image'));
+    check('compaction reduces old observations without mutating the transcript', JSON.stringify(compact).length < original.length - 20000 && JSON.stringify(observationHistory) === original);
+    check('history longer than 80 messages retains instructions and matched tool groups', pruneHistory([...observationHistory, ...Array.from({ length: 90 }, () => observationHistory[0])]).length === 99);
+    const counts = addUsage({ inputTokens: 10, outputTokens: 3 }, { inputTokens: 20, outputTokens: 4, cacheReadTokens: 5 });
+    check('usage accumulates across requests', counts.inputTokens === 30 && counts.outputTokens === 7 && counts.cacheReadTokens === 5);
+
+    const memory = new MemoryStore(tmp);
+    memory.write('travel', 'Prefer aisle seats on flights.', false);
+    memory.write('coding', 'Use TypeScript.', false);
+    check('memory retrieves relevant notes without dumping all notes', memory.search('flight aisle').includes('aisle') && !memory.search('flight aisle').includes('TypeScript'));
+    check('memory retrieval is bounded', memory.search('flight aisle', 12).length <= 12);
+    check('memory survives a new store instance', new MemoryStore(tmp).get('travel').includes('aisle'));
+    let invalidKey = false;
+    try { memory.write('__proto__', 'unsafe', false); } catch { invalidKey = true; }
+    check('memory rejects prototype keys', invalidKey);
+    let oversize = false;
+    try { memory.write('travel', 'x'.repeat(8000), true); } catch { oversize = true; }
+    check('memory refuses oversized append without overwriting existing note', oversize && memory.get('travel').includes('aisle'));
+    memory.remove('coding');
+    check('memory deletion persists', !new MemoryStore(tmp).search('TypeScript'));
+    const validMemory = fs.readFileSync(memory.file, 'utf8');
+    fs.writeFileSync(memory.file, '{broken');
+    let corruptRefused = false;
+    try { memory.write('new', 'text', false); } catch { corruptRefused = true; }
+    check('corrupt memory is never silently overwritten', corruptRefused && fs.readFileSync(memory.file, 'utf8') === '{broken');
+    fs.writeFileSync(memory.file, validMemory);
+    let deniedMemory = false;
+    try { await memoryTools().find(t => t.name === 'memory_read')!.handler({ key: 'travel' }, { userDataPath: tmp } as never); } catch { deniedMemory = true; }
+    check('memory tools fail closed without host sharing permission', deniedMemory);
+
+    // Exercise the real request loop, persistence and provider policy, not just helpers.
+    const savedConfig = settings.get();
+    const requests: StreamRequest[] = [];
+    const measured: Provider = {
+      id: 'anthropic', label: 'usage probe', listModels: async () => ['probe'], supportsVision: () => false,
+      async *stream(req) {
+        requests.push(req);
+        yield { type: 'usage', usage: { inputTokens: 10, outputTokens: 1 } };
+        yield { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } };
+        yield { type: 'text', delta: 'Answer.' };
+        yield { type: 'stop', reason: 'end_turn' };
+      },
+    };
+    const memoryAgent = new Agent({ providers: new Map([['anthropic', measured]]), settings, sessions, tabs, history, approvals,
+      userDataPath: tmp, getTools: () => memoryTools(), emit: () => {} });
+    settings.set({ memoryEnabled: true, memoryLocalOnly: true });
+    const privateChat = sessions.create();
+    await memoryAgent.send(privateChat.id, 'flight preferences');
+    check('local-only memory is absent from hosted requests and tool catalogue',
+      !JSON.stringify(requests.at(-1)).includes('Prefer aisle') && requests.at(-1)?.tools.length === 0);
+    check('cumulative usage snapshots are counted once and persisted',
+      sessions.load(privateChat.id)?.messages.at(-1)?.usage?.inputTokens === 10 && sessions.load(privateChat.id)?.messages.at(-1)?.usage?.outputTokens === 5);
+    settings.set({ memoryLocalOnly: false });
+    await memoryAgent.send(sessions.create().id, 'flight preferences');
+    check('cloud sharing opt-in retrieves relevant saved memory', JSON.stringify(requests.at(-1)).includes('Prefer aisle'));
+    const beforeBudget = requests.length;
+    settings.set({ inputTokenBudget: 8000 });
+    await memoryAgent.send(sessions.create().id, 'x'.repeat(60000));
+    check('oversized hosted request is stopped before provider invocation', requests.length === beforeBudget);
+    settings.set({ provider: 'local', memoryLocalOnly: true });
+    let externalMemoryDenied = false;
+    try { await memoryAgent.runToolForExternalAgent('memory_read', { key: 'travel' }); } catch { externalMemoryDenied = true; }
+    check('external agent cannot borrow the local provider identity to read private memory', externalMemoryDenied);
+    check('settings import cannot authorize cloud memory disclosure', sanitizeSettings({ memoryLocalOnly: false }).memoryLocalOnly === undefined);
+    settings.set({ provider: 'anthropic', memoryLocalOnly: false });
+    const switching: Provider = {
+      ...measured,
+      async *stream() {
+        settings.set({ provider: 'local', memoryLocalOnly: true });
+        yield { type: 'tool_use', id: 'private-memory', name: 'memory_read', input: { key: 'travel' } };
+        yield { type: 'stop', reason: 'tool_use' };
+      },
+    };
+    const switchedChat = sessions.create();
+    const switchingAgent = new Agent({ providers: new Map([['anthropic', switching]]), settings, sessions, tabs, history, approvals,
+      userDataPath: tmp, getTools: () => memoryTools(), emit: () => {} });
+    await switchingAgent.send(switchedChat.id, 'Read saved memory.');
+    check('switching the dropdown cannot disclose local notes to the running cloud provider', !JSON.stringify(sessions.load(switchedChat.id)).includes('Prefer aisle'));
+    settings.set(savedConfig);
 
     /* --------------------------------------------- fitting a request in -- */
     // Every one of these was a way the old fitter produced a request that was
