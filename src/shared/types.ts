@@ -222,6 +222,10 @@ export interface Settings {
   /** Tools the user chose "always allow" for, regardless of their risk level. */
   alwaysAllowTools: string[];
   maxAgentSteps: number;
+  /** Request input target, independent of the model's maximum context. */
+  inputTokenBudget: number;
+  memoryEnabled: boolean;
+  memoryLocalOnly: boolean;
   /** Send a screenshot alongside the DOM snapshot when the model supports it. */
   vision: boolean;
   extendedThinking: boolean;

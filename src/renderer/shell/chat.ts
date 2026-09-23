@@ -6,6 +6,7 @@ import type {
   ChatSession,
   ContentBlock,
   ToolCallStatus,
+  TokenUsage,
 } from '../../shared/types';
 import { renderMarkdown } from './markdown';
 
@@ -220,6 +221,7 @@ export class ChatView {
         break;
 
       case 'usage':
+        if (this.live?.messageId === event.messageId) this.renderUsage(this.live.root, event.usage);
         break;
     }
   }
@@ -494,7 +496,21 @@ export class ChatView {
     for (const block of msg.blocks) this.appendBlock(body, block);
 
     root.append(who, body);
+    if (msg.usage) this.renderUsage(root, msg.usage);
     return root;
+  }
+
+  private renderUsage(root: HTMLElement, usage: TokenUsage) {
+    let row = root.querySelector<HTMLElement>('.token-usage');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'token-usage muted';
+      root.appendChild(row);
+    }
+    row.textContent = `${usage.inputTokens.toLocaleString()} input · ${usage.outputTokens.toLocaleString()} output tokens` +
+      (usage.cacheReadTokens ? ` · ${usage.cacheReadTokens.toLocaleString()} cached input` : '') +
+      (usage.cacheWriteTokens ? ` · ${usage.cacheWriteTokens.toLocaleString()} cache writes` : '');
+    row.title = 'Provider-reported totals for this task. Cached input and cache writes are included in input where reported; unavailable usage is not estimated.';
   }
 
   private appendBlock(parent: HTMLElement, block: ContentBlock) {

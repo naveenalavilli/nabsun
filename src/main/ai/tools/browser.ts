@@ -50,6 +50,7 @@ export function browserTools(): Tool[] {
             type: 'boolean',
             description: 'Only include elements currently on screen. Useful on very long pages.',
           },
+          maxChars: { type: 'number', description: 'Outline character limit, 1000–24000; default 8000. Increase if needed.' },
         },
       },
       async (input, ctx) => {
@@ -57,7 +58,7 @@ export function browserTools(): Tool[] {
         await ctx.tabs.waitForSettled(tab, 8_000);
         const snap = await ctx.tabs.callBridge<PageSnapshot>(
           tab,
-          `window.__nabsunAgent.snapshot({ viewportOnly: ${bool(input.viewportOnly)} })`,
+          `window.__nabsunAgent.snapshot({ viewportOnly: ${bool(input.viewportOnly)}, maxChars: ${Math.max(1000, Math.min(24000, num(input.maxChars, 8000)))} })`,
       ctx.signal,
         );
         ctx.status(`Read ${snap.title || snap.url}`);
@@ -264,10 +265,12 @@ export function browserTools(): Tool[] {
       {
         name: 'browser_read_text',
         description:
-          'Get the full readable text of the page, without element handles. Use this to read an article or long document rather than to interact with it.',
+          'Read page prose without element handles. Prefer a selector for the relevant section. Use offset to continue a truncated read on an unchanged page.',
         risk: 'safe',
         properties: {
           selector: { type: 'string', description: 'Optional CSS selector to read a subtree only.' },
+          maxChars: { type: 'number', description: 'Characters to read, 1000–60000; default 12000.' },
+          offset: { type: 'number', description: 'Character offset for continuation on an unchanged page, default 0.' },
           tabId: { type: 'string' },
         },
       },
@@ -275,13 +278,14 @@ export function browserTools(): Tool[] {
         const tab = target(ctx, input);
         await ctx.tabs.waitForSettled(tab, 8_000);
         const selector = input.selector === undefined ? 'undefined' : JSON.stringify(str(input.selector));
+        const offset = Math.max(0, Math.floor(num(input.offset, 0)));
         const res = await ctx.tabs.callBridge<{ text: string; truncated: boolean }>(
           tab,
-          `window.__nabsunAgent.readText(${selector})`,
+          `window.__nabsunAgent.readText(${selector}, ${Math.max(1000, Math.min(60000, num(input.maxChars, 12000)))}, ${Math.max(0, Math.floor(num(input.offset, 0)))})`,
       ctx.signal,
         );
         ctx.status(`Read text from ${tab.wc.getTitle()}`);
-        return res.truncated ? `${res.text}\n\n[…truncated]` : res.text;
+        return res.truncated ? `${res.text}\n\n[More text available: continue with offset=${offset + res.text.length} and the same selector on this unchanged page.]` : res.text;
       },
     ),
 

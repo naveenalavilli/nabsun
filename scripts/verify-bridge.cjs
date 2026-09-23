@@ -95,6 +95,12 @@ app.whenReady().then(async () => {
     // --- reading / extraction ----------------------------------------------
     const text = await evalInPage(wc, 'window.__nabsunAgent.readText()');
     check('readText returns prose', text.text.includes('Sign in'));
+    await wc.executeJavaScript(`{ const p = document.createElement('p'); p.id = 'long-read'; p.textContent = 'A'.repeat(13000) + 'END'; document.body.appendChild(p); }`);
+    const firstRead = await evalInPage(wc, 'window.__nabsunAgent.readText("#long-read")');
+    const secondRead = await evalInPage(wc, 'window.__nabsunAgent.readText("#long-read", 12000, 12000)');
+    check('page reads have a bounded default and exact continuation', firstRead.text.length === 12000 && firstRead.truncated && secondRead.text === 'A'.repeat(1000) + 'END' && !secondRead.truncated);
+    await wc.executeJavaScript("document.getElementById('long-read').remove()");
+
 
     const found = await evalInPage(wc, 'window.__nabsunAgent.findText("pricing")');
     check('findText locates a string', found.length > 0, JSON.stringify(found));

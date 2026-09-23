@@ -44,7 +44,7 @@ interface Snapshot {
   truncated: boolean;
 }
 
-const MAX_TEXT_CHARS = 24_000;
+const MAX_TEXT_CHARS = 8_000;
 const MAX_ELEMENTS = 500;
 
 const SKIP_TAGS = new Set([
@@ -782,7 +782,9 @@ function scrollPage(
 }
 
 /** Full readable text of the page (or a CSS-selected subtree). */
-function readText(selector?: string, maxChars = 60_000): { text: string; truncated: boolean } {
+function readText(selector?: string, maxChars = 12_000, offset = 0): { text: string; truncated: boolean } {
+  maxChars = Number.isFinite(maxChars) ? Math.max(1000, Math.min(60_000, Math.floor(maxChars))) : 12_000;
+  offset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
   const root = selector ? document.querySelector(selector) : document.body;
   if (!root) throw new Error(`No element matches selector ${JSON.stringify(selector)}`);
 
@@ -810,7 +812,7 @@ function readText(selector?: string, maxChars = 60_000): { text: string; truncat
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { text: text.slice(0, maxChars), truncated: text.length > maxChars };
+  return { text: text.slice(offset, offset + maxChars), truncated: text.length > offset + maxChars };
 }
 
 function findText(query: string, limit = 20): { ref: string | null; context: string }[] {
