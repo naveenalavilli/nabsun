@@ -29,6 +29,21 @@ function check(name: string, test: () => void) {
 async function main() {
   await app.whenReady();
   const settings = new SettingsStore();
+  check('new profiles show onboarding', () => assert.equal(settings.get().onboardingCompleted, false));
+  settings.set({ onboardingCompleted: true });
+  settings.flush();
+  check('completed onboarding persists', () => assert.equal(new SettingsStore().get().onboardingCompleted, true));
+  const settingsFile = path.join(tmp, 'settings.json');
+  fs.writeFileSync(settingsFile, JSON.stringify({ provider: 'codex-cli', models: { 'codex-cli': 'custom-model' } }));
+  const upgraded = new SettingsStore();
+  check('existing profiles skip onboarding and retain their model', () => {
+    assert.equal(upgraded.get().onboardingCompleted, true);
+    assert.equal(upgraded.get().models['codex-cli'], 'custom-model');
+  });
+  upgraded.flush();
+  settings.set({ onboardingCompleted: false });
+  settings.flush();
+  check('unfinished onboarding survives restart', () => assert.equal(new SettingsStore().get().onboardingCompleted, false));
   const approvals = new ApprovalManager(settings);
   const questions = new QuestionManager();
   const tool = { name: 'review_write', risk: 'write' } as Tool;

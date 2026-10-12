@@ -33,7 +33,10 @@
     "check:payload": "node scripts/check-release-payload.mjs",
     "release": "node scripts/release.mjs",
     "verify:payload": "node --test scripts/verify-engine-payload.mjs",
-    "verify:connections": "node dist/test/connection-harness.js && node scripts/electron-run.mjs scripts/verify-connections-ui.cjs",
+    "verify:onboarding": "node scripts/electron-run.mjs scripts/verify-onboarding-ui.cjs",
+    "verify:omnibox": "node scripts/electron-run.mjs scripts/verify-omnibox-ui.cjs",
+    "verify:appearance": "node scripts/electron-run.mjs scripts/verify-appearance-ui.cjs",
+    "verify:connections": "node dist/test/connection-harness.js && node scripts/electron-run.mjs scripts/verify-connections-ui.cjs && npm run verify:onboarding",
     "verify:connections:native": "node dist/test/native-install-harness.js --install"
   },
   "dependencies": {

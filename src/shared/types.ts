@@ -196,6 +196,7 @@ export interface McpServerConfig {
 }
 
 export interface Settings {
+  onboardingCompleted: boolean;
   provider: ProviderId;
   models: Record<ProviderId, string>;
   baseUrls: { openai: string; ollama: string; anthropic: string };
@@ -215,6 +216,7 @@ export interface Settings {
   homepage: string;
   searchEngine: 'google' | 'duckduckgo' | 'bing';
   theme: 'dark' | 'light' | 'system';
+  appearance: 'classic' | 'playful' | 'blossom' | 'ocean';
   sidebarWidth: number;
   sidebarOpen: boolean;
   /** Risk levels the agent may run without asking. */

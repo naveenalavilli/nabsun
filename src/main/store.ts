@@ -62,6 +62,7 @@ export class JsonStore<T extends object> {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  onboardingCompleted: false,
   // The bundled model: works on first launch with no account, no key and no
   // network, and costs nothing per action. Everything else is one setting away.
   provider: 'local',
@@ -89,6 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // web is white — a dark shell around a white page is a glare sandwich.
   // 'dark' and 'system' are both available in Settings.
   theme: 'light',
+  appearance: 'classic',
   sidebarWidth: 420,
   sidebarOpen: true,
   autoApprove: { safe: true, write: false, dangerous: false },
@@ -116,6 +118,11 @@ export class SettingsStore {
 
   constructor() {
     this.store = new JsonStore<Settings>('settings.json', DEFAULT_SETTINGS);
+    // Existing profiles predate onboarding; do not interrupt them on upgrade.
+    try {
+      const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
+      if (saved.onboardingCompleted === undefined) this.store.set({ onboardingCompleted: true });
+    } catch { /* A new profile starts with the welcome screen. */ }
   }
 
   get(): Settings {

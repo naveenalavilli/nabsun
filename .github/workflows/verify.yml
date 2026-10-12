@@ -49,6 +49,24 @@ jobs:
         run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-connections-ui.cjs --no-sandbox
       - name: Fresh official native installation and auth protocol
         run: npm run verify:connections:native
+      - name: Onboarding and model picker on Windows and macOS
+        if: runner.os != 'Linux'
+        run: npm run verify:onboarding
+      - name: Address bar on Windows and macOS
+        if: runner.os != 'Linux'
+        run: npm run verify:omnibox
+      - name: Themes on Windows and macOS
+        if: runner.os != 'Linux'
+        run: npm run verify:appearance
+      - name: Themes on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-appearance-ui.cjs --no-sandbox
+      - name: Address bar on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-omnibox-ui.cjs --no-sandbox
+      - name: Onboarding and model picker on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-onboarding-ui.cjs --no-sandbox
 
   verify:
     runs-on: windows-2022

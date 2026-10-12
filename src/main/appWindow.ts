@@ -244,7 +244,24 @@ export class AppWindow {
    * The overlay is only attached while something is showing. A permanently
    * attached transparent view would swallow every click meant for the page.
    */
+  private overlayRequest = 0;
+
   showOverlay(kind: 'omnibox' | 'palette', payload: unknown) {
+    const request = ++this.overlayRequest;
+    if (kind === 'omnibox') {
+      // Measure the actual toolbar, including extension buttons and window size.
+      void this.shell.webContents.executeJavaScript(`(() => {
+        const r = document.getElementById('omnibox').getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height, viewportWidth: innerWidth };
+      })()`).then(anchor => {
+        if (request === this.overlayRequest) this.presentOverlay(kind, { ...(payload as object), anchor });
+      }).catch(err => console.error('[omnibox] Could not measure address bar', err));
+      return;
+    }
+    this.presentOverlay(kind, payload);
+  }
+
+  private presentOverlay(kind: 'omnibox' | 'palette', payload: unknown) {
     if (!this.overlayVisible) {
       this.window.contentView.addChildView(this.overlay);
       this.overlayVisible = true;
@@ -258,11 +275,13 @@ export class AppWindow {
       kind,
       payload,
       theme: theme === 'system' ? null : theme,
+      appearance: this.settings.get().appearance,
     });
     this.overlay.webContents.focus();
   }
 
   hideOverlay() {
+    this.overlayRequest++;
     if (!this.overlayVisible) return;
     this.window.contentView.removeChildView(this.overlay);
     this.overlayVisible = false;

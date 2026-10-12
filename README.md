@@ -30,6 +30,9 @@ Get-FileHash .\Nabsun-<version>-x64-setup.exe -Algorithm SHA256
 
 ## Use the assistant
 
+The first-run guide lets you try the built-in assistant, connect Codex or Claude,
+or start browsing. Reopen it from **Settings → Getting started**.
+
 Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
 The built-in model is suitable for simple tasks; use a larger model for complex work.
 
@@ -44,6 +47,10 @@ No terminal commands, npm packages, or separate Node.js installation are require
 Your provider account must have access to the assistant. Use **Repair / update**
 if the connection needs fixing.
 
+Choose a model above the chat or in **Settings → Model**. Each provider remembers
+its selection for your next message. **Default** uses the CLI's own settings;
+**Other model…** accepts a specific model ID. Availability depends on your account.
+
 Credentials remain in the provider CLI's store. **Sign out** also signs that CLI
 out outside Nabsun. Claude Code may open your system browser during sign-in.
 
@@ -52,6 +59,8 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
 
 ## Features and controls
 
+- **Settings → Appearance:** Classic, Playful, Blossom, or Ocean, with light, dark,
+  or device color mode. Themes change the look, not content or safety settings.
 - Tabs, bookmarks, history, downloads, session restore, and encrypted saved passwords.
 - Page reading, research, form filling, and browser actions in your existing tabs.
 - Approval prompts for clicks, typing, navigation, and page code by default.

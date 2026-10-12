@@ -1,5 +1,7 @@
 import type { ProviderId, ProviderStatus, Settings } from '../../shared/types';
 import { isOnDevice } from '../../shared/types';
+import { modelPicker } from './model-picker';
+import { appearanceSelector } from './appearance';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -61,6 +63,10 @@ export class SettingsView {
     const s = this.settings;
     if (!s) return;
     this.root.textContent = '';
+    const welcome = el('button', { textContent: 'Getting started' });
+    welcome.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
+    this.root.append(welcome);
+    this.root.append(appearanceSelector(s, next => { this.settings = next; this.onChanged(next); }));
     this.root.append(this.modelSection(s), this.behaviourSection(s), this.browsingSection(s));
     void this.integrationsSection().then((node) => {
       this.root.append(node);
@@ -86,8 +92,7 @@ export class SettingsView {
 
     const current = this.credentials.find((c) => c.id === s.provider);
 
-    // A CLI backend runs its own agent loop under its own login, so the model
-    // and key controls below do not apply to it.
+    // CLI backends use their own login; model choices still apply per turn.
     if (current?.kind === 'cli') {
       const status = el('div', { className: 'status-line' }, [
         el('span', { className: `dot ${current.hasCredentials ? 'on' : 'off'}` }),
@@ -109,13 +114,9 @@ export class SettingsView {
         await this.render();
       });
 
-      const modelInput = el('input', {
-        type: 'text',
-        value: s.models[current.id] ?? '',
-        placeholder: "Leave blank to use the CLI's own default",
-      });
-      modelInput.addEventListener('change', () => {
-        void this.patch({ models: { ...s.models, [current.id]: modelInput.value.trim() } });
+      const modelInput = modelPicker(s, next => {
+        this.settings = next;
+        this.onChanged(next);
       });
 
       set.append(
@@ -125,7 +126,7 @@ export class SettingsView {
           'Connect in Extensions. Nabsun handles setup and account sign-in for you.',
         ),
         field('Executable path', pathInput, 'Only needed when the CLI is not on your PATH.'),
-        field('Model override', modelInput),
+        field('Model', modelInput),
       );
 
       const connect = el('button', { className: 'primary', textContent: 'Manage connection' });

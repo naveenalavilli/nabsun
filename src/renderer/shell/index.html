@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'" />
     <title>Nabsun</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
   </head>
   <body>
     <div id="app">
@@ -78,7 +79,9 @@
           </div>
 
           <div id="sidebar-views">
+            <section id="view-onboarding" class="view"><div id="onboarding-body" class="welcome"></div></section>
             <section id="view-chat" class="view active">
+              <div id="chat-model-bar"></div>
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
                 <div id="composer-chips">

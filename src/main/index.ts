@@ -300,6 +300,7 @@ async function boot() {
       // string on purpose: the palette's prefers-color-scheme rule only
       // applies when neither explicit value is set.
       THEME: config.theme === 'system' ? '' : config.theme,
+      APPEARANCE: config.appearance,
       APP_VERSION: app.getVersion(),
       CHROMIUM: process.versions.chrome,
       ELECTRON: process.versions.electron,

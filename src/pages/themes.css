@@ -1,0 +1,62 @@
+/* Shared by browser chrome, address suggestions, and internal pages.
+   Color mode and visual style are independent preferences. */
+:root[data-appearance='playful'] {
+  --theme-accent: #6541b5;
+  --theme-accent-text: light-dark(#59369f, #d3baff);
+  --theme-paper: light-dark(#f5f0ff, #211c2c);
+  --theme-surface: light-dark(#fffaff, #2a2336);
+  --theme-border: light-dark(#d8c9ef, #514263);
+  --theme-chrome: #35244f;
+  --theme-chrome-raised: #493464;
+  --theme-chrome-dim: #cabce1;
+  --radius: 12px;
+  --radius-lg: 16px;
+}
+:root[data-appearance='blossom'] {
+  --theme-accent: #a23465;
+  --theme-accent-text: light-dark(#902657, #ffb6d3);
+  --theme-paper: light-dark(#fff2f5, #291c23);
+  --theme-surface: light-dark(#fffafb, #34242d);
+  --theme-border: light-dark(#e8c8d4, #62434f);
+  --theme-chrome: #492635;
+  --theme-chrome-raised: #603547;
+  --theme-chrome-dim: #e4c1d0;
+}
+:root[data-appearance='ocean'] {
+  --theme-accent: #096c85;
+  --theme-accent-text: light-dark(#075e75, #8ddbeb);
+  --theme-paper: light-dark(#edf8fb, #14272d);
+  --theme-surface: light-dark(#f8fdff, #1c333b);
+  --theme-border: light-dark(#bddce5, #365965);
+  --theme-chrome: #163945;
+  --theme-chrome-raised: #234c5a;
+  --theme-chrome-dim: #b3d5df;
+}
+:root[data-appearance]:is([data-appearance='playful'], [data-appearance='blossom'], [data-appearance='ocean']) {
+  --bg: var(--theme-paper);
+  --bg-raised: var(--theme-surface);
+  --bg-input: var(--theme-surface);
+  --sidebar-bg: var(--theme-surface);
+  --hero: var(--theme-paper);
+  --sunken: var(--theme-paper);
+  --border: var(--theme-border);
+  --border-strong: var(--theme-border);
+  --text: light-dark(#24212b, #f2edf5);
+  --text-dim: light-dark(#635969, #c9bdcf);
+  --text-faint: light-dark(#6b6171, #b3a8ba);
+  --accent: var(--theme-accent);
+  --accent-dim: var(--theme-accent);
+  --accent-deep: var(--theme-accent);
+  --accent-text: var(--theme-accent-text);
+  --accent-soft: var(--theme-accent-text);
+  --accent-2: var(--theme-accent-text);
+  --accent-3: var(--theme-accent-text);
+  --accent-tint: color-mix(in srgb, var(--theme-accent) 14%, transparent);
+  --accent-tint-strong: color-mix(in srgb, var(--theme-accent) 25%, transparent);
+  --ring: color-mix(in srgb, var(--theme-accent) 30%, transparent);
+  --chrome: var(--theme-chrome);
+  --chrome-raised: var(--theme-chrome-raised);
+  --chrome-border: var(--theme-chrome-raised);
+  --chrome-text: #fff8ff;
+  --chrome-dim: var(--theme-chrome-dim);
+}

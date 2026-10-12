@@ -3,6 +3,8 @@ import { ExtensionsView } from './extensions';
 import { BookmarksView, PasswordsView } from './vault';
 import { ChatView } from './chat';
 import { SettingsView } from './settings';
+import { modelPicker } from './model-picker';
+import { OnboardingView } from './onboarding';
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
@@ -142,7 +144,7 @@ function renderToolbar(next: WindowState) {
     try {
       const parsed = new URL(url);
       omniboxScheme.textContent = parsed.protocol === 'https:' ? '🔒' : '⚠';
-      omniboxText.textContent = `${parsed.hostname}${parsed.pathname === '/' ? '' : parsed.pathname}${parsed.search}`;
+      omniboxText.textContent = `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}${parsed.search}${parsed.hash}`;
     } catch {
       omniboxScheme.textContent = '';
       omniboxText.textContent = url;
@@ -411,6 +413,7 @@ function renderExtensionActions(items: ExtensionStatus[]) {
 }
 
 type ViewName =
+  | 'onboarding'
   | 'chat'
   | 'history'
   | 'settings'
@@ -427,6 +430,7 @@ function showView(name: ViewName) {
   if (name === 'bookmarks') void bookmarksView.render();
   if (name === 'passwords') void passwordsView.render();
   if (name === 'history') void renderSessions();
+  if (name === 'onboarding') onboarding.render();
 }
 
 async function renderSessions() {
@@ -481,12 +485,39 @@ const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
 const settingsView = new SettingsView((next) => {
   settings = next;
+  applyTheme(next.theme);
 });
+const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
+  settings = next;
+  renderChatModel(next);
+  showView(destination);
+  if (prompt) chat.ask(prompt);
+});
+
+let modelSignature = '';
+function renderChatModel(next: Settings) {
+  const signature = `${next.provider}:${next.models[next.provider]}`;
+  if (signature === modelSignature) return;
+  modelSignature = signature;
+  const bar = $('#chat-model-bar');
+  bar.replaceChildren();
+  const provider = document.createElement('button');
+  provider.className = 'model-provider';
+  const labels = { local: 'On-device assistant', 'codex-cli': 'Codex', 'claude-cli': 'Claude Code', anthropic: 'Anthropic API', openai: 'OpenAI API', ollama: 'Ollama' };
+  provider.textContent = `${labels[next.provider]} · Change`;
+  provider.title = 'Change assistant in Settings';
+  provider.addEventListener('click', () => showView('settings'));
+  bar.append(provider);
+  if (next.provider === 'codex-cli' || next.provider === 'claude-cli') {
+    bar.append(modelPicker(next, updated => { settings = updated; renderChatModel(updated); }));
+  }
+}
 
 async function refreshSettings() {
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
   applyVerbose(settings.verbose);
+  renderChatModel(settings);
 }
 
 function wireExtensions() {
@@ -497,6 +528,10 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  window.addEventListener('nabsun:welcome', () => {
+    window.nabsun.window.toggleSidebar(true);
+    showView('onboarding');
+  });
   $('#new-chat').addEventListener('click', async () => {
     await chat.start();
     showView('chat');
@@ -540,6 +575,7 @@ window.nabsun.onSettingsChanged((next) => {
   settings = next;
   applyTheme(next.theme);
   applyVerbose(next.verbose);
+  renderChatModel(next);
 });
 
 /**
@@ -554,6 +590,7 @@ window.nabsun.onSettingsChanged((next) => {
  */
 function applyTheme(theme: Settings['theme']): void {
   const root = document.documentElement;
+  root.dataset.appearance = settings?.appearance ?? 'classic';
   if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
   else delete root.dataset.theme;
 }
@@ -633,6 +670,8 @@ async function boot() {
   wireExtensions();
 
   settings = await window.nabsun.settings.get();
+  renderChatModel(settings);
+  applyTheme(settings.theme);
   $<HTMLInputElement>('#autopilot').checked = settings.autoApprove.write;
   $<HTMLInputElement>('#autopilot').addEventListener('change', async (e) => {
     const on = (e.target as HTMLInputElement).checked;
@@ -645,6 +684,10 @@ async function boot() {
   await bookmarksView.refresh();
   await chat.start();
   window.nabsun.ready();
+  if (!settings.onboardingCompleted) {
+    window.nabsun.window.toggleSidebar(true);
+    showView('onboarding');
+  }
 }
 
 void boot();
