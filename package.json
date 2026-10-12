@@ -1,7 +1,7 @@
 {
   "name": "nabsun",
   "productName": "Nabsun",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
   "main": "dist/main/index.js",
   "author": "Naveen Alavilli",
@@ -14,8 +14,9 @@
     "start": "npm run build && node scripts/electron-run.mjs",
     "setup": "node node_modules/electron/install.js",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
+    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:updates && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
     "verify:review": "node scripts/electron-run.mjs dist/test/review-harness.js",
+    "verify:updates": "node scripts/electron-run.mjs scripts/verify-updates.cjs",
     "verify:browse": "node scripts/electron-run.mjs dist/test/browsing-harness.js",
     "verify:cli": "node dist/test/cli-harness.js",
     "verify:page": "node scripts/electron-run.mjs scripts/verify-bridge.cjs",
@@ -33,7 +34,10 @@
     "check:payload": "node scripts/check-release-payload.mjs",
     "release": "node scripts/release.mjs",
     "verify:payload": "node --test scripts/verify-engine-payload.mjs",
-    "verify:connections": "node dist/test/connection-harness.js && node scripts/electron-run.mjs scripts/verify-connections-ui.cjs",
+    "verify:onboarding": "node scripts/electron-run.mjs scripts/verify-onboarding-ui.cjs",
+    "verify:omnibox": "node scripts/electron-run.mjs scripts/verify-omnibox-ui.cjs",
+    "verify:appearance": "node scripts/electron-run.mjs scripts/verify-appearance-ui.cjs",
+    "verify:connections": "node dist/test/connection-harness.js && node scripts/electron-run.mjs scripts/verify-connections-ui.cjs && npm run verify:onboarding",
     "verify:connections:native": "node dist/test/native-install-harness.js --install"
   },
   "dependencies": {

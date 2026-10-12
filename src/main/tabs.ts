@@ -40,7 +40,6 @@ export class Tab {
       webPreferences: {
         ...popupOptions?.webPreferences,
         preload: preloadPath,
-        additionalArguments: [`--nabsun-chrome-major=${process.versions.chrome.split('.')[0]}`],
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,

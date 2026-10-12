@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'" />
     <title>Nabsun</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
   </head>
   <body>
     <div id="app">
@@ -33,6 +34,7 @@
           <button id="bookmark" class="icon-btn" title="Bookmark this page" aria-label="Bookmark">☆</button>
           <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
           <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
+          <button id="update-btn" class="pill" hidden>Update available</button>
           <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
           <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
           <button id="sidebar-toggle" class="icon-btn" title="Toggle AI sidebar (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
@@ -78,7 +80,9 @@
           </div>
 
           <div id="sidebar-views">
+            <section id="view-onboarding" class="view"><div id="onboarding-body" class="welcome"></div></section>
             <section id="view-chat" class="view active">
+              <div id="chat-model-bar"></div>
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
                 <div id="composer-chips">

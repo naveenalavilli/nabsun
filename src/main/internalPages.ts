@@ -130,6 +130,11 @@ export function registerInternalProtocol(
     // Internal pages have no IPC bridge, so live values are substituted here
     // rather than fetched by the page.
     let html = fs.readFileSync(file, 'utf8');
+    // Trusted bundled styles, included before CSP hashes are calculated.
+    const themesFile = path.join(pagesRoot, 'themes.css');
+    if (fs.existsSync(themesFile)) {
+      html = html.replace('</head>', `<style>${fs.readFileSync(themesFile, 'utf8')}</style></head>`);
+    }
     if (html.includes('{{')) {
       const values = tokens();
       // Escaping depends on where the placeholder sits. A token in markup needs

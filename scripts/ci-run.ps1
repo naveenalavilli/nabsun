@@ -1,7 +1,7 @@
 # Preserve streamed output and the native exit code for each CI step.
 param(
   [Parameter(Mandatory = $true, Position = 0)]
-  [ValidateSet('typecheck', 'build', 'verify:cli', 'verify:browse', 'verify:page',
+  [ValidateSet('typecheck', 'build', 'verify:cli', 'verify:browse', 'verify:page', 'verify:review', 'verify:updates',
     'verify:agent', 'verify:mcp', 'verify:local', 'fetch:model', 'check:payload', 'dist:win', 'dist:win:ci')]
   [string]$Script,
   [Parameter(ValueFromRemainingArguments = $true)]

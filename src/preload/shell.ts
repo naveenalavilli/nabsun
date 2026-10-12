@@ -9,6 +9,10 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 }
 
 const api: ShellApi = {
+  updates: {
+    check: manual => ipcRenderer.invoke(CH.updateCheck, manual),
+    open: () => ipcRenderer.invoke(CH.updateOpen),
+  },
   onWindowState: (cb) => on(CH.windowState, cb),
   onAgentEvent: (cb) => on(CH.agentEvent, cb),
   onApprovalRequest: (cb) => on(CH.agentApprovalRequest, cb),

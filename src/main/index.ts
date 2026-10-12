@@ -300,6 +300,7 @@ async function boot() {
       // string on purpose: the palette's prefers-color-scheme rule only
       // applies when neither explicit value is set.
       THEME: config.theme === 'system' ? '' : config.theme,
+      APPEARANCE: config.appearance,
       APP_VERSION: app.getVersion(),
       CHROMIUM: process.versions.chrome,
       ELECTRON: process.versions.electron,
@@ -513,24 +514,8 @@ function configureSession(settings: SettingsStore) {
     callback();
   });
 
-  // Present as a normal Chrome build so sites don't serve degraded pages to an
-  // unrecognised Electron UA string.
-  const chromeVersion = process.versions.chrome;
-  ses.setUserAgent(
-    `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`,
-  );
-
-  const major = chromeVersion.split('.')[0];
-  ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    if (!settings.get().presentAsChrome) return callback({ requestHeaders: details.requestHeaders });
-    return callback({ requestHeaders: { ...details.requestHeaders,
-      'Sec-CH-UA': `"Chromium";v="${major}", "Google Chrome";v="${major}", "Not?A_Brand";v="24"`,
-      'Sec-CH-UA-Mobile': '?0',
-      'Sec-CH-UA-Platform': '"Windows"' } });
-  });
-
-
-
+  // Use Electron/Chromium's native user agent and client hints. In particular,
+  // do not claim Windows on macOS/Linux or rewrite only low-entropy hints.
 }
 
 function zoomActive(deps: IpcDeps, direction: 'in' | 'out' | 'reset') {

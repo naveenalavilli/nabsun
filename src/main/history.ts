@@ -238,8 +238,7 @@ export function buildSuggestions(
   const out: OmniboxSuggestion[] = [];
   if (!q) return out;
 
-  const looksLikeUrl = resolveNavigationInput(q, settings.searchEngine).startsWith('http') &&
-    !/\s/.test(q) && /\./.test(q);
+  const looksLikeUrl = resolveNavigationInput(q, settings.searchEngine) !== searchUrlFor(settings.searchEngine, q);
 
   if (looksLikeUrl) {
     out.push({

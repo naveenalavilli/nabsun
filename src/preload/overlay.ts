@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { CH } from '../shared/ipc';
-import type { OmniboxSuggestion } from '../shared/types';
+import type { OmniboxSuggestion, Settings } from '../shared/types';
 
 export interface OverlayApi {
   onOpen(
@@ -9,6 +9,7 @@ export interface OverlayApi {
       payload: unknown;
       /** null means "follow the OS"; see AppWindow.showOverlay. */
       theme: 'light' | 'dark' | null;
+      appearance?: Settings['appearance'];
     }) => void,
   ): void;
   suggest(query: string): Promise<OmniboxSuggestion[]>;

@@ -86,6 +86,8 @@ function copyStatic() {
   const jobs = [
     ['src/renderer/shell/index.html', 'renderer/shell/index.html'],
     ['src/renderer/shell/styles.css', 'renderer/shell/styles.css'],
+    ['src/pages/themes.css', 'renderer/shell/themes.css'],
+    ['src/pages/themes.css', 'renderer/overlay/themes.css'],
     ['src/renderer/overlay/index.html', 'renderer/overlay/index.html'],
   ];
   for (const [from, to] of jobs) {

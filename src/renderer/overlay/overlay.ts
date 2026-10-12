@@ -24,6 +24,7 @@ let selected = 0;
 let mode: 'omnibox' | 'palette' = 'omnibox';
 /** Guards against a slow suggestion response overwriting a newer query. */
 let queryToken = 0;
+let composing = false;
 
 const COMMANDS: { title: string; subtitle: string; command: string; hint?: string }[] = [
   { title: 'New tab', subtitle: 'Open a blank tab', command: 'new-tab', hint: 'Ctrl+T' },
@@ -48,14 +49,27 @@ const ICONS: Record<OmniboxSuggestion['kind'], string> = {
   command: '⌘',
 };
 
-window.overlay.onOpen(({ kind, payload, theme }) => {
+window.overlay.onOpen(({ kind, payload, theme, appearance }) => {
+  document.documentElement.dataset.appearance = appearance ?? 'classic';
   // Match the shell rather than the OS; see AppWindow.showOverlay.
   if (theme) document.documentElement.dataset.theme = theme;
   else delete document.documentElement.dataset.theme;
   mode = kind;
+  queryToken++;
+  rows = [];
   backdrop.classList.toggle('palette', kind === 'palette');
-  const query = (payload as { query?: string })?.query ?? '';
+  const { query: rawQuery = '', anchor } = (payload ?? {}) as {
+    query?: string; anchor?: { x: number; y: number; width: number; height: number; viewportWidth: number };
+  };
+  const query = rawQuery.startsWith('nabsun://') ? '' : rawQuery;
+  if (anchor) {
+    backdrop.style.setProperty('--address-left', `${anchor.x}px`);
+    backdrop.style.setProperty('--address-top', `${anchor.y}px`);
+    backdrop.style.setProperty('--address-right', `${Math.max(0, anchor.viewportWidth - anchor.x - anchor.width)}px`);
+    backdrop.style.setProperty('--address-height', `${anchor.height}px`);
+  }
   input.value = kind === 'omnibox' ? query : '';
+  input.setAttribute('aria-label', kind === 'omnibox' ? 'Search or enter address' : 'Type a command');
   input.placeholder = kind === 'omnibox' ? 'Search or enter address' : 'Type a command';
   selected = 0;
   input.focus();
@@ -67,8 +81,11 @@ input.addEventListener('input', () => {
   selected = 0;
   void refresh();
 });
+input.addEventListener('compositionstart', () => { composing = true; });
+input.addEventListener('compositionend', () => { composing = false; selected = 0; void refresh(); });
 
 input.addEventListener('keydown', (e) => {
+  if (composing || e.isComposing || e.keyCode === 229) return;
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
@@ -88,6 +105,7 @@ input.addEventListener('keydown', (e) => {
       break;
     case 'Escape':
       e.preventDefault();
+      queryToken++;
       window.overlay.close();
       break;
   }
@@ -106,6 +124,7 @@ function move(delta: number) {
 
 async function refresh() {
   const query = input.value;
+  const token = ++queryToken;
   if (mode === 'palette') {
     const q = query.trim().toLowerCase();
     rows = COMMANDS.filter(
@@ -121,9 +140,14 @@ async function refresh() {
     return;
   }
 
-  const token = ++queryToken;
-  const suggestions = query.trim() ? await window.overlay.suggest(query) : [];
+  // Enter must always target the current text, even while IPC is pending.
+  rows = query.trim() ? [{ icon: '↗', title: query, run: () => window.overlay.run('navigate', query) }] : [];
+  paint();
+  let suggestions: OmniboxSuggestion[] = [];
+  try { suggestions = query.trim() ? await window.overlay.suggest(query) : []; }
+  catch { return; } // Keep the current text usable when suggestions fail.
   if (token !== queryToken) return;
+  selected = 0;
 
   rows = suggestions.map((s) => ({
     icon: ICONS[s.kind] ?? '•',
@@ -151,11 +175,13 @@ async function refresh() {
 
 function paint() {
   list.textContent = '';
+  input.setAttribute('aria-expanded', String(rows.length > 0));
+  input.removeAttribute('aria-activedescendant');
   if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = mode === 'palette' ? 'No matching commands' : 'Start typing to search';
-    list.append(empty);
+    empty.textContent = 'No matching commands';
+    if (mode === 'palette') list.append(empty);
     return;
   }
 
@@ -163,6 +189,9 @@ function paint() {
     const item = document.createElement('div');
     item.className = `item${i === selected ? ' selected' : ''}`;
     item.setAttribute('role', 'option');
+    item.id = `suggestion-${i}`;
+    item.setAttribute('aria-selected', String(i === selected));
+    if (i === selected) input.setAttribute('aria-activedescendant', item.id);
 
     const icon = document.createElement('span');
     icon.className = 'kind';
@@ -191,8 +220,13 @@ function paint() {
 
     item.addEventListener('mouseenter', () => {
       selected = i;
-      paint();
+      for (const [index, child] of [...list.children].entries()) {
+        child.classList.toggle('selected', index === selected);
+        child.setAttribute('aria-selected', String(index === selected));
+      }
+      input.setAttribute('aria-activedescendant', item.id);
     });
+    item.addEventListener('mousedown', e => e.preventDefault());
     item.addEventListener('click', () => row.run());
     list.append(item);
   });

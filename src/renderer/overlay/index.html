@@ -73,6 +73,28 @@
         padding-top: 64px;
       }
       #backdrop.palette { align-items: flex-start; padding-top: 128px; }
+      #backdrop:not(.palette) { background: transparent; display: block; padding: 0; }
+      #backdrop:not(.palette) #panel {
+        position: absolute;
+        left: var(--address-left, 110px); right: var(--address-right, 180px);
+        top: var(--address-top, 42px); width: auto;
+        max-height: calc(100vh - var(--address-top, 42px) - 16px);
+        border: 1px solid var(--border-strong); border-radius: 16px;
+        box-shadow: 0 4px 12px var(--shadow);
+      }
+      #backdrop:not(.palette) #input {
+        height: var(--address-height, 32px); min-height: 28px;
+        padding: 0 14px; flex-shrink: 0; font-size: 13px; border-bottom: none;
+      }
+      #backdrop:not(.palette) #list:empty { display: none; }
+      #backdrop:not(.palette) #list { padding: 4px 0 8px; border-top: 1px solid var(--border); }
+      #backdrop:not(.palette) .item { border-radius: 0; padding: 8px 14px; min-height: 38px; }
+      #backdrop:not(.palette) .item.selected { background: var(--hover); }
+      #backdrop:not(.palette) .item .text { display: flex; align-items: baseline; gap: 12px; }
+      #backdrop:not(.palette) .item .title { flex: 0 1 auto; }
+      #backdrop:not(.palette) .item .sub { flex: 1; color: var(--text-dim); }
+      :root[data-theme='dark'] { --hover: #ffffff14; }
+      @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --hover: #ffffff14; } }
       #panel {
         width: min(720px, calc(100vw - 96px));
         max-height: calc(100vh - 140px);
@@ -115,11 +137,12 @@
       ::-webkit-scrollbar { width: 9px; }
       ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
     </style>
+    <link rel="stylesheet" href="themes.css" />
   </head>
   <body>
     <div id="backdrop">
       <div id="panel">
-        <input id="input" type="text" spellcheck="false" autocomplete="off" aria-label="Command input" />
+        <input id="input" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" role="combobox" aria-autocomplete="list" aria-controls="list" aria-expanded="false" aria-label="Search or enter address" />
         <div id="list" role="listbox"></div>
       </div>
     </div>
