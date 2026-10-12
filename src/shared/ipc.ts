@@ -1,3 +1,4 @@
+import type { UpdateStatus } from './updates';
 import type {
   AgentEvent,
   AccountStatus,
@@ -28,6 +29,8 @@ import type {
 
 /** Renderer -> main, request/response. */
 export const CH = {
+  updateCheck: 'updates:check',
+  updateOpen: 'updates:open',
   // shell lifecycle
   shellReady: 'shell:ready',
   windowState: 'window:state', // main -> renderer push
@@ -187,6 +190,7 @@ export interface CredentialSaveResult {
 
 /** The surface exposed on `window.nabsun` inside the shell renderer. */
 export interface ShellApi {
+  updates: { check(manual?: boolean): Promise<UpdateStatus>; open(): Promise<void> };
   onWindowState(cb: (state: WindowState) => void): () => void;
   onAgentEvent(cb: (event: AgentEvent) => void): () => void;
   onApprovalRequest(cb: (req: ApprovalRequest) => void): () => void;

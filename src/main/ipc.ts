@@ -3,6 +3,7 @@ import path from 'node:path';
 import { app, dialog, session, shell } from 'electron';
 import { pathToFileURL } from 'node:url';
 import { uiIpc } from './uiSecurity';
+import { UpdateChecker, RELEASE_PAGE } from './updates';
 import { CH } from '../shared/ipc';
 import type {
   ApprovalDecision,
@@ -71,6 +72,10 @@ export function registerIpc(deps: IpcDeps): void {
       channels: new Set([CH.omniboxSuggest, CH.overlayCommand, CH.overlayClose]),
     },
   ]);
+
+  const updates = new UpdateChecker(app.getVersion());
+  ipcMain.handle(CH.updateCheck, (_event, manual?: boolean) => updates.check(manual === true));
+  ipcMain.handle(CH.updateOpen, () => shell.openExternal(RELEASE_PAGE));
 
   /* ---------------------------------------------------------------- tabs */
 
@@ -178,7 +183,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CH.settingsGet, () => settings.get());
   ipcMain.handle(CH.settingsSet, async (_e, patch: Partial<Settings>) => {
     const before = settings.get();
-    const next = settings.set(patch);
+    const next = settings.save(patch);
     win.applySettings(next);
     if (patch.mcpServers && JSON.stringify(before.mcpServers) !== JSON.stringify(next.mcpServers)) {
       await deps.reloadIntegrations();
@@ -342,7 +347,7 @@ export function registerIpc(deps: IpcDeps): void {
       if (!Object.keys(clean).length) {
         return { ok: false, error: 'That file contains no recognisable settings.' };
       }
-      const next = settings.set(clean);
+      const next = settings.save(clean);
       win.applySettings(next);
       await deps.reloadIntegrations();
       return { ok: true, path: result.filePaths[0], settings: next };

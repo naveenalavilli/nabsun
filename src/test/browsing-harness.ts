@@ -56,6 +56,9 @@ function startServer(): Promise<{ server: Server; origin: string }> {
     if (req.url === '/' || req.url === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end('<title>Home Page</title><h1>Home</h1><a id="next" href="/page2">Go to page two</a>');
+    } else if (req.url === '/identity') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(req.headers));
     } else if (req.url === '/popup-post') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
@@ -158,6 +161,29 @@ app.whenReady().then(async () => {
     const tab = tabs.create(`${origin}/`);
     await until(() => tab.wc.getTitle() === 'Home Page');
     check('a page loads over HTTP', tab.wc.getTitle() === 'Home Page', tab.wc.getTitle());
+
+    const identityScript = `JSON.stringify({
+      ua: navigator.userAgent, platform: navigator.platform,
+      brands: navigator.userAgentData?.brands,
+      patchedBrands: !!navigator.userAgentData && Object.hasOwn(navigator.userAgentData, 'brands'),
+      chrome: ['loadTimes', 'csi', 'app', 'runtime'].map(key => [key, typeof window.chrome?.[key],
+        typeof window.chrome?.[key] === 'function' ? String(window.chrome[key]) : null])
+    })`;
+    const native = new BrowserWindow({ show: false, webPreferences: {
+      partition: 'persist:browse-harness', sandbox: true, contextIsolation: true, nodeIntegration: false,
+    } });
+    try {
+      await native.loadURL(`${origin}/`);
+      check('page preload preserves native browser identity and APIs',
+        await tab.wc.executeJavaScript(identityScript) === await native.webContents.executeJavaScript(identityScript));
+      const identity = await tab.wc.executeJavaScript(`(async () => {
+        const headers = await (await fetch('/identity')).json();
+        return { network: headers['user-agent'], javascript: navigator.userAgent,
+          networkPlatform: headers['sec-ch-ua-platform'], platform: navigator.userAgentData?.platform };
+      })()`);
+      check('network and JavaScript user agents agree', identity.network === identity.javascript);
+      check('client hints preserve the native platform', identity.networkPlatform === JSON.stringify(identity.platform));
+    } finally { native.destroy(); }
 
     await until(() => !tab.wc.isLoading());
     await tab.wc.executeJavaScript('document.body.insertAdjacentHTML("beforeend", "<p>findneedle findneedle findneedle</p>")');

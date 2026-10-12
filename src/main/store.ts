@@ -39,6 +39,27 @@ export class JsonStore<T extends object> {
     return this.cache;
   }
 
+  /** Commit first; a failed write must not change the live value or notify UI. */
+  commit(value: T): T {
+    this.write(value);
+    if (this.writeTimer) clearTimeout(this.writeTimer);
+    this.writeTimer = null;
+    this.cache = value;
+    return this.cache;
+  }
+
+  private write(value: T) {
+    fs.mkdirSync(path.dirname(this.file), { recursive: true });
+    const tmp = `${this.file}.tmp`;
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+      fs.renameSync(tmp, this.file);
+    } catch (err) {
+      try { fs.unlinkSync(tmp); } catch { /* Cleanup must not mask the write error. */ }
+      throw err;
+    }
+  }
+
   /** Debounced so rapid updates (sidebar drag, scroll state) don't thrash disk. */
   private scheduleWrite() {
     if (this.writeTimer) clearTimeout(this.writeTimer);
@@ -51,10 +72,7 @@ export class JsonStore<T extends object> {
       this.writeTimer = null;
     }
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      const tmp = `${this.file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(this.cache, null, 2), 'utf8');
-      fs.renameSync(tmp, this.file);
+      this.write(this.cache);
     } catch (err) {
       console.error('[store] failed to persist', this.file, err);
     }
@@ -102,7 +120,6 @@ export const DEFAULT_SETTINGS: Settings = {
   vision: true,
   extendedThinking: false,
   verbose: false,
-  presentAsChrome: true,
   blockAds: true,
   bookmarksBarVisible: true,
   savePasswords: true,
@@ -149,10 +166,18 @@ export class SettingsStore {
     return next;
   }
 
+  /** User-requested saves are durable before IPC reports success.
+   * Background layout updates continue to use the debounced set(). */
+  save(patch: Partial<Settings>): Settings {
+    this.store.commit({ ...this.get(), ...patch });
+    const next = this.get();
+    for (const l of this.listeners) l(next);
+    return next;
+  }
+
   /** Restores factory defaults. Credentials live elsewhere and are untouched. */
   reset(): Settings {
-    this.store.replace({ ...DEFAULT_SETTINGS });
-    this.store.flush();
+    this.store.commit({ ...DEFAULT_SETTINGS });
     const next = this.get();
     for (const l of this.listeners) l(next);
     return next;

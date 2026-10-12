@@ -242,7 +242,6 @@ export interface Settings {
    * lines tells the user nothing they wanted to know.
    */
   verbose: boolean;
-  presentAsChrome: boolean;
   blockAds: boolean;
   bookmarksBarVisible: boolean;
   /** Offer to save passwords typed into sign-in forms. */

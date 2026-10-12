@@ -493,6 +493,7 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 #chat-model-bar > .model-provider:hover { color: var(--accent-text); }
 #chat-model-bar > .model-provider:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; border-radius: 3px; }
 .model-picker { min-width: 0; }
+.settings-save-error { color: var(--danger-text); font-size: 12px; line-height: 1.5; }
 .model-select-control { position: relative; min-width: 0; }
 .model-select-control::after {
   content: ''; position: absolute; right: 15px; top: 50%; width: 6px; height: 6px;

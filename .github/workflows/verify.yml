@@ -97,6 +97,12 @@ jobs:
       - name: Verify browser
         timeout-minutes: 10
         run: ./scripts/ci-run.ps1 verify:browse
+      - name: Verify settings persistence and security regressions
+        timeout-minutes: 5
+        run: ./scripts/ci-run.ps1 verify:review
+      - name: Verify update notifications
+        timeout-minutes: 5
+        run: ./scripts/ci-run.ps1 verify:updates
       - name: Verify page bridge
         timeout-minutes: 10
         run: ./scripts/ci-run.ps1 verify:page
@@ -185,6 +191,8 @@ jobs:
           NABSUN_REQUIRE_LOCAL: '1'
         run: |
           npm run verify:browse
+          npm run verify:review
+          npm run verify:updates
           npm run verify:page
           npm run verify:agent
           npm run verify:mcp

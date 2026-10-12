@@ -5,6 +5,7 @@ import { ChatView } from './chat';
 import { SettingsView } from './settings';
 import { modelPicker } from './model-picker';
 import { OnboardingView } from './onboarding';
+import { startUpdateChecks } from './updates';
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
@@ -662,6 +663,7 @@ async function revealWhenReady(id: string, timeoutMs = 2000): Promise<void> {
 
 async function boot() {
   wireToolbar();
+  startUpdateChecks();
   wireFind();
   wireSidebarResize();
   wireSidebarButtons();
@@ -674,10 +676,22 @@ async function boot() {
   applyTheme(settings.theme);
   $<HTMLInputElement>('#autopilot').checked = settings.autoApprove.write;
   $<HTMLInputElement>('#autopilot').addEventListener('change', async (e) => {
-    const on = (e.target as HTMLInputElement).checked;
-    settings = await window.nabsun.settings.set({
-      autoApprove: { ...settings!.autoApprove, write: on },
-    });
+    const checkbox = e.target as HTMLInputElement;
+    const on = checkbox.checked;
+    checkbox.disabled = true;
+    $('#composer').querySelector('.settings-save-error')?.remove();
+    try {
+      settings = await window.nabsun.settings.set({
+        autoApprove: { ...settings!.autoApprove, write: on },
+      });
+    } catch {
+      checkbox.checked = settings!.autoApprove.write;
+      const error = document.createElement('p');
+      error.className = 'settings-save-error';
+      error.setAttribute('role', 'alert');
+      error.textContent = 'Could not save Autopilot. Your previous setting is still active. Please try again.';
+      $('#composer').prepend(error);
+    } finally { checkbox.disabled = false; }
   });
 
   await refreshBookmarks();

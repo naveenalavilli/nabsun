@@ -30,6 +30,10 @@ Get-FileHash .\Nabsun-<version>-x64-setup.exe -Algorithm SHA256
 
 ## Use the assistant
 
+Nabsun checks for new releases at startup and every 24 hours. Click **Update
+available** in the toolbar to download one, or use **Settings > App updates** to
+check manually. Updates require downloading and running the new installer.
+
 The first-run guide lets you try the built-in assistant, connect Codex or Claude,
 or start browsing. Reopen it from **Settings → Getting started**.
 
@@ -109,7 +113,7 @@ a Developer ID certificate and notarization.
 
 ## Current limits
 
-Nabsun is a developer preview. There is no automatic update, profile sync, or
+Nabsun is a developer preview. There is no automatic update installation, profile sync, or
 private browsing mode. The small local model can struggle with long tasks, and
 website compatibility varies. Review actions before approving them.
 

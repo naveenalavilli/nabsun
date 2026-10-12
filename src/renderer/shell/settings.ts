@@ -2,6 +2,7 @@ import type { ProviderId, ProviderStatus, Settings } from '../../shared/types';
 import { isOnDevice } from '../../shared/types';
 import { modelPicker } from './model-picker';
 import { appearanceSelector } from './appearance';
+import { updatesSection } from './updates';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -38,6 +39,8 @@ export class SettingsView {
   private root = document.querySelector<HTMLElement>('#settings-body')!;
   private settings: Settings | null = null;
   private credentials: ProviderStatus[] = [];
+  private saveError = '';
+  private paintGeneration = 0;
   /**
    * What happened to the last credential save, per provider.
    *
@@ -55,22 +58,39 @@ export class SettingsView {
   }
 
   private async patch(patch: Partial<Settings>) {
-    this.settings = await window.nabsun.settings.set(patch);
-    this.onChanged(this.settings);
+    try {
+      this.settings = await window.nabsun.settings.set(patch);
+      this.saveError = '';
+      this.root.querySelector('.settings-save-error')?.remove();
+      this.onChanged(this.settings);
+    } catch {
+      this.saveError = 'Could not save settings. Your previous settings are still active. Please try again.';
+      this.paint();
+    }
   }
 
   private paint() {
+    const generation = ++this.paintGeneration;
     const s = this.settings;
     if (!s) return;
     this.root.textContent = '';
+    if (this.saveError) {
+      const error = el('p', { className: 'settings-save-error', textContent: this.saveError });
+      error.setAttribute('role', 'alert');
+      this.root.append(error);
+    }
     const welcome = el('button', { textContent: 'Getting started' });
     welcome.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
     this.root.append(welcome);
+    this.root.append(updatesSection());
     this.root.append(appearanceSelector(s, next => { this.settings = next; this.onChanged(next); }));
     this.root.append(this.modelSection(s), this.behaviourSection(s), this.browsingSection(s));
     void this.integrationsSection().then((node) => {
+      if (generation !== this.paintGeneration) return;
       this.root.append(node);
-      void this.advancedSection().then((adv) => this.root.append(adv));
+      void this.advancedSection().then((adv) => {
+        if (generation === this.paintGeneration) this.root.append(adv);
+      });
     });
   }
 
@@ -366,14 +386,6 @@ export class SettingsView {
         s.vision,
         'Lets the assistant look at the page visually when layout matters.',
         (v) => void this.patch({ vision: v }),
-      ),
-      checkbox(
-        'Identify as Google Chrome',
-        s.presentAsChrome,
-        'Some sites refuse to sign you in unless the browser reports itself as Chrome. ' +
-          'On by default. Turning it off makes Nabsun report itself accurately, ' +
-          'and Google sign-in will stop working.',
-        (v) => void this.patch({ presentAsChrome: v }),
       ),
     );
 
@@ -765,9 +777,14 @@ export class SettingsView {
         }, 4000);
         return;
       }
-      await window.nabsun.config.reset();
-      status.textContent = 'Settings restored to defaults. API keys were left untouched.';
-      await this.render();
+      try {
+        await window.nabsun.config.reset();
+        this.saveError = '';
+        status.textContent = 'Settings restored to defaults. API keys were left untouched.';
+        await this.render();
+      } catch {
+        status.textContent = 'Could not reset settings. Your previous settings are still active. Please try again.';
+      }
     });
 
     buttons.append(exportBtn, importBtn, resetBtn);

@@ -93,6 +93,11 @@ browser navigation or trusted plugin code.
 
 ## Limits
 
+Release checks contact GitHub's public API at startup and every 24 hours, with
+short-lived caching for repeated checks. No account, browsing history, or local
+settings are sent. GitHub receives the request's IP address. Notifications link
+to Nabsun's official release page; the app does not download or execute updates.
+
 There is no central action audit log, enterprise policy enforcement, plugin
 sandbox, separate password-vault unlock, or automatic updater. Windows packages
 are unsigned; macOS builds use ad-hoc signing without notarization.

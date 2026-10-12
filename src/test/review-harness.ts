@@ -44,6 +44,61 @@ async function main() {
   settings.set({ onboardingCompleted: false });
   settings.flush();
   check('unfinished onboarding survives restart', () => assert.equal(new SettingsStore().get().onboardingCompleted, false));
+  const beforeSave = settings.get();
+  const savedBytes = fs.readFileSync(settingsFile, 'utf8');
+  const proposed = { theme: 'dark' as const, onboardingCompleted: true,
+    models: { ...beforeSave.models, 'codex-cli': 'retry-model' } };
+  let saveEvents = 0;
+  const unsubscribeSave = settings.onChange(() => { saveEvents++; });
+  for (const operation of ['mkdirSync', 'writeFileSync', 'renameSync'] as const) {
+    const realOperation = fs[operation];
+    try {
+      (fs as any)[operation] = () => { throw Object.assign(new Error('Profile write failed'), { code: 'EACCES' }); };
+      check(`${operation} failure rejects a settings save without publishing it`, () => {
+        assert.throws(() => settings.save(proposed), /Profile write failed/);
+        assert.deepEqual(settings.get(), beforeSave);
+        assert.equal(saveEvents, 0);
+        assert.equal(fs.readFileSync(settingsFile, 'utf8'), savedBytes);
+        assert.deepEqual(new SettingsStore().get(), beforeSave);
+      });
+      check(`${operation} failure rejects reset without replacing existing settings`, () => {
+        assert.throws(() => settings.reset(), /Profile write failed/);
+        assert.deepEqual(settings.get(), beforeSave);
+        assert.equal(saveEvents, 0);
+      });
+    } finally { (fs as any)[operation] = realOperation; }
+  }
+  check('failed writes leave no settings staging file', () => assert.equal(fs.existsSync(`${settingsFile}.tmp`), false));
+  settings.set({ sidebarWidth: 480 });
+  const realRename = fs.renameSync;
+  try {
+    fs.renameSync = (() => { throw new Error('Rename denied'); }) as typeof fs.renameSync;
+    assert.throws(() => settings.save(proposed), /Rename denied/);
+  } finally { fs.renameSync = realRename; }
+  settings.flush();
+  check('a later background flush cannot persist a rejected user change', () => {
+    const restarted = new SettingsStore().get();
+    assert.equal(restarted.sidebarWidth, 480);
+    assert.equal(restarted.theme, beforeSave.theme);
+    assert.equal(restarted.onboardingCompleted, beforeSave.onboardingCompleted);
+    assert.deepEqual(restarted.models, beforeSave.models);
+  });
+  settings.set({ sidebarWidth: 490 });
+  let durableAtNotification = false;
+  const unsubscribeDurability = settings.onChange(next => {
+    durableAtNotification = fs.readFileSync(settingsFile, 'utf8') === JSON.stringify(next, null, 2);
+  });
+  settings.save(proposed);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  check('retry commits before notification and survives pending background writes', () => {
+    assert.equal(durableAtNotification, true);
+    assert.deepEqual(new SettingsStore().get(), settings.get());
+    assert.equal(settings.get().sidebarWidth, 490);
+    assert.equal(settings.get().models['codex-cli'], 'retry-model');
+  });
+  unsubscribeDurability();
+  unsubscribeSave();
+  settings.reset();
   const approvals = new ApprovalManager(settings);
   const questions = new QuestionManager();
   const tool = { name: 'review_write', risk: 'write' } as Tool;
