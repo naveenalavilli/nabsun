@@ -3,7 +3,6 @@ import { ExtensionsView } from './extensions';
 import { BookmarksView, PasswordsView } from './vault';
 import { ChatView } from './chat';
 import { SettingsView } from './settings';
-import { modelPicker } from './model-picker';
 import { OnboardingView } from './onboarding';
 import { startUpdateChecks } from './updates';
 
@@ -490,35 +489,14 @@ const settingsView = new SettingsView((next) => {
 });
 const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
   settings = next;
-  renderChatModel(next);
   showView(destination);
   if (prompt) chat.ask(prompt);
 });
-
-let modelSignature = '';
-function renderChatModel(next: Settings) {
-  const signature = `${next.provider}:${next.models[next.provider]}`;
-  if (signature === modelSignature) return;
-  modelSignature = signature;
-  const bar = $('#chat-model-bar');
-  bar.replaceChildren();
-  const provider = document.createElement('button');
-  provider.className = 'model-provider';
-  const labels = { local: 'On-device assistant', 'codex-cli': 'Codex', 'claude-cli': 'Claude Code', anthropic: 'Anthropic API', openai: 'OpenAI API', ollama: 'Ollama' };
-  provider.textContent = `${labels[next.provider]} · Change`;
-  provider.title = 'Change assistant in Settings';
-  provider.addEventListener('click', () => showView('settings'));
-  bar.append(provider);
-  if (next.provider === 'codex-cli' || next.provider === 'claude-cli') {
-    bar.append(modelPicker(next, updated => { settings = updated; renderChatModel(updated); }));
-  }
-}
 
 async function refreshSettings() {
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
   applyVerbose(settings.verbose);
-  renderChatModel(settings);
 }
 
 function wireExtensions() {
@@ -576,7 +554,6 @@ window.nabsun.onSettingsChanged((next) => {
   settings = next;
   applyTheme(next.theme);
   applyVerbose(next.verbose);
-  renderChatModel(next);
 });
 
 /**
@@ -672,7 +649,6 @@ async function boot() {
   wireExtensions();
 
   settings = await window.nabsun.settings.get();
-  renderChatModel(settings);
   applyTheme(settings.theme);
   $<HTMLInputElement>('#autopilot').checked = settings.autoApprove.write;
   $<HTMLInputElement>('#autopilot').addEventListener('change', async (e) => {

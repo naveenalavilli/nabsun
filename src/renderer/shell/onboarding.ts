@@ -19,7 +19,7 @@ export class OnboardingView {
       </div>
       <button class="welcome-choice primary" data-action="local"><strong>Try the built-in assistant</strong><span>Runs on your device. No account needed.</span></button>
       <button class="welcome-choice" data-action="connect"><strong>Connect Codex or Claude</strong><span>Sign in through your browser. Nabsun handles setup.</span></button>
-      <p class="hint">With a connected provider, your messages and any included page content go to that provider. Switch models above the chat.</p>
+      <p class="hint">With a connected provider, your messages and any included page content go to that provider. Switch models in Settings → Model.</p>
       <button class="welcome-skip" data-action="skip">Just browse for now</button>
       <p class="hint">You can reopen this guide from Settings.</p>
       <p class="welcome-status" role="status"></p>`;
