@@ -6,11 +6,18 @@ export function appearanceSelector(settings: Settings, changed: (next: Settings)
   legend.textContent = 'Appearance';
   const label = document.createElement('label');
   label.textContent = 'Color mode';
+  const field = document.createElement('div');
+  field.className = 'field';
+  const control = document.createElement('div');
+  control.className = 'color-mode-control';
   const mode = document.createElement('select');
+  mode.id = 'appearance-color-mode';
+  label.htmlFor = mode.id;
   mode.setAttribute('aria-label', 'Color mode');
   for (const [value, name] of [['system', 'Follow device'], ['light', 'Light'], ['dark', 'Dark']]) mode.add(new Option(name, value));
   mode.value = settings.theme;
-  label.append(mode);
+  control.append(mode);
+  field.append(label, control);
   const choices = document.createElement('div');
   choices.className = 'theme-choices';
   choices.setAttribute('role', 'group');
@@ -59,6 +66,6 @@ export function appearanceSelector(settings: Settings, changed: (next: Settings)
     choices.append(button);
   }
   mode.addEventListener('change', () => void save({ theme: mode.value as Settings['theme'] }));
-  root.append(legend, label, choices, status);
+  root.append(legend, field, choices, status);
   return root;
 }
