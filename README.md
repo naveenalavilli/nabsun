@@ -51,7 +51,7 @@ No terminal commands, npm packages, or separate Node.js installation are require
 Your provider account must have access to the assistant. Use **Repair / update**
 if the connection needs fixing.
 
-Choose a model above the chat or in **Settings → Model**. Each provider remembers
+Choose a provider and model in **Settings → Model**. Each provider remembers
 its selection for your next message. **Default** uses the CLI's own settings;
 **Other model…** accepts a specific model ID. Availability depends on your account.
 
