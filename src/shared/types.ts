@@ -28,6 +28,7 @@ export interface WindowState {
   tabs: TabState[];
   activeTabId: string | null;
   sidebarOpen: boolean;
+  assistantDetached: boolean;
   sidebarWidth: number;
   findOpen: boolean;
   bookmarksBarVisible: boolean;
@@ -232,6 +233,7 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system';
   appearance: 'classic' | 'playful' | 'blossom' | 'ocean';
   assistantZoom: number;
+  assistantDetached: boolean;
   sidebarWidth: number;
   sidebarOpen: boolean;
   /** Risk levels the agent may run without asking. */

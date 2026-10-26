@@ -439,6 +439,8 @@ body.no-bookmarks-bar #bookmarks-bar { display: none; }
 
 #body { flex: 1; display: flex; min-height: 0; }
 .browser-window #sidebar, .browser-window #sidebar-resizer { display: none; }
+.browser-window #body { position: relative; }
+.browser-window.assistant-attached #sidebar-resizer { display: block; position: absolute; top: 0; bottom: 0; width: 3px; }
 .assistant-window #topchrome,
 .assistant-window #bookmarks-bar,
 .assistant-window #password-bar,

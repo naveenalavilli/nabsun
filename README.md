@@ -37,8 +37,10 @@ check manually. Updates require downloading and running the new installer.
 The first-run guide lets you try the built-in assistant, connect Codex or Claude,
 or start browsing. Reopen it from **Settings → Getting started**.
 
-Open the separate assistant window with **Ctrl+Shift+A** and ask about a page or give it a task.
-Closing this window hides it; reopening it preserves your chat and draft.
+Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
+Use **Detach** to move it from the browser sidebar into a separate window, or
+**Attach** to bring it back. Your choice is saved. Use **Hide** or close the
+detached window to hide the assistant; reopening preserves your chat and draft.
 Use **Text size** controls or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
 or reset the assistant text. The zoom level is saved independently of website zoom.
 **Stop** cancels active assistant work and browser tool calls, including CLI subprocesses.

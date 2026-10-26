@@ -88,8 +88,13 @@ async function main() {
   ipcMain.handle(CH.updateCheck, () => ({ state: 'current', currentVersion: 'test' }));
   settings.onChange(next => win.send(CH.settingsChanged, next));
   try {
-    await until(() => win.assistant.isVisible());
     const sessionCount = () => fs.readdirSync(path.join(tmp, 'sessions')).filter(name => name.endsWith('.json')).length;
+    await until(() => win.window.contentView.children.includes(win.assistant.view) && sessionCount() === 1);
+    assert.equal(win.state.assistantDetached, false, 'assistant starts attached by default');
+    assert.equal(win.assistant.isVisible(), false);
+    assert.equal(win.contentBounds.width, win.window.getContentSize()[0] - win.state.sidebarWidth - 3);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-detach").click()');
+    await until(() => win.assistant.isVisible());
     assert.equal(sessionCount(), 1, 'only the assistant creates a chat');
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0], 'browser retains its full width');
     assert.equal(await win.assistant.webContents.executeJavaScript('getComputedStyle(document.querySelector("#topchrome")).display'), 'none');
@@ -97,6 +102,26 @@ async function main() {
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Preserved draft"; document.querySelector("#assistant-zoom-in").click()');
     await until(() => settings.get().assistantZoom === 1.1);
+    const assistantContentsId = win.assistant.webContents.id;
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-detach").click()');
+    await until(() => !settings.get().assistantDetached);
+    assert.equal(win.assistant.isVisible(), false);
+    assert.equal(win.window.contentView.children.includes(win.assistant.view), true);
+    assert.equal(win.contentBounds.width, win.window.getContentSize()[0] - win.state.sidebarWidth - 3);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'), 'Preserved draft');
+    win.resizeSidebar(480);
+    assert.equal(win.assistant.view.getBounds().width, win.state.sidebarWidth);
+    win.toggleSidebar(false);
+    assert.equal(win.assistant.view.getVisible(), false);
+    assert.equal(win.contentBounds.width, win.window.getContentSize()[0]);
+    win.toggleSidebar(true);
+    assert.equal(win.assistant.view.getVisible(), true);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-detach").click()');
+    await until(() => settings.get().assistantDetached);
+    assert.equal(win.assistant.webContents.id, assistantContentsId, 'mode switches keep the same renderer');
+    assert.equal(win.assistant.contentView.children.includes(win.assistant.view), true);
+    assert.equal(win.contentBounds.width, win.window.getContentSize()[0]);
+    console.log('PASS attach/detach preserves renderer, draft and zoom; attached resize and hide restore browser space');
     assert.equal(win.shell.webContents.getZoomFactor(), 1, 'assistant zoom leaves browser chrome unchanged');
     win.assistant.close();
     assert.equal(win.assistant.isDestroyed(), false);
@@ -105,6 +130,7 @@ async function main() {
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'), 'Preserved draft');
     settings.flush();
     assert.equal(new SettingsStore().get().assistantZoom, 1.1);
+    assert.equal(new SettingsStore().get().assistantDetached, true);
     for (let i = 0; i < 20; i++) win.zoomAssistant(0.1);
     assert.equal(win.assistant.webContents.getZoomFactor(), 2);
     win.assistant.setSize(380, 820);
@@ -137,6 +163,9 @@ async function main() {
     win.assistant.close();
     win.toggleSidebar(true);
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length'), 2);
+    win.setAssistantDetached(false);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length'), 2);
+    win.setAssistantDetached(true);
     provider.finish!();
     await until(() => provider.requests.length === 2);
     assert.equal(provider.requests[1].includes('Run this future prompt'), true);

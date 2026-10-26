@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { BaseWindow, BrowserWindow, WebContentsView, screen } from 'electron';
+import { BaseWindow, WebContentsView, screen } from 'electron';
 import type { Settings, WindowState } from '../shared/types';
 import { CH } from '../shared/ipc';
 import type { HistoryStore } from './history';
@@ -15,12 +15,33 @@ const INFO_BAR_H = 46;
 const MIN_SIDEBAR = 300;
 const MAX_SIDEBAR_RATIO = 0.6;
 
+/** One renderer moves between hosts, preserving live chat and approval state. */
+class AssistantWindow extends BaseWindow {
+  readonly view: WebContentsView;
+  get webContents() { return this.view.webContents; }
+
+  constructor(width: number, height: number) {
+    super({ title: 'Nabsun Assistant', width, height, minWidth: 380, minHeight: 480, show: false, backgroundColor: '#f4f2eb' });
+    this.view = new WebContentsView({ webPreferences: {
+      partition: 'assistant-ui', preload: path.join(__dirname, '..', 'preload', 'shell.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    } });
+    this.contentView.addChildView(this.view);
+    this.on('resize', () => {
+      if (!this.contentView.children.includes(this.view)) return;
+      const [width, height] = this.getContentSize();
+      this.view.setBounds({ x: 0, y: 0, width, height });
+    });
+  }
+}
+
 export class AppWindow {
   readonly window: BaseWindow;
   readonly shell: WebContentsView;
   readonly overlay: WebContentsView;
   readonly tabs: TabManager;
-  readonly assistant: BrowserWindow;
+  readonly assistant: AssistantWindow;
+  private assistantDetached: boolean;
   private assistantReady = false;
   private assistantCommands: unknown[] = [];
   private assistantMessages: { channel: string; payload: unknown }[] = [];
@@ -42,6 +63,7 @@ export class AppWindow {
   ) {
     const config = settings.get();
     this.sidebarOpen = config.sidebarOpen;
+    this.assistantDetached = config.assistantDetached;
     this.sidebarWidth = config.sidebarWidth;
     this.bookmarksBarVisible = config.bookmarksBarVisible;
 
@@ -83,15 +105,7 @@ export class AppWindow {
     lockUiNavigation(this.shell.webContents);
     void this.shell.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'));
 
-    this.assistant = new BrowserWindow({
-      title: 'Nabsun Assistant', width: Math.min(560, display.width), height: Math.min(820, display.height), minWidth: 380, minHeight: 480,
-      show: false, backgroundColor: '#f4f2eb',
-      webPreferences: {
-        partition: 'assistant-ui',
-        preload: path.join(__dirname, '..', 'preload', 'shell.js'),
-        contextIsolation: true, nodeIntegration: false, sandbox: true,
-      },
-    });
+    this.assistant = new AssistantWindow(Math.min(560, display.width), Math.min(820, display.height));
     this.assistant.setMenuBarVisibility(false);
     lockUiNavigation(this.assistant.webContents);
     this.assistant.on('close', event => {
@@ -107,7 +121,7 @@ export class AppWindow {
         this.zoomAssistant(delta);
       }
     });
-    void this.assistant.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'), { query: { assistant: '1' } });
+    void this.assistant.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'), { query: { assistant: '1' } });
 
     // A thrown exception in the shell silently kills the browser chrome — no
     // tab strip, no buttons — with nothing visible anywhere. Surface it.
@@ -153,6 +167,7 @@ export class AppWindow {
     this.window.on('unmaximize', () => this.layout());
     this.window.on('closed', () => {
       this.assistant.destroy();
+      this.assistant.webContents.close();
       this.tabs.destroyAll();
       this.hideExtensionPopup();
       // BaseWindow does not own the lifetime of its WebContentsViews.
@@ -181,10 +196,11 @@ export class AppWindow {
   private contentRect() {
     const [width, height] = this.window.getContentSize();
     const top = this.chromeHeight();
+    const sidebar = this.sidebarOpen && !this.assistantDetached ? this.clampSidebar(this.sidebarWidth) + 3 : 0;
     return {
       x: 0,
       y: top,
-      width: Math.max(0, width),
+      width: Math.max(0, width - sidebar),
       height: Math.max(0, height - top),
     };
   }
@@ -204,6 +220,14 @@ export class AppWindow {
     this.shell.setBounds({ x: 0, y: 0, width, height });
     this.overlay.setBounds({ x: 0, y: 0, width, height });
     this.tabs.setBounds(this.contentRect());
+    if (!this.assistantDetached) {
+      this.assistant.view.setVisible(this.sidebarOpen);
+      const sidebarWidth = this.clampSidebar(this.sidebarWidth);
+      this.assistant.view.setBounds({ x: width - sidebarWidth, y: this.chromeHeight(), width: sidebarWidth, height: Math.max(0, height - this.chromeHeight()) });
+    } else {
+      const [assistantWidth, assistantHeight] = this.assistant.getContentSize();
+      this.assistant.view.setBounds({ x: 0, y: 0, width: assistantWidth, height: assistantHeight });
+    }
     this.pushState();
   }
 
@@ -214,6 +238,7 @@ export class AppWindow {
       tabs: this.tabs.states,
       activeTabId: this.tabs.activeTabId,
       sidebarOpen: this.sidebarOpen,
+      assistantDetached: this.assistantDetached,
       sidebarWidth: this.clampSidebar(this.sidebarWidth),
       findOpen: this.findOpen,
       bookmarksBarVisible: this.bookmarksBarVisible,
@@ -252,7 +277,7 @@ export class AppWindow {
     this.pushState();
     for (const { channel, payload } of this.assistantMessages.splice(0)) this.assistant.webContents.send(channel, payload);
     for (const payload of this.assistantCommands.splice(0)) this.assistant.webContents.send(CH.overlayCommand, payload);
-    if (this.sidebarOpen) this.assistant.show();
+    this.setAssistantDetached(this.assistantDetached, false);
   }
 
   showAssistantCommand(payload: unknown) {
@@ -278,11 +303,36 @@ export class AppWindow {
   toggleSidebar(open?: boolean) {
     this.sidebarOpen = open ?? !this.sidebarOpen;
     if (this.sidebarOpen && this.assistantReady) {
-      this.assistant.show();
-      this.assistant.focus();
+      if (this.assistantDetached) {
+        this.assistant.show();
+        this.assistant.focus();
+      } else {
+        this.window.show();
+        this.window.focus();
+        this.assistant.webContents.focus();
+      }
     } else if (!this.sidebarOpen) this.assistant.hide();
     this.settings.set({ sidebarOpen: this.sidebarOpen });
     this.layout();
+  }
+
+  setAssistantDetached(detached: boolean, save = true) {
+    this.assistantDetached = detached;
+    const view = this.assistant.view;
+    for (const host of [this.window, this.assistant]) {
+      if (host.contentView.children.includes(view)) host.contentView.removeChildView(view);
+    }
+    (detached ? this.assistant : this.window).contentView.addChildView(view);
+    if (this.overlayVisible) {
+      this.window.contentView.removeChildView(this.overlay);
+      this.window.contentView.addChildView(this.overlay);
+    }
+    view.setVisible(true);
+    if (!detached || !this.sidebarOpen) this.assistant.hide();
+    else if (this.assistantReady) this.assistant.show();
+    if (save) this.settings.set({ assistantDetached: detached });
+    this.layout();
+    if (this.sidebarOpen && this.assistantReady) this.assistant.webContents.focus();
   }
 
   resizeSidebar(width: number) {
@@ -432,6 +482,7 @@ export class AppWindow {
   }
 
   applySettings(next: Settings) {
+    if (next.assistantDetached !== this.assistantDetached) this.setAssistantDetached(next.assistantDetached, false);
     if (!this.assistant.isDestroyed()) {
       const zoom = Number.isFinite(next.assistantZoom) ? Math.max(0.75, Math.min(2, next.assistantZoom)) : 1;
       this.assistant.webContents.setZoomFactor(zoom);

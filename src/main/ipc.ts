@@ -143,6 +143,9 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.assistantZoom, (_e, delta: number | null) => {
     if (delta === null || delta === 0.1 || delta === -0.1) win.zoomAssistant(delta);
   });
+  ipcMain.on(CH.assistantDetach, (_e, detached: boolean) => {
+    if (typeof detached === 'boolean') win.setAssistantDetached(detached);
+  });
   ipcMain.on(CH.shellReady, (event) => {
     if (event.sender === win.assistant.webContents) win.readyAssistant();
     else win.pushState();
