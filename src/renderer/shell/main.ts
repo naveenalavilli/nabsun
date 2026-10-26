@@ -514,6 +514,8 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  $('#assistant-detach').addEventListener('click', () => window.nabsun.window.detachAssistant(!state?.assistantDetached));
+  $('#assistant-hide').addEventListener('click', () => window.nabsun.window.toggleSidebar(false));
   $('#assistant-extensions').addEventListener('click', () => showView('extensions'));
   window.addEventListener('nabsun:welcome', () => {
     window.nabsun.window.toggleSidebar(true);
@@ -547,8 +549,12 @@ function wireShortcuts() {
 
 window.nabsun.onWindowState((next) => {
   state = next;
+  document.documentElement.classList.toggle('assistant-attached', !next.assistantDetached && next.sidebarOpen);
+  $('#assistant-detach').textContent = next.assistantDetached ? 'Attach' : 'Detach';
+  $('#assistant-detach').title = next.assistantDetached ? 'Attach assistant to browser' : 'Detach assistant into a separate window';
+  $('#sidebar-resizer').style.right = `${next.sidebarWidth}px`;
   window.__activeTabId = next.activeTabId;
-  document.body.classList.toggle('sidebar-closed', !assistantWindow);
+  document.body.classList.toggle('sidebar-closed', !assistantWindow && (next.assistantDetached || !next.sidebarOpen));
   document.body.classList.toggle('no-bookmarks-bar', !next.bookmarksBarVisible);
   if (!assistantWindow) $('#sidebar').style.width = `${next.sidebarWidth}px`;
   $('#sidebar-toggle').classList.toggle('on', next.sidebarOpen);

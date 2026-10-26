@@ -111,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: 'classic',
   sidebarWidth: 420,
   assistantZoom: 1,
+  assistantDetached: false,
   sidebarOpen: true,
   autoApprove: { safe: true, write: false, dangerous: false },
   alwaysAllowTools: [],

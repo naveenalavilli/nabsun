@@ -47,6 +47,7 @@ const api: ShellApi = {
     resizeSidebar: (width) => ipcRenderer.send(CH.sidebarResize, width),
     openAssistantView: name => ipcRenderer.send(CH.assistantView, name),
     zoomAssistant: delta => ipcRenderer.send(CH.assistantZoom, delta),
+    detachAssistant: detached => ipcRenderer.send(CH.assistantDetach, detached),
     showOverlay: (kind, payload) => ipcRenderer.send(CH.overlayShow, kind, payload),
   },
 
