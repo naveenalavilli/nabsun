@@ -711,6 +711,10 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 /* --------------------------------------------------------------- composer */
 
 #composer { border-top: 1px solid var(--border); padding: 9px 11px 11px; }
+#prompt-queue { max-height: 180px; overflow-y: auto; margin-bottom: 10px; font-size: 12px; }
+.queued-prompt { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.queued-prompt > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queued-prompt > button { flex-shrink: 0; padding: 3px 7px; }
 #composer-chips { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
 .chip {
   display: flex; align-items: center; gap: 5px;

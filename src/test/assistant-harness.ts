@@ -36,16 +36,20 @@ async function until(test: () => boolean | Promise<boolean>) {
 class WaitingProvider implements Provider {
   readonly id = 'anthropic' as const;
   readonly label = 'Waiting fixture';
+  readonly requests: string[] = [];
+  finish: (() => void) | null = null;
   async listModels() { return ['fixture']; }
   supportsVision() { return false; }
   async *stream(req: StreamRequest): AsyncGenerator<StreamEvent> {
+    this.requests.push(JSON.stringify(req.messages.at(-1)));
     yield { type: 'text', delta: 'Working until Stop.' };
     await new Promise<void>(resolve => {
+      this.finish = resolve;
       if (req.signal.aborted) resolve();
       else req.signal.addEventListener('abort', () => resolve(), { once: true });
     });
     // Even a backend that returns normally after cancellation must report Stop.
-    yield { type: 'text', delta: 'SHOULD NOT APPEAR' };
+    yield { type: 'text', delta: req.signal.aborted ? 'SHOULD NOT APPEAR' : 'Completed.' };
   }
 }
 
@@ -65,7 +69,8 @@ async function main() {
   const history = new HistoryStore();
   const sessions = new SessionStore(tmp);
   const win = new AppWindow(settings, history);
-  const providers = new Map([['anthropic' as const, new WaitingProvider()]]);
+  const provider = new WaitingProvider();
+  const providers = new Map([['anthropic' as const, provider]]);
   const approvals = new ApprovalManager(settings);
   const questions = new QuestionManager();
   const agent = new Agent({ providers, settings, sessions, tabs: win.tabs, history, approvals, questions,
@@ -116,6 +121,44 @@ async function main() {
     win.assistant.setSize(560, 820);
     console.log('PASS hide/reopen preserves draft; independent zoom persists, clamps and resets');
 
+    const submitPrompt = (text: string) => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value = ${JSON.stringify(text)}; document.querySelector('#attach-page').checked = false; document.querySelector('#send').click()`);
+    await submitPrompt('First queued test');
+    await until(() => provider.requests.length === 1);
+    await submitPrompt('Cancel this future prompt');
+    await submitPrompt('Run this future prompt');
+    await submitPrompt('Run this last');
+    await until(() => win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length === 3'));
+    assert.equal(provider.requests.length, 1, 'future prompts wait for the current turn');
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("Cancel this future prompt")'), false);
+    const queuedSessionId = sessions.list()[0].id;
+    assert.equal(JSON.stringify(sessions.load(queuedSessionId)).includes('Cancel this future prompt'), false, 'pending prompts are not in model history');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".queued-prompt button").click()');
+    await until(() => win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length === 2'));
+    win.assistant.close();
+    win.toggleSidebar(true);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length'), 2);
+    provider.finish!();
+    await until(() => provider.requests.length === 2);
+    assert.equal(provider.requests[1].includes('Run this future prompt'), true);
+    const activeCannotBeCancelled = await win.assistant.webContents.executeJavaScript(`(async () => {
+      const state = await window.nabsun.agent.queue(${JSON.stringify(queuedSessionId)});
+      return window.nabsun.agent.cancelQueued(state.sessionId, state.active.id);
+    })()`);
+    assert.equal(activeCannotBeCancelled, false, 'a picked-up prompt requires Stop');
+    provider.finish!();
+    await until(() => provider.requests.length === 3);
+    assert.equal(provider.requests[2].includes('Run this last'), true);
+    assert.equal(provider.requests.some(request => request.includes('Cancel this future prompt')), false);
+    await submitPrompt('Discard this on Stop');
+    await until(() => win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length === 1'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#stop").click()');
+    await until(() => !agent.isRunning(queuedSessionId));
+    await until(() => win.assistant.webContents.executeJavaScript('document.querySelectorAll(".queued-prompt").length === 0 && document.querySelector("#stop").hidden'));
+    assert.equal(provider.requests.length, 3, 'Stop does not launch a pending prompt');
+    assert.equal(JSON.stringify(sessions.load(queuedSessionId)).includes('Discard this on Stop'), false);
+    console.log('PASS follow-ups run in order; cancellation removes pending prompts before model history; Stop clears the queue');
+
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Switching chat test"');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#attach-page").checked = false; document.querySelector("#send").click()');
     await until(() => win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("Working until Stop.")'));
     const runningId = sessions.list()[0].id;

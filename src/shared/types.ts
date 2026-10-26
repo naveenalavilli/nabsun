@@ -105,6 +105,8 @@ export interface ToolSpec {
 }
 
 export type AgentEvent =
+  | { type: 'queue_changed'; state: PromptQueueState }
+  | { type: 'prompt_started'; sessionId: string; prompt: QueuedPrompt }
   | { type: 'turn_start'; sessionId: string; messageId: string }
   | { type: 'text_delta'; messageId: string; delta: string }
   | { type: 'thinking_delta'; messageId: string; delta: string }
@@ -122,6 +124,18 @@ export type AgentEvent =
   | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: string }
   | { type: 'error'; sessionId: string; message: string }
   | { type: 'aborted'; sessionId: string };
+
+export interface QueuedPrompt {
+  id: string;
+  text: string;
+  attachPage: boolean;
+}
+
+export interface PromptQueueState {
+  sessionId: string;
+  active: QueuedPrompt | null;
+  pending: QueuedPrompt[];
+}
 
 export interface ApprovalRequest {
   id: string;

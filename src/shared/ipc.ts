@@ -21,6 +21,7 @@ import type {
   PluginStatus,
   ProviderId,
   ProviderStatus,
+  PromptQueueState,
   SavedLogin,
   Settings,
   ToolSpec,
@@ -70,6 +71,8 @@ export const CH = {
   // agent
   agentSend: 'agent:send',
   agentAbort: 'agent:abort',
+  agentQueue: 'agent:queue',
+  agentCancelQueued: 'agent:cancel-queued',
   agentEvent: 'agent:event', // main -> renderer push
   agentTools: 'agent:tools',
   agentApprovalRequest: 'agent:approval-request', // main -> renderer push
@@ -244,6 +247,8 @@ export interface ShellApi {
   agent: {
     send(sessionId: string, text: string, opts?: { attachPage?: boolean }): void;
     abort(sessionId: string): void;
+    queue(sessionId: string): Promise<PromptQueueState>;
+    cancelQueued(sessionId: string, id: string): Promise<boolean>;
     tools(): Promise<ToolSpec[]>;
     resolveApproval(id: string, decision: ApprovalDecision): void;
     /** Answers a question from the assistant; null means the user skipped it. */
