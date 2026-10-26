@@ -63,6 +63,10 @@ export function registerIpc(deps: IpcDeps): void {
     deps;
   const ipcMain = uiIpc([
     {
+      contents: win.assistant.webContents,
+      url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'shell', 'index.html')).href,
+    },
+    {
       contents: win.shell.webContents,
       url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'shell', 'index.html')).href,
     },
@@ -130,7 +134,18 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.winClose, () => win.window.close());
   ipcMain.on(CH.sidebarToggle, (_e, open?: boolean) => win.toggleSidebar(open));
   ipcMain.on(CH.sidebarResize, (_e, width: number) => win.resizeSidebar(width));
-  ipcMain.on(CH.shellReady, () => win.pushState());
+  ipcMain.on(CH.assistantView, (_e, name: string) => {
+    if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
+      win.showAssistantCommand({ command: 'show-view', arg: name });
+    }
+  });
+  ipcMain.on(CH.assistantZoom, (_e, delta: number | null) => {
+    if (delta === null || delta === 0.1 || delta === -0.1) win.zoomAssistant(delta);
+  });
+  ipcMain.on(CH.shellReady, (event) => {
+    if (event.sender === win.assistant.webContents) win.readyAssistant();
+    else win.pushState();
+  });
 
   /* ---------------------------------------------------------------- find */
 
@@ -161,7 +176,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.agentSend, (_e, sessionId: string, text: string, opts?: { attachPage?: boolean }) => {
     void agent.send(sessionId, text, opts ?? {});
   });
-  ipcMain.on(CH.agentAbort, (_e, sessionId: string) => agent.abort(sessionId));
+  ipcMain.on(CH.agentAbort, () => agent.stop());
   ipcMain.handle(CH.agentTools, () => agent.toolSpecs());
   ipcMain.on(CH.agentApprovalResolve, (_e, id: string, decision: ApprovalDecision) => {
     approvals.resolve(id, decision);

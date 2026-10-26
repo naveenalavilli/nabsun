@@ -65,6 +65,7 @@ const configs = [
   nodeBundle('src/test/codex-live.ts', `${out}/test/codex-live.js`),
   nodeBundle('src/test/browsing-harness.ts', `${out}/test/browsing-harness.js`),
   nodeBundle('src/test/review-harness.ts', `${out}/test/review-harness.js`),
+  nodeBundle('src/test/assistant-harness.ts', `${out}/test/assistant-harness.js`),
   // Self-contained so a packaged app can spawn it without node_modules.
   nodeBundle('src/mcp-server/main.ts', `${out}/bin/nabsun-mcp.js`),
   webBundle('src/renderer/shell/main.ts', `${out}/renderer/shell/main.js`),

@@ -55,6 +55,8 @@ export const CH = {
   winClose: 'win:close',
   sidebarToggle: 'sidebar:toggle',
   sidebarResize: 'sidebar:resize',
+  assistantView: 'assistant:view',
+  assistantZoom: 'assistant:zoom',
 
   // find in page
   findStart: 'find:start',
@@ -223,6 +225,8 @@ export interface ShellApi {
     close(): void;
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
+    openAssistantView(name: string): void;
+    zoomAssistant(delta: number | null): void;
     /** Asks the main process to attach the overlay view (omnibox / palette). */
     showOverlay(kind: 'omnibox' | 'palette', payload?: unknown): void;
   };

@@ -6,6 +6,9 @@ import { SettingsView } from './settings';
 import { OnboardingView } from './onboarding';
 import { startUpdateChecks } from './updates';
 
+const assistantWindow = new URLSearchParams(location.search).get('assistant') === '1';
+document.documentElement.classList.add(assistantWindow ? 'assistant-window' : 'browser-window');
+
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
 let state: WindowState | null = null;
@@ -423,6 +426,10 @@ type ViewName =
   | 'passwords';
 
 function showView(name: ViewName) {
+  if (!assistantWindow) {
+    window.nabsun.window.openAssistantView(name);
+    return;
+  }
   for (const view of document.querySelectorAll('.view')) view.classList.remove('active');
   $(`#view-${name}`).classList.add('active');
   if (name === 'settings') void settingsView.render();
@@ -479,7 +486,7 @@ async function renderSessions() {
 
 /* ------------------------------------------------------------------ boot -- */
 
-const chat = new ChatView(() => void renderSessions());
+const chat = new ChatView(() => void renderSessions(), assistantWindow);
 const bookmarksView = new BookmarksView(() => showView('bookmarks'));
 const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
@@ -507,6 +514,7 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  $('#assistant-extensions').addEventListener('click', () => showView('extensions'));
   window.addEventListener('nabsun:welcome', () => {
     window.nabsun.window.toggleSidebar(true);
     showView('onboarding');
@@ -540,9 +548,9 @@ function wireShortcuts() {
 window.nabsun.onWindowState((next) => {
   state = next;
   window.__activeTabId = next.activeTabId;
-  document.body.classList.toggle('sidebar-closed', !next.sidebarOpen);
+  document.body.classList.toggle('sidebar-closed', !assistantWindow);
   document.body.classList.toggle('no-bookmarks-bar', !next.bookmarksBarVisible);
-  $('#sidebar').style.width = `${next.sidebarWidth}px`;
+  if (!assistantWindow) $('#sidebar').style.width = `${next.sidebarWidth}px`;
   $('#sidebar-toggle').classList.toggle('on', next.sidebarOpen);
   if (next.findOpen && findbar.hidden) openFind();
   if (!next.findOpen && !findbar.hidden) closeFind();
@@ -567,6 +575,7 @@ window.nabsun.onSettingsChanged((next) => {
  * dark whatever it said.
  */
 function applyTheme(theme: Settings['theme']): void {
+  $('#assistant-zoom-reset').textContent = `${Math.round((settings?.assistantZoom ?? 1) * 100)}%`;
   const root = document.documentElement;
   root.dataset.appearance = settings?.appearance ?? 'classic';
   if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
@@ -587,6 +596,9 @@ function applyVerbose(verbose: boolean): void {
 
 window.nabsun.onCommand((command, arg) => {
   switch (command) {
+    case 'show-view':
+      showView(arg as ViewName);
+      break;
     case 'ask-ai':
       showView('chat');
       chat.ask(String(arg ?? ''), true);
@@ -639,6 +651,9 @@ async function revealWhenReady(id: string, timeoutMs = 2000): Promise<void> {
 }
 
 async function boot() {
+  $('#assistant-zoom-in').addEventListener('click', () => window.nabsun.window.zoomAssistant(0.1));
+  $('#assistant-zoom-out').addEventListener('click', () => window.nabsun.window.zoomAssistant(-0.1));
+  $('#assistant-zoom-reset').addEventListener('click', () => window.nabsun.window.zoomAssistant(null));
   wireToolbar();
   startUpdateChecks();
   wireFind();
@@ -672,9 +687,9 @@ async function boot() {
 
   await refreshBookmarks();
   await bookmarksView.refresh();
-  await chat.start();
+  if (assistantWindow) await chat.start();
   window.nabsun.ready();
-  if (!settings.onboardingCompleted) {
+  if (assistantWindow && !settings.onboardingCompleted) {
     window.nabsun.window.toggleSidebar(true);
     showView('onboarding');
   }

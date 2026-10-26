@@ -438,6 +438,18 @@ body.no-bookmarks-bar #bookmarks-bar { display: none; }
 /* ------------------------------------------------------------------ body */
 
 #body { flex: 1; display: flex; min-height: 0; }
+.browser-window #sidebar, .browser-window #sidebar-resizer { display: none; }
+.assistant-window #topchrome,
+.assistant-window #bookmarks-bar,
+.assistant-window #password-bar,
+.assistant-window #findbar,
+.assistant-window #content-placeholder,
+.assistant-window #sidebar-resizer { display: none !important; }
+.assistant-window #sidebar { width: 100% !important; flex: 1; min-width: 0; border: 0; }
+.assistant-window #sidebar-head .row, .assistant-window #composer-chips { flex-wrap: wrap; }
+.assistant-window #prompt { min-width: 0; }
+#assistant-zoom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
+#assistant-zoom button { padding: 4px 7px; }
 #content-placeholder { flex: 1; min-width: 0; background: var(--bg); }
 
 #sidebar-resizer { flex: 0 0 3px; cursor: col-resize; background: transparent; }

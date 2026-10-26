@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { BaseWindow, WebContentsView, screen } from 'electron';
+import { BaseWindow, BrowserWindow, WebContentsView, screen } from 'electron';
 import type { Settings, WindowState } from '../shared/types';
 import { CH } from '../shared/ipc';
 import type { HistoryStore } from './history';
@@ -20,6 +20,10 @@ export class AppWindow {
   readonly shell: WebContentsView;
   readonly overlay: WebContentsView;
   readonly tabs: TabManager;
+  readonly assistant: BrowserWindow;
+  private assistantReady = false;
+  private assistantCommands: unknown[] = [];
+  private assistantMessages: { channel: string; payload: unknown }[] = [];
 
   private sidebarOpen: boolean;
   private sidebarWidth: number;
@@ -79,6 +83,32 @@ export class AppWindow {
     lockUiNavigation(this.shell.webContents);
     void this.shell.webContents.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'));
 
+    this.assistant = new BrowserWindow({
+      title: 'Nabsun Assistant', width: Math.min(560, display.width), height: Math.min(820, display.height), minWidth: 380, minHeight: 480,
+      show: false, backgroundColor: '#f4f2eb',
+      webPreferences: {
+        partition: 'assistant-ui',
+        preload: path.join(__dirname, '..', 'preload', 'shell.js'),
+        contextIsolation: true, nodeIntegration: false, sandbox: true,
+      },
+    });
+    this.assistant.setMenuBarVisibility(false);
+    lockUiNavigation(this.assistant.webContents);
+    this.assistant.on('close', event => {
+      // Keep the renderer and pending approval cards alive when hidden.
+      event.preventDefault();
+      this.toggleSidebar(false);
+    });
+    this.assistant.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown' || !(input.control || input.meta)) return;
+      const delta = ['+', '='].includes(input.key) ? 0.1 : input.key === '-' ? -0.1 : null;
+      if (delta !== null || input.key === '0') {
+        event.preventDefault();
+        this.zoomAssistant(delta);
+      }
+    });
+    void this.assistant.loadFile(path.join(__dirname, '..', 'renderer', 'shell', 'index.html'), { query: { assistant: '1' } });
+
     // A thrown exception in the shell silently kills the browser chrome — no
     // tab strip, no buttons — with nothing visible anywhere. Surface it.
     this.shell.webContents.on('console-message', (event) => {
@@ -122,6 +152,7 @@ export class AppWindow {
     this.window.on('maximize', () => this.layout());
     this.window.on('unmaximize', () => this.layout());
     this.window.on('closed', () => {
+      this.assistant.destroy();
       this.tabs.destroyAll();
       this.hideExtensionPopup();
       // BaseWindow does not own the lifetime of its WebContentsViews.
@@ -150,11 +181,10 @@ export class AppWindow {
   private contentRect() {
     const [width, height] = this.window.getContentSize();
     const top = this.chromeHeight();
-    const sidebar = this.sidebarOpen ? this.clampSidebar(this.sidebarWidth) : 0;
     return {
       x: 0,
       y: top,
-      width: Math.max(0, width - sidebar),
+      width: Math.max(0, width),
       height: Math.max(0, height - top),
     };
   }
@@ -195,8 +225,47 @@ export class AppWindow {
   }
 
   send(channel: string, payload?: unknown) {
+    if (channel === CH.overlayCommand) {
+      const command = (payload as { command?: string })?.command;
+      if (command && ['ask-ai', 'ask-selection', 'open-settings', 'open-bookmarks', 'open-passwords', 'open-downloads', 'open-clear-data'].includes(command)) {
+        this.showAssistantCommand(payload);
+        return;
+      }
+      if (!this.shell.webContents.isDestroyed()) this.shell.webContents.send(channel, payload);
+      return;
+    }
+    if (new Set<string>([CH.agentEvent, CH.agentApprovalRequest, CH.agentQuestion]).has(channel)) {
+      if (this.assistant.isDestroyed()) return;
+      if (channel !== CH.agentEvent) this.toggleSidebar(true);
+      if (this.assistantReady) this.assistant.webContents.send(channel, payload);
+      else this.assistantMessages.push({ channel, payload });
+      return;
+    }
     if (this.shell.webContents.isDestroyed()) return;
     this.shell.webContents.send(channel, payload);
+    if (this.assistantReady && !this.assistant.isDestroyed()) this.assistant.webContents.send(channel, payload);
+  }
+
+  readyAssistant() {
+    this.assistantReady = true;
+    this.applySettings(this.settings.get());
+    this.pushState();
+    for (const { channel, payload } of this.assistantMessages.splice(0)) this.assistant.webContents.send(channel, payload);
+    for (const payload of this.assistantCommands.splice(0)) this.assistant.webContents.send(CH.overlayCommand, payload);
+    if (this.sidebarOpen) this.assistant.show();
+  }
+
+  showAssistantCommand(payload: unknown) {
+    this.toggleSidebar(true);
+    if (this.assistantReady) this.assistant.webContents.send(CH.overlayCommand, payload);
+    else this.assistantCommands.push(payload);
+  }
+
+  zoomAssistant(delta: number | null) {
+    const wc = this.assistant.webContents;
+    const factor = delta === null ? 1 : Math.max(0.75, Math.min(2, Math.round((wc.getZoomFactor() + delta) * 100) / 100));
+    wc.setZoomFactor(factor);
+    this.settings.set({ assistantZoom: factor });
   }
 
   sendOverlay(channel: string, payload?: unknown) {
@@ -208,6 +277,10 @@ export class AppWindow {
 
   toggleSidebar(open?: boolean) {
     this.sidebarOpen = open ?? !this.sidebarOpen;
+    if (this.sidebarOpen && this.assistantReady) {
+      this.assistant.show();
+      this.assistant.focus();
+    } else if (!this.sidebarOpen) this.assistant.hide();
     this.settings.set({ sidebarOpen: this.sidebarOpen });
     this.layout();
   }
@@ -359,6 +432,10 @@ export class AppWindow {
   }
 
   applySettings(next: Settings) {
+    if (!this.assistant.isDestroyed()) {
+      const zoom = Number.isFinite(next.assistantZoom) ? Math.max(0.75, Math.min(2, next.assistantZoom)) : 1;
+      this.assistant.webContents.setZoomFactor(zoom);
+    }
     if (next.sidebarWidth !== this.sidebarWidth) {
       this.sidebarWidth = next.sidebarWidth;
       this.layout();

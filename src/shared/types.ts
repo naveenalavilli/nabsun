@@ -217,6 +217,7 @@ export interface Settings {
   searchEngine: 'google' | 'duckduckgo' | 'bing';
   theme: 'dark' | 'light' | 'system';
   appearance: 'classic' | 'playful' | 'blossom' | 'ocean';
+  assistantZoom: number;
   sidebarWidth: number;
   sidebarOpen: boolean;
   /** Risk levels the agent may run without asking. */

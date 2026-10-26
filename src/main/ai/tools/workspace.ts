@@ -336,6 +336,18 @@ async function readCapped(
 
 /* ------------------------------------------------------------------- web -- */
 
+export function isSearchResultsUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return (['duckduckgo', 'google', 'bing'] as const).some(engine => {
+      const search = new URL(searchUrlFor(engine, ''));
+      return url.origin === search.origin && url.pathname === search.pathname && url.searchParams.has('q');
+    });
+  } catch {
+    return false;
+  }
+}
+
 export function webTools(): Tool[] {
   return [
     defineTool(
@@ -363,7 +375,7 @@ export function webTools(): Tool[] {
         // multi-query research run does not accumulate a pile of tabs.
         const background = bool(input.background, false);
         const current = ctx.getAgentTabId() ? ctx.tabs.byId(ctx.getAgentTabId()!) : null;
-        const reusable = current && /duckduckgo|google\.[a-z.]+\/search|bing\.com\/search/.test(current.wc.getURL());
+        const reusable = current && isSearchResultsUrl(current.wc.getURL());
         const tab = reusable ? current! : ctx.tabs.create(url, { background, byAgent: true });
         if (reusable) ctx.tabs.navigate(tab.id, url);
         if (!background) ctx.tabs.activate(tab.id);

@@ -110,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'light',
   appearance: 'classic',
   sidebarWidth: 420,
+  assistantZoom: 1,
   sidebarOpen: true,
   autoApprove: { safe: true, write: false, dangerous: false },
   alwaysAllowTools: [],

@@ -38,6 +38,7 @@ export class ChatView {
   private sessionId: string | null = null;
   private live: LiveTurn | null = null;
   private busy = false;
+  private runningSessionId: string | null = null;
   /**
    * Questions waiting on an answer, keyed by id and tagged with their session.
    *
@@ -47,7 +48,8 @@ export class ChatView {
    */
   private pendingQuestions = new Map<string, AgentQuestion>();
 
-  constructor(private readonly onSessionChanged: () => void) {
+  constructor(private readonly onSessionChanged: () => void, enabled = true) {
+    if (!enabled) return;
     this.wireComposer();
     window.nabsun.onAgentEvent((e) => this.handleEvent(e));
     window.nabsun.onApprovalRequest((r) => this.renderApproval(r));
@@ -69,6 +71,8 @@ export class ChatView {
   }
 
   private setSession(session: ChatSession) {
+    this.flushText();
+    this.live = null;
     this.sessionId = session.id;
     this.transcript.textContent = '';
     if (!session.messages.length) this.renderEmptyState();
@@ -95,7 +99,10 @@ export class ChatView {
   private wireComposer() {
     this.sendBtn.addEventListener('click', () => this.submit());
     this.stopBtn.addEventListener('click', () => {
-      if (this.sessionId) window.nabsun.agent.abort(this.sessionId);
+      if (this.runningSessionId || this.sessionId) {
+        window.nabsun.agent.abort(this.runningSessionId ?? this.sessionId!);
+        this.setActivity('Stopping');
+      }
     });
     this.prompt.addEventListener('input', () => this.autoGrow());
     this.prompt.addEventListener('keydown', (e) => {
@@ -127,6 +134,7 @@ export class ChatView {
     this.scrollToEnd();
 
     window.nabsun.agent.send(this.sessionId, text, { attachPage: this.attachPage.checked });
+    this.runningSessionId = this.sessionId;
     this.prompt.value = '';
     this.autoGrow();
     this.setBusy(true);
@@ -144,6 +152,18 @@ export class ChatView {
   /* -------------------------------------------------------------- events -- */
 
   private handleEvent(event: AgentEvent) {
+    if (event.type === 'turn_start') {
+      this.runningSessionId = event.sessionId;
+      this.setBusy(true);
+    }
+    if (event.type === 'turn_end' || event.type === 'aborted' || event.type === 'error') {
+      if (event.sessionId === this.runningSessionId) {
+        this.runningSessionId = null;
+        this.setBusy(false);
+      }
+    }
+    if ('sessionId' in event && event.sessionId !== this.sessionId) return;
+    if ('messageId' in event && event.type !== 'turn_start' && event.messageId !== this.live?.messageId) return;
     switch (event.type) {
       case 'turn_start':
         this.live = this.beginTurn(event.messageId);

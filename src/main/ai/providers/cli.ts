@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ProviderId, TokenUsage } from '../../../shared/types';
 import type { ModelMessage, Provider, StreamEvent, StreamRequest } from '../provider';
+import { stopProcessTree } from './processTree';
 
 export interface CliBridgeInfo {
   url: string;
@@ -556,7 +557,7 @@ function latestUserText(messages: ModelMessage[]): string {
  * These providers emit prose and progress but never `tool_use`, so the agent
  * loop runs exactly one iteration and lets the CLI own the rest.
  */
-abstract class CliProvider implements Provider {
+export abstract class CliProvider implements Provider {
   abstract readonly id: ProviderId;
   abstract readonly label: string;
   protected abstract readonly binName: string;
@@ -657,6 +658,7 @@ abstract class CliProvider implements Provider {
           ...launcherEnv(launcher),
         },
         windowsHide: true,
+        detached: process.platform !== 'win32',
       }) as ChildProcessWithoutNullStreams;
     } catch (err) {
       // spawn() throws synchronously for EINVAL/ENOENT instead of emitting
@@ -676,17 +678,29 @@ abstract class CliProvider implements Provider {
     });
     child.stdin.end(prompt, 'utf8');
 
-    const onAbort = () => child.kill();
-    req.signal.addEventListener('abort', onAbort, { once: true });
-
     // Bridge the callback-style child streams into an async iterator.
     const queue: StreamEvent[] = [];
     let notify: (() => void) | null = null;
     let finished = false;
     let failure: Error | null = null;
     let stderrTail = '';
+    let stopped = false;
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
+      stopProcessTree(child);
+    };
+    const onAbort = () => {
+      stop();
+      queue.length = 0;
+      finished = true;
+      notify?.();
+    };
+    req.signal.addEventListener('abort', onAbort, { once: true });
+    if (req.signal.aborted) onAbort();
 
     const push = (events: StreamEvent[]) => {
+      if (req.signal.aborted) return;
       if (!events.length) return;
       queue.push(...events);
       notify?.();
@@ -699,6 +713,7 @@ abstract class CliProvider implements Provider {
     const outDecoder = new StringDecoder('utf8');
     let stdoutBuffer = '';
     child.stdout.on('data', (chunk: Buffer) => {
+      if (req.signal.aborted) return;
       stdoutBuffer += outDecoder.write(chunk);
       const lines = stdoutBuffer.split('\n');
       stdoutBuffer = lines.pop() ?? '';
@@ -725,14 +740,14 @@ abstract class CliProvider implements Provider {
     });
 
     child.on('close', (code) => {
-      if (stdoutBuffer.trim()) {
+      if (!req.signal.aborted && stdoutBuffer.trim()) {
         try {
           push(this.handleLine(stdoutBuffer));
         } catch {
           /* trailing partial line */
         }
       }
-      push(this.finalize());
+      if (!req.signal.aborted) push(this.finalize());
       if (code !== 0 && !req.signal.aborted && !failure) {
         failure = new Error(
           this.failureHint() ??
@@ -745,6 +760,7 @@ abstract class CliProvider implements Provider {
 
     try {
       while (true) {
+        req.signal.throwIfAborted();
         while (queue.length) yield queue.shift()!;
         if (finished) break;
         await new Promise<void>((resolve) => {
@@ -759,7 +775,7 @@ abstract class CliProvider implements Provider {
       yield { type: 'stop', reason: 'end_turn' };
     } finally {
       req.signal.removeEventListener('abort', onAbort);
-      if (!child.killed) child.kill();
+      if (child.exitCode === null && child.signalCode === null) stop();
     }
   }
 }

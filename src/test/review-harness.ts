@@ -8,7 +8,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, dialog, shell as osShell, type Session } from 'electron';
 import { requestExternalLink } from '../main/externalLinks';
 import { DownloadManager } from '../main/downloads';
-import { fetchPublicUrl, isPrivateAddress } from '../main/ai/tools/workspace';
+import { fetchPublicUrl, isPrivateAddress, isSearchResultsUrl } from '../main/ai/tools/workspace';
 import { CH } from '../shared/ipc';
 import { ApprovalManager } from '../main/ai/approvals';
 import { QuestionManager } from '../main/ai/questions';
@@ -28,6 +28,18 @@ function check(name: string, test: () => void) {
 
 async function main() {
   await app.whenReady();
+  check('search reuse accepts supported results pages', () => {
+    for (const url of ['https://duckduckgo.com/?q=test', 'https://www.google.com/search?q=test', 'https://www.bing.com/search?q=test']) {
+      assert.equal(isSearchResultsUrl(url), true, url);
+    }
+  });
+  check('search reuse preserves unrelated pages and lookalike hosts', () => {
+    for (const url of ['https://example.com/editor?topic=duckduckgo', 'https://www.google.com.evil.test/search?q=x',
+      'https://example.com/google.com/search?q=x', 'https://duckduckgo.com/settings',
+      'https://www.google.com/search-help?q=x', 'https://www.bing.com/search', 'not a URL']) {
+      assert.equal(isSearchResultsUrl(url), false, url);
+    }
+  });
   const settings = new SettingsStore();
   check('new profiles show onboarding', () => assert.equal(settings.get().onboardingCompleted, false));
   settings.set({ onboardingCompleted: true });

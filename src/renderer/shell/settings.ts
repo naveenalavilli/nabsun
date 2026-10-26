@@ -41,6 +41,13 @@ export class SettingsView {
   private credentials: ProviderStatus[] = [];
   private saveError = '';
   private paintGeneration = 0;
+  private approvalSave: Promise<void> = Promise.resolve();
+
+  private setAutoApprove(key: keyof Settings['autoApprove'], value: boolean) {
+    // Serialize edits so even rapid toggles merge with the preceding save.
+    this.approvalSave = this.approvalSave.then(() =>
+      this.patch({ autoApprove: { ...this.settings!.autoApprove, [key]: value } }));
+  }
   /**
    * What happened to the last credential save, per provider.
    *
@@ -419,19 +426,19 @@ export class SettingsView {
         'Run read-only actions automatically',
         s.autoApprove.safe,
         'Reading pages, searching, extracting data. Nothing is changed.',
-        (v) => void this.patch({ autoApprove: { ...s.autoApprove, safe: v } }),
+        (v) => this.setAutoApprove('safe', v),
       ),
       checkbox(
         'Autopilot — run page actions without asking',
         s.autoApprove.write,
         'Clicking, typing, navigating, opening and closing tabs. The assistant is still told to pause before anything irreversible.',
-        (v) => void this.patch({ autoApprove: { ...s.autoApprove, write: v } }),
+        (v) => this.setAutoApprove('write', v),
       ),
       checkbox(
         'Run high-risk actions without asking',
         s.autoApprove.dangerous,
         'Includes executing arbitrary JavaScript in a page. Leave this off unless you know you want it.',
-        (v) => void this.patch({ autoApprove: { ...s.autoApprove, dangerous: v } }),
+        (v) => this.setAutoApprove('dangerous', v),
       ),
     );
 

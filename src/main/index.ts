@@ -519,6 +519,10 @@ function configureSession(settings: SettingsStore) {
 }
 
 function zoomActive(deps: IpcDeps, direction: 'in' | 'out' | 'reset') {
+  if (deps.win.assistant.isFocused()) {
+    deps.win.zoomAssistant(direction === 'reset' ? null : direction === 'in' ? 0.1 : -0.1);
+    return;
+  }
   const id = deps.win.tabs.activeTabId;
   if (id) deps.win.tabs.zoom(id, direction);
 }
@@ -717,7 +721,7 @@ function buildMenu(deps: IpcDeps) {
           click: () => deps.win.showOverlay('palette', {}),
         },
         { type: 'separator' },
-        { label: 'Toggle AI Sidebar', accelerator: 'CmdOrCtrl+Shift+A', click: run('toggle-sidebar') },
+        { label: 'Toggle Assistant Window', accelerator: 'CmdOrCtrl+Shift+A', click: run('toggle-sidebar') },
         { type: 'separator' },
         { label: 'Developer Tools (page)', accelerator: 'F12', click: run('devtools') },
         {
