@@ -45,6 +45,8 @@ const api: ShellApi = {
     close: () => ipcRenderer.send(CH.winClose),
     toggleSidebar: (open) => ipcRenderer.send(CH.sidebarToggle, open),
     resizeSidebar: (width) => ipcRenderer.send(CH.sidebarResize, width),
+    openAssistantView: name => ipcRenderer.send(CH.assistantView, name),
+    zoomAssistant: delta => ipcRenderer.send(CH.assistantZoom, delta),
     showOverlay: (kind, payload) => ipcRenderer.send(CH.overlayShow, kind, payload),
   },
 
@@ -61,6 +63,8 @@ const api: ShellApi = {
   agent: {
     send: (sessionId, text, opts) => ipcRenderer.send(CH.agentSend, sessionId, text, opts),
     abort: (sessionId) => ipcRenderer.send(CH.agentAbort, sessionId),
+    queue: sessionId => ipcRenderer.invoke(CH.agentQueue, sessionId),
+    cancelQueued: (sessionId, id) => ipcRenderer.invoke(CH.agentCancelQueued, sessionId, id),
     tools: () => ipcRenderer.invoke(CH.agentTools),
     resolveApproval: (id, decision) => ipcRenderer.send(CH.agentApprovalResolve, id, decision),
     answer: (id, text) => ipcRenderer.send(CH.agentAnswer, id, text),

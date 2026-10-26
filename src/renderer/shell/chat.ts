@@ -7,6 +7,8 @@ import type {
   ContentBlock,
   ToolCallStatus,
   TokenUsage,
+  PromptQueueState,
+  QueuedPrompt,
 } from '../../shared/types';
 import { renderMarkdown } from './markdown';
 
@@ -37,7 +39,9 @@ export class ChatView {
 
   private sessionId: string | null = null;
   private live: LiveTurn | null = null;
-  private busy = false;
+  private runningSessionId: string | null = null;
+  private queues = new Map<string, PromptQueueState>();
+  private queuePanel = $('#prompt-queue');
   /**
    * Questions waiting on an answer, keyed by id and tagged with their session.
    *
@@ -47,7 +51,8 @@ export class ChatView {
    */
   private pendingQuestions = new Map<string, AgentQuestion>();
 
-  constructor(private readonly onSessionChanged: () => void) {
+  constructor(private readonly onSessionChanged: () => void, enabled = true) {
+    if (!enabled) return;
     this.wireComposer();
     window.nabsun.onAgentEvent((e) => this.handleEvent(e));
     window.nabsun.onApprovalRequest((r) => this.renderApproval(r));
@@ -69,6 +74,8 @@ export class ChatView {
   }
 
   private setSession(session: ChatSession) {
+    this.flushText();
+    this.live = null;
     this.sessionId = session.id;
     this.transcript.textContent = '';
     if (!session.messages.length) this.renderEmptyState();
@@ -80,6 +87,11 @@ export class ChatView {
       if (pending.sessionId === session.id) this.renderQuestion(pending);
     }
     this.scrollToEnd();
+    this.renderQueue();
+    void window.nabsun.agent.queue(session.id).then(state => {
+      if (!this.queues.has(session.id)) this.queues.set(session.id, state);
+      this.renderQueue();
+    }).catch(() => { /* Live queue events still keep this view current. */ });
   }
 
   /** Pre-fills the composer, used by "Ask about page" and the omnibox. */
@@ -95,7 +107,10 @@ export class ChatView {
   private wireComposer() {
     this.sendBtn.addEventListener('click', () => this.submit());
     this.stopBtn.addEventListener('click', () => {
-      if (this.sessionId) window.nabsun.agent.abort(this.sessionId);
+      if (this.runningSessionId || this.sessionId) {
+        window.nabsun.agent.abort(this.runningSessionId ?? this.sessionId!);
+        this.setActivity('Stopping');
+      }
     });
     this.prompt.addEventListener('input', () => this.autoGrow());
     this.prompt.addEventListener('keydown', (e) => {
@@ -114,36 +129,95 @@ export class ChatView {
 
   private submit() {
     const text = this.prompt.value.trim();
-    if (!text || this.busy || !this.sessionId) return;
-
-    this.transcript.querySelector('.empty-state')?.remove();
-    const message: ChatMessage = {
-      id: `local-${Date.now()}`,
-      role: 'user',
-      blocks: [{ type: 'text', text }],
-      createdAt: Date.now(),
-    };
-    this.transcript.appendChild(this.renderMessage(message));
-    this.scrollToEnd();
+    if (!text || !this.sessionId) return;
 
     window.nabsun.agent.send(this.sessionId, text, { attachPage: this.attachPage.checked });
     this.prompt.value = '';
     this.autoGrow();
-    this.setBusy(true);
   }
 
   private setBusy(busy: boolean) {
     this.busyBar.hidden = !busy;
-    this.busy = busy;
-    this.sendBtn.hidden = busy;
+    this.sendBtn.hidden = false;
     this.stopBtn.hidden = !busy;
     this.prompt.disabled = false;
     if (!busy) this.stepBadge.textContent = '';
+    this.renderQueue();
+  }
+
+  private renderQueue() {
+    const working = this.runningSessionId !== null || [...this.queues.values()].some(queue => queue.active);
+    this.stopBtn.hidden = !working;
+    this.busyBar.hidden = !working;
+    const state = this.sessionId ? this.queues.get(this.sessionId) : undefined;
+    this.sendBtn.textContent = state?.active ? 'Queue' : 'Send';
+    this.sendBtn.setAttribute('aria-label', state?.active ? 'Queue message' : 'Send');
+    this.stopBtn.title = 'Stop active work and cancel all queued prompts';
+    if (!this.queuePanel) return;
+    this.queuePanel.replaceChildren();
+    this.queuePanel.hidden = !state?.pending.length;
+    if (!state?.pending.length) return;
+    const heading = document.createElement('strong');
+    heading.textContent = `Queued (${state.pending.length})`;
+    this.queuePanel.append(heading);
+    for (const prompt of state.pending) {
+      const row = document.createElement('div');
+      row.className = 'queued-prompt';
+      row.dataset.promptId = prompt.id;
+      const text = document.createElement('span');
+      text.textContent = prompt.text;
+      text.title = prompt.text + (prompt.attachPage ? '\nIncludes page when this prompt starts.' : '');
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = 'Cancel';
+      cancel.setAttribute('aria-label', `Cancel queued prompt: ${prompt.text}`);
+      cancel.addEventListener('click', async () => {
+        cancel.disabled = true;
+        try {
+          const removed = await window.nabsun.agent.cancelQueued(state.sessionId, prompt.id);
+          if (!removed) cancel.title = 'This prompt has already started. Use Stop to cancel it.';
+        } catch { cancel.textContent = 'Retry'; }
+        finally { cancel.disabled = false; }
+      });
+      row.append(text, cancel);
+      this.queuePanel.append(row);
+    }
+  }
+
+  private renderStartedPrompt(prompt: QueuedPrompt) {
+    this.transcript.querySelector('.empty-state')?.remove();
+    this.transcript.appendChild(this.renderMessage({
+      id: prompt.id, role: 'user', blocks: [{ type: 'text', text: prompt.text }], createdAt: Date.now(),
+    }));
+    this.scrollToEnd();
   }
 
   /* -------------------------------------------------------------- events -- */
 
   private handleEvent(event: AgentEvent) {
+    if (event.type === 'queue_changed') {
+      this.queues.set(event.state.sessionId, event.state);
+      this.renderQueue();
+      return;
+    }
+    if (event.type === 'prompt_started') {
+      this.runningSessionId = event.sessionId;
+      this.setBusy(true);
+      if (event.sessionId === this.sessionId) this.renderStartedPrompt(event.prompt);
+      return;
+    }
+    if (event.type === 'turn_start') {
+      this.runningSessionId = event.sessionId;
+      this.setBusy(true);
+    }
+    if (event.type === 'turn_end' || event.type === 'aborted' || event.type === 'error') {
+      if (event.sessionId === this.runningSessionId) {
+        this.runningSessionId = null;
+        this.setBusy(false);
+      }
+    }
+    if ('sessionId' in event && event.sessionId !== this.sessionId) return;
+    if ('messageId' in event && event.type !== 'turn_start' && event.messageId !== this.live?.messageId) return;
     switch (event.type) {
       case 'turn_start':
         this.live = this.beginTurn(event.messageId);

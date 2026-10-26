@@ -243,6 +243,11 @@ export class Agent {
     this.runs.clear();
   }
 
+  /** User Stop cancels every active chat and external browser call. */
+  stop() {
+    for (const run of this.runs.values()) run.controller.abort();
+  }
+
   toolSpecs(): ToolSpec[] {
     return this.deps.getTools().map(({ name, description, inputSchema, risk, source }) => ({
       name,
@@ -601,6 +606,7 @@ export class Agent {
 
       try {
         for await (const event of stream) {
+          signal.throwIfAborted();
           switch (event.type) {
             case 'text':
               stepText += event.delta;
@@ -636,6 +642,7 @@ export class Agent {
       }
 
       const assistantContent: ModelBlock[] = [];
+      signal.throwIfAborted();
       if (stepText) assistantContent.push({ type: 'text', text: stepText });
       for (const call of pendingCalls) {
         assistantContent.push({ type: 'tool_use', id: call.id, name: call.name, input: call.input });

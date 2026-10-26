@@ -37,7 +37,7 @@
           <button id="update-btn" class="pill" hidden>Update available</button>
           <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
           <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
-          <button id="sidebar-toggle" class="icon-btn" title="Toggle AI sidebar (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
+          <button id="sidebar-toggle" class="icon-btn" title="Toggle assistant window (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
         </div>
       </header>
 
@@ -67,6 +67,13 @@
 
         <aside id="sidebar" aria-label="AI assistant">
           <div id="sidebar-head">
+            <div id="assistant-zoom" role="toolbar" aria-label="Assistant text size">
+              <span>Text size</span>
+              <button id="assistant-zoom-out" title="Smaller text (Ctrl+-)" aria-label="Smaller text">A−</button>
+              <button id="assistant-zoom-reset" title="Reset text size (Ctrl+0)" aria-label="Reset text size">100%</button>
+              <button id="assistant-zoom-in" title="Larger text (Ctrl++)" aria-label="Larger text">A+</button>
+              <button id="assistant-extensions" title="Extensions">Extensions</button>
+            </div>
             <div class="row">
               <strong id="sidebar-title">Assistant</strong>
               <div class="grow"></div>
@@ -84,6 +91,7 @@
             <section id="view-chat" class="view active">
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
+                <div id="prompt-queue" aria-label="Queued prompts" aria-live="polite" hidden></div>
                 <div id="composer-chips">
                   <label class="chip">
                     <input type="checkbox" id="attach-page" checked />

@@ -22,6 +22,7 @@ import { CLI_PROVIDERS } from '../shared/types';
 import { DEFAULT_SETTINGS, NoSecureStorageError } from './store';
 import { SoulStore, soulPath } from './soul';
 import type { Agent } from './ai/agent';
+import { PromptQueue } from './ai/promptQueue';
 import type { ApprovalManager } from './ai/approvals';
 import type { QuestionManager } from './ai/questions';
 import type { Provider } from './ai/provider';
@@ -62,6 +63,10 @@ export function registerIpc(deps: IpcDeps): void {
   const { win, settings, secrets, history, sessions, agent, approvals, questions, mcp, plugins, providers, downloads, extensions, accounts, passwords } =
     deps;
   const ipcMain = uiIpc([
+    {
+      contents: win.assistant.webContents,
+      url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'shell', 'index.html')).href,
+    },
     {
       contents: win.shell.webContents,
       url: pathToFileURL(path.join(__dirname, '..', 'renderer', 'shell', 'index.html')).href,
@@ -130,7 +135,18 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.winClose, () => win.window.close());
   ipcMain.on(CH.sidebarToggle, (_e, open?: boolean) => win.toggleSidebar(open));
   ipcMain.on(CH.sidebarResize, (_e, width: number) => win.resizeSidebar(width));
-  ipcMain.on(CH.shellReady, () => win.pushState());
+  ipcMain.on(CH.assistantView, (_e, name: string) => {
+    if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
+      win.showAssistantCommand({ command: 'show-view', arg: name });
+    }
+  });
+  ipcMain.on(CH.assistantZoom, (_e, delta: number | null) => {
+    if (delta === null || delta === 0.1 || delta === -0.1) win.zoomAssistant(delta);
+  });
+  ipcMain.on(CH.shellReady, (event) => {
+    if (event.sender === win.assistant.webContents) win.readyAssistant();
+    else win.pushState();
+  });
 
   /* ---------------------------------------------------------------- find */
 
@@ -158,10 +174,22 @@ export function registerIpc(deps: IpcDeps): void {
 
   /* --------------------------------------------------------------- agent */
 
-  ipcMain.on(CH.agentSend, (_e, sessionId: string, text: string, opts?: { attachPage?: boolean }) => {
-    void agent.send(sessionId, text, opts ?? {});
+  const promptQueue = new PromptQueue({
+    send: (sessionId, prompt) => agent.send(sessionId, prompt.text, { attachPage: prompt.attachPage }),
+    changed: state => win.send(CH.agentEvent, { type: 'queue_changed', state }),
+    started: (sessionId, prompt) => win.send(CH.agentEvent, { type: 'prompt_started', sessionId, prompt }),
   });
-  ipcMain.on(CH.agentAbort, (_e, sessionId: string) => agent.abort(sessionId));
+
+  ipcMain.on(CH.agentSend, (_e, sessionId: string, text: string, opts?: { attachPage?: boolean }) => {
+    if (!sessions.load(sessionId) || typeof text !== 'string') return;
+    promptQueue.submit(sessionId, text, opts?.attachPage === true);
+  });
+  ipcMain.on(CH.agentAbort, () => {
+    promptQueue.clear();
+    agent.stop();
+  });
+  ipcMain.handle(CH.agentQueue, (_e, sessionId: string) => promptQueue.get(sessionId));
+  ipcMain.handle(CH.agentCancelQueued, (_e, sessionId: string, id: string) => promptQueue.cancel(sessionId, id));
   ipcMain.handle(CH.agentTools, () => agent.toolSpecs());
   ipcMain.on(CH.agentApprovalResolve, (_e, id: string, decision: ApprovalDecision) => {
     approvals.resolve(id, decision);
@@ -175,7 +203,10 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CH.sessionList, () => sessions.list());
   ipcMain.handle(CH.sessionLoad, (_e, id: string) => sessions.load(id));
   ipcMain.handle(CH.sessionNew, () => sessions.create());
-  ipcMain.handle(CH.sessionDelete, (_e, id: string) => sessions.remove(id));
+  ipcMain.handle(CH.sessionDelete, (_e, id: string) => {
+    promptQueue.clear(id);
+    sessions.remove(id);
+  });
   ipcMain.handle(CH.sessionRename, (_e, id: string, title: string) => sessions.rename(id, title));
 
   /* ------------------------------------------------------------ settings */

@@ -37,7 +37,16 @@ check manually. Updates require downloading and running the new installer.
 The first-run guide lets you try the built-in assistant, connect Codex or Claude,
 or start browsing. Reopen it from **Settings → Getting started**.
 
-Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
+Open the separate assistant window with **Ctrl+Shift+A** and ask about a page or give it a task.
+Closing this window hides it; reopening it preserves your chat and draft.
+Use **Text size** controls or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
+or reset the assistant text. The zoom level is saved independently of website zoom.
+**Stop** cancels active assistant work and browser tool calls, including CLI subprocesses.
+Send more prompts while a reply is running to queue follow-ups in the same chat.
+They run in order; use **Cancel** beside any queued prompt to remove it before
+it starts. **Stop** also clears queued prompts. Queues remain available when you
+switch chats or hide the assistant, and last until the app closes. **Include page**
+uses the page open when that queued prompt starts.
 The built-in model is suitable for simple tasks; use a larger model for complex work.
 
 To connect **Codex** or **Claude Code**:

@@ -21,6 +21,7 @@ import type {
   PluginStatus,
   ProviderId,
   ProviderStatus,
+  PromptQueueState,
   SavedLogin,
   Settings,
   ToolSpec,
@@ -55,6 +56,8 @@ export const CH = {
   winClose: 'win:close',
   sidebarToggle: 'sidebar:toggle',
   sidebarResize: 'sidebar:resize',
+  assistantView: 'assistant:view',
+  assistantZoom: 'assistant:zoom',
 
   // find in page
   findStart: 'find:start',
@@ -68,6 +71,8 @@ export const CH = {
   // agent
   agentSend: 'agent:send',
   agentAbort: 'agent:abort',
+  agentQueue: 'agent:queue',
+  agentCancelQueued: 'agent:cancel-queued',
   agentEvent: 'agent:event', // main -> renderer push
   agentTools: 'agent:tools',
   agentApprovalRequest: 'agent:approval-request', // main -> renderer push
@@ -223,6 +228,8 @@ export interface ShellApi {
     close(): void;
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
+    openAssistantView(name: string): void;
+    zoomAssistant(delta: number | null): void;
     /** Asks the main process to attach the overlay view (omnibox / palette). */
     showOverlay(kind: 'omnibox' | 'palette', payload?: unknown): void;
   };
@@ -240,6 +247,8 @@ export interface ShellApi {
   agent: {
     send(sessionId: string, text: string, opts?: { attachPage?: boolean }): void;
     abort(sessionId: string): void;
+    queue(sessionId: string): Promise<PromptQueueState>;
+    cancelQueued(sessionId: string, id: string): Promise<boolean>;
     tools(): Promise<ToolSpec[]>;
     resolveApproval(id: string, decision: ApprovalDecision): void;
     /** Answers a question from the assistant; null means the user skipped it. */
