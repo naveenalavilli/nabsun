@@ -35,14 +35,15 @@ available** in the toolbar to download one, or use **Settings > App updates** to
 check manually. Updates require downloading and running the new installer.
 
 The first-run guide lets you try the built-in assistant, connect Codex or Claude,
-or start browsing. Reopen it from **Settings → Your launchpad**.
+or start browsing without opening the assistant. Reopen it from **Settings → Getting started**.
 
-Open **Settings** with the gear in the browser toolbar or assistant. Settings
+Open **Settings** with the browser toolbar gear or from **Assistant options**. Settings
 and the visual getting-started guide use the full browser content area. Choose
 a category from the left, or search for a category such as model, theme, or
-privacy and press Enter. Preferences save as you change them. Use **Back to
+privacy and press Enter. Advanced local-model file paths and tuning controls
+stay collapsed until requested. Preferences save as you change them. Use **Back to
 browser** or Escape to return to the same tab; your chat and assistant layout
-are preserved. The setup tour is available from **Your launchpad**.
+are preserved. The setup tour is available from **Getting started**.
 
 Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
 Open **Assistant options (⋯)** for **Detach assistant** to move it into a separate
@@ -55,16 +56,20 @@ or reset the assistant text. The zoom level is saved independently of website zo
 Send more prompts while a reply is running to queue follow-ups in the same chat.
 They run in order; use **Cancel** beside any queued prompt to remove it before
 it starts. **Stop** also clears queued prompts. Queues remain available when you
-switch chats or hide the assistant, and last until the app closes. **Include page**
+switch chats or hide the assistant, and last until the app closes. **Use this page**
 uses the page open when that queued prompt starts.
-The built-in model is suitable for simple tasks; use a larger model for complex work.
+For a first try, choose an example question in the empty chat. It fills the
+message box without sending it; edit it and press Send when ready. Use the
+Getting started guide link whenever you need a refresher. The built-in assistant
+is best for short, simple tasks. Optional account connections and advanced
+preferences remain in Settings.
 
 Chat history, Settings, Extensions, Bookmarks, and Saved passwords are also in
 Assistant options. New chat and Hide remain directly in the compact header.
 
 ## Developer tools
 
-Use the browser toolbar's **Page developer tools** button, **F12**, or
+Use **Developer → Toggle Page Developer Tools**, **F12**, or
 **Ctrl+Shift+I** on Windows/Linux (**Option+Command+I** on Mac) to toggle
 Chromium DevTools for the active webpage. Inspect HTML/CSS in Elements, run
 JavaScript in Console, and use Network, Sources, Performance, Memory, and

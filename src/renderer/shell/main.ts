@@ -507,6 +507,10 @@ const settingsView = new SettingsView((next) => {
 const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
   settings = next;
   closeWorkspace();
+  if (destination === 'browse') {
+    window.nabsun.window.toggleSidebar(false);
+    return;
+  }
   showView(destination);
   if (prompt) window.nabsun.window.prefillAssistant(prompt);
 });
@@ -539,7 +543,6 @@ function wireSidebarButtons() {
       menu.querySelector<HTMLElement>('summary')!.focus();
     }
   });
-  $('#developer-tools-btn').addEventListener('click', () => window.nabsun.window.pageDevTools('toggle'));
   $('#assistant-detach').addEventListener('click', () => window.nabsun.window.detachAssistant(!state?.assistantDetached));
   $('#assistant-hide').addEventListener('click', () => window.nabsun.window.toggleSidebar(false));
   $('#assistant-extensions').addEventListener('click', () => showView('extensions'));

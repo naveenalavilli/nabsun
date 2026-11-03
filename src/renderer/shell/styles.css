@@ -592,6 +592,13 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 .empty-state { color: var(--text-faint); padding: 24px 6px; text-align: center; line-height: 1.7; }
 .empty-state h3 { margin: 0 0 10px; font-size: 13px; color: var(--text); }
 .empty-state code { color: var(--accent-text); }
+.starter-questions { display:grid; gap:8px; margin:20px auto 14px; max-width:340px; }
+.starter-questions button { padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--bg-input); color:var(--text); text-align:left; font:inherit; font-size:12px; cursor:pointer; }
+.starter-questions button:hover { border-color:var(--accent); background:var(--hover); }
+.starter-hint { color:var(--text-dim); font-size:11px; line-height:1.6; }
+.starter-tour { padding:8px; border:0; background:transparent; color:var(--accent-text); font:inherit; font-size:12px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.starter-questions button:focus-visible,.starter-tour:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
+:root:not(.verbose) .token-usage { display:none; }
 
 /* markdown */
 .bubble p { margin: 0 0 9px; }
@@ -1031,6 +1038,22 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .welcome-choice:not(.primary):hover { border-color:var(--accent); background:var(--bg-raised); }
 .welcome-choice strong { font-size:14px; }
 .welcome-skip { padding:9px 12px; border:1px solid var(--border-strong); border-radius:8px; background:transparent; color:var(--text-dim); font:inherit; cursor:pointer; }
+.welcome-start { max-width:620px; padding:22px; margin:24px 0 16px; background:var(--bg-input); border:1px solid var(--border); border-radius:14px; }
+.welcome-recommended { margin:0 0 12px; font-size:12px; font-weight:650; color:var(--accent-text); }
+.welcome-start .welcome-skip { margin-top:4px; }
+.welcome-optional { max-width:620px; padding:16px 20px; border:1px solid var(--border); border-radius:10px; }
+.welcome-optional summary,.settings-advanced summary { font-size:12px; font-weight:650; cursor:pointer; color:var(--text-dim); }
+.welcome-optional p { font-size:12px; line-height:1.7; color:var(--text-dim); }
+.settings-advanced { margin-top:20px; padding:16px; background:var(--bg); border:1px solid var(--border); border-radius:10px; }
+.settings-advanced[open] summary { margin-bottom:20px; }
+@media(max-height:750px) {
+  #workspace .welcome { padding:20px 24px; }
+  #workspace .welcome-heading { display:none; }
+  #workspace .welcome-eyebrow { margin:0 0 8px; }
+  #workspace .welcome h1 { font-size:28px; }
+  #workspace .welcome-intro { margin:10px 0 14px; font-size:12px; line-height:1.5; }
+  .welcome-start { margin:14px 0; padding:16px; }
+}
 
 /* One control language throughout Settings and setup, including native form semantics. */
 #workspace button, #workspace input, #workspace select, #workspace textarea { font-family:inherit; }

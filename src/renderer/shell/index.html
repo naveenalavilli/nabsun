@@ -35,7 +35,6 @@
           <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
           <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
           <button id="update-btn" class="pill" hidden>Update available</button>
-          <button id="developer-tools-btn" class="icon-btn" title="Page developer tools (F12)" aria-label="Page developer tools"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 5-4 5 4 5m8-10 4 5-4 5m-3-12-2 14"/></svg></button>
           <button id="browser-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button>
           <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
           <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
@@ -107,13 +106,13 @@
               <div id="composer">
                 <div id="prompt-queue" aria-label="Queued prompts" aria-live="polite" hidden></div>
                 <div id="composer-chips">
-                  <label class="chip">
+                  <label class="chip" title="Include text from the open page with your question. Turn off to ask without sharing the page.">
                     <input type="checkbox" id="attach-page" checked />
-                    <span>Include page</span>
+                    <span>Use this page</span>
                   </label>
-                  <label class="chip" title="Let the assistant click and type without asking each time">
+                  <label class="chip" title="Allows clicks, typing, and navigation without asking first. Leave off if you want to approve actions.">
                     <input type="checkbox" id="autopilot" />
-                    <span>Autopilot</span>
+                    <span>Automatic actions</span>
                   </label>
                   <div class="grow"></div>
                   <span id="step-badge" class="muted"></span>
