@@ -408,15 +408,25 @@ async function boot() {
   // Written on a debounce as tabs change, so a hard kill still leaves a
   // recent snapshot behind.
   let saveTimer: NodeJS.Timeout | null = null;
+  const saveSession = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    if (win.window.isDestroyed()) return;
+    try {
+      fs.writeFileSync(sessionFile, JSON.stringify(win.tabs.snapshot()), 'utf8');
+    } catch {
+      /* a failed snapshot must never interrupt browsing */
+    }
+  };
   win.tabs.on('update', () => {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      try {
-        fs.writeFileSync(sessionFile, JSON.stringify(win.tabs.snapshot()), 'utf8');
-      } catch {
-        /* a failed snapshot must never interrupt browsing */
-      }
-    }, 1500);
+    if (!win.window.isDestroyed()) saveTimer = setTimeout(saveSession, 1500);
+  });
+  // Capture the session before tab teardown and cancel delayed writes after it.
+  win.window.on('close', saveSession);
+  win.window.on('closed', () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
   });
 
   // Integrations start in the background: a slow MCP server or extension must
@@ -425,6 +435,7 @@ async function boot() {
   void extensions.loadAll().then(() => win.send(CH.extChanged, extensions.status()));
 
   app.on('second-instance', () => {
+    if (win.window.isDestroyed()) return;
     win.window.show();
     win.window.focus();
   });

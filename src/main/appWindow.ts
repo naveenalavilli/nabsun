@@ -47,6 +47,10 @@ export class AppWindow {
   private assistantMessages: { channel: string; payload: unknown }[] = [];
 
   private shellReady = false;
+  private disposed = false;
+  private lastWindowState: WindowState | null = null;
+  private lastContentRect = { x: 0, y: 0, width: 0, height: 0 };
+  private readonly onTabsUpdated = () => this.pushState();
   private workspaceName: 'settings' | 'onboarding' | null = null;
   private workspaceOpen = false;
   private sidebarOpen: boolean;
@@ -166,13 +170,19 @@ export class AppWindow {
       onFindResult: (r) => this.send(CH.findResult, r),
     });
 
-    this.tabs.on('update', () => this.pushState());
+    this.tabs.on('update', this.onTabsUpdated);
     this.window.on('resize', () => this.layout());
     this.window.on('maximize', () => this.layout());
     this.window.on('unmaximize', () => this.layout());
     this.window.on('closed', () => {
-      this.assistant.destroy();
-      this.assistant.webContents.close();
+      this.disposed = true;
+      this.overlayRequest++;
+      this.tabs.off('update', this.onTabsUpdated);
+      this.assistantCommands = [];
+      this.assistantMessages = [];
+      const assistantContents = this.assistant.webContents;
+      if (!this.assistant.isDestroyed()) this.assistant.destroy();
+      if (assistantContents && !assistantContents.isDestroyed()) assistantContents.close();
       this.tabs.destroyAll();
       this.hideExtensionPopup();
       // BaseWindow does not own the lifetime of its WebContentsViews.
@@ -199,10 +209,11 @@ export class AppWindow {
   }
 
   private contentRect() {
+    if (this.disposed || this.window.isDestroyed()) return this.lastContentRect;
     const [width, height] = this.window.getContentSize();
     const top = this.chromeHeight();
     const sidebar = this.sidebarOpen && !this.assistantDetached ? this.clampSidebar(this.sidebarWidth) + 3 : 0;
-    return {
+    return this.lastContentRect = {
       x: 0,
       y: top,
       width: Math.max(0, width - sidebar),
@@ -211,6 +222,7 @@ export class AppWindow {
   }
 
   private clampSidebar(width: number): number {
+    if (this.disposed || this.window.isDestroyed()) return this.lastWindowState?.sidebarWidth ?? width;
     const [winWidth] = this.window.getContentSize();
     return Math.max(MIN_SIDEBAR, Math.min(width, Math.round(winWidth * MAX_SIDEBAR_RATIO)));
   }
@@ -221,6 +233,7 @@ export class AppWindow {
   }
 
   layout() {
+    if (this.disposed || this.window.isDestroyed()) return;
     const [width, height] = this.window.getContentSize();
     this.shell.setBounds({ x: 0, y: 0, width, height });
     this.overlay.setBounds({ x: 0, y: 0, width, height });
@@ -237,6 +250,7 @@ export class AppWindow {
   }
 
   openWorkspace(name: 'settings' | 'onboarding' | null) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.workspaceName = name;
     this.workspaceOpen = name !== null;
     this.hideOverlay();
@@ -254,7 +268,14 @@ export class AppWindow {
   /* -------------------------------------------------------------- state -- */
 
   get state(): WindowState {
-    return {
+    if (this.disposed || this.window.isDestroyed()) {
+      return this.lastWindowState ?? {
+        tabs: [], activeTabId: null, maximized: false, sidebarOpen: this.sidebarOpen,
+        assistantDetached: this.assistantDetached, sidebarWidth: this.sidebarWidth,
+        findOpen: this.findOpen, bookmarksBarVisible: this.bookmarksBarVisible,
+      };
+    }
+    return this.lastWindowState = {
       maximized: this.window.isMaximized(),
       tabs: this.tabs.states,
       activeTabId: this.tabs.activeTabId,
@@ -267,10 +288,12 @@ export class AppWindow {
   }
 
   pushState() {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.send(CH.windowState, this.state);
   }
 
   send(channel: string, payload?: unknown) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if (channel === CH.overlayCommand) {
       const command = (payload as { command?: string })?.command;
       if (command === 'open-settings' || command === 'open-clear-data') {
@@ -298,12 +321,14 @@ export class AppWindow {
   }
 
   readyShell() {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.shellReady = true;
     this.pushState();
     if (this.workspaceName) this.shell.webContents.send(CH.overlayCommand, { command: 'workspace', arg: this.workspaceName });
   }
 
   readyAssistant() {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.assistantReady = true;
     this.applySettings(this.settings.get());
     this.pushState();
@@ -313,12 +338,14 @@ export class AppWindow {
   }
 
   showAssistantCommand(payload: unknown) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.toggleSidebar(true);
     if (this.assistantReady) this.assistant.webContents.send(CH.overlayCommand, payload);
     else this.assistantCommands.push(payload);
   }
 
   zoomAssistant(delta: number | null) {
+    if (this.disposed || this.window.isDestroyed()) return;
     const wc = this.assistant.webContents;
     const factor = delta === null ? 1 : Math.max(0.75, Math.min(2, Math.round((wc.getZoomFactor() + delta) * 100) / 100));
     wc.setZoomFactor(factor);
@@ -326,6 +353,7 @@ export class AppWindow {
   }
 
   sendOverlay(channel: string, payload?: unknown) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if (this.overlay.webContents.isDestroyed()) return;
     this.overlay.webContents.send(channel, payload);
   }
@@ -333,6 +361,7 @@ export class AppWindow {
   /* ------------------------------------------------------------ sidebar -- */
 
   toggleSidebar(open?: boolean) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if ((open ?? !this.sidebarOpen) && this.workspaceOpen) this.openWorkspace(null);
     this.sidebarOpen = open ?? !this.sidebarOpen;
     if (this.sidebarOpen && this.assistantReady) {
@@ -350,6 +379,7 @@ export class AppWindow {
   }
 
   setAssistantDetached(detached: boolean, save = true) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.assistantDetached = detached;
     const view = this.assistant.view;
     for (const host of [this.window, this.assistant]) {
@@ -369,12 +399,14 @@ export class AppWindow {
   }
 
   resizeSidebar(width: number) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.sidebarWidth = this.clampSidebar(width);
     this.settings.set({ sidebarWidth: this.sidebarWidth });
     this.layout();
   }
 
   toggleBookmarksBar(visible?: boolean) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.bookmarksBarVisible = visible ?? !this.bookmarksBarVisible;
     this.settings.set({ bookmarksBarVisible: this.bookmarksBarVisible });
     this.layout();
@@ -382,12 +414,14 @@ export class AppWindow {
 
   /** Shows or hides the "save password?" bar, which shrinks the page area. */
   setPendingLogin(login: { origin: string; username: string; password: string } | null) {
+    if (this.disposed || this.window.isDestroyed()) return;
     const had = Boolean(this.pendingLogin);
     this.pendingLogin = login;
     if (had !== Boolean(login)) this.layout();
   }
 
   setFindOpen(open: boolean) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if (this.findOpen === open) return;
     this.findOpen = open;
     if (!open) this.tabs.stopFind();
@@ -403,6 +437,7 @@ export class AppWindow {
   private overlayRequest = 0;
 
   showOverlay(kind: 'omnibox' | 'palette', payload: unknown) {
+    if (this.disposed || this.window.isDestroyed()) return;
     const request = ++this.overlayRequest;
     if (kind === 'omnibox') {
       // Measure the actual toolbar, including extension buttons and window size.
@@ -418,6 +453,7 @@ export class AppWindow {
   }
 
   private presentOverlay(kind: 'omnibox' | 'palette', payload: unknown) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if (!this.overlayVisible) {
       this.window.contentView.addChildView(this.overlay);
       this.overlayVisible = true;
@@ -437,6 +473,7 @@ export class AppWindow {
   }
 
   hideOverlay() {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.overlayRequest++;
     if (!this.overlayVisible) return;
     this.window.contentView.removeChildView(this.overlay);
@@ -464,6 +501,7 @@ export class AppWindow {
    * the extension's own session, anchored under its button.
    */
   showExtensionPopup(extensionId: string, anchorX: number) {
+    if (this.disposed || this.window.isDestroyed()) return;
     this.hideExtensionPopup();
     const target = this.popupResolver?.(extensionId);
     if (!target) return;
@@ -515,6 +553,7 @@ export class AppWindow {
   }
 
   applySettings(next: Settings) {
+    if (this.disposed || this.window.isDestroyed()) return;
     if (next.assistantDetached !== this.assistantDetached) this.setAssistantDetached(next.assistantDetached, false);
     if (!this.assistant.isDestroyed()) {
       const zoom = Number.isFinite(next.assistantZoom) ? Math.max(0.75, Math.min(2, next.assistantZoom)) : 1;

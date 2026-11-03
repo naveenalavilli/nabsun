@@ -474,16 +474,16 @@ export class TabManager extends EventEmitter {
     });
   }
 
-  private updateScheduled = false;
+  private disposed = false;
+  private updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   emitUpdate() {
     // Chromium fires navigation/loading events in bursts; coalescing them into
     // one frame keeps the shell from re-rendering dozens of times per load.
-    if (this.updateScheduled) return;
-    this.updateScheduled = true;
-    setTimeout(() => {
-      this.updateScheduled = false;
-      this.emit('update');
+    if (this.disposed || this.updateTimer) return;
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = null;
+      if (!this.disposed) this.emit('update');
     }, 16);
   }
 
@@ -590,9 +590,13 @@ export class TabManager extends EventEmitter {
   }
 
   destroyAll() {
-    for (const tab of this.tabs) tab.destroy();
+    this.disposed = true;
+    if (this.updateTimer) clearTimeout(this.updateTimer);
+    this.updateTimer = null;
+    const tabs = this.tabs;
     this.tabs = [];
     this.activeId = null;
+    for (const tab of tabs) tab.destroy();
   }
 }
 

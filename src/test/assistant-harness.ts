@@ -24,6 +24,8 @@ import { CH } from '../shared/ipc';
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-assistant-test-'));
 app.setPath('userData', tmp);
+// Keep the test process alive long enough to observe callbacks after closure.
+app.on('window-all-closed', () => {});
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function until(test: () => boolean | Promise<boolean>) {
   const deadline = Date.now() + 10_000;
@@ -328,9 +330,39 @@ async function main() {
     assert.equal(await Promise.race([consuming, delay(2000).then(() => false)]), true, 'cancellation does not wait for inherited pipes to close');
     await until(() => pids.every(pid => { try { process.kill(pid, 0); return false; } catch { return true; } }));
     console.log('PASS CLI cancellation returns promptly and terminates wrapper and child');
+    const closedState = win.state;
+    const closedBounds = win.contentBounds;
+    let lateUpdates = 0;
+    const countLateUpdate = () => lateUpdates++;
+    win.tabs.on('update', countLateUpdate);
+    // Reproduce a Chromium update queued immediately before the window closes.
+    win.tabs.emitUpdate();
+    win.window.destroy();
+    assert.doesNotThrow(() => {
+      win.pushState();
+      win.layout();
+      win.send(CH.windowState, closedState);
+      win.send(CH.agentApprovalRequest, {});
+      win.openWorkspace('settings');
+      win.readyShell();
+      win.readyAssistant();
+      win.toggleSidebar(true);
+      win.setAssistantDetached(false);
+      win.zoomAssistant(0.1);
+      win.showOverlay('omnibox', {});
+      win.hideOverlay();
+      win.applySettings(settings.get());
+      win.tabs.emitUpdate();
+    }, 'late UI callbacks after destruction must be harmless');
+    assert.deepEqual(win.state, closedState, 'closed windows expose their last safe state');
+    assert.deepEqual(win.contentBounds, closedBounds, 'late coordinate reads do not touch a destroyed window');
+    await delay(80);
+    assert.equal(lateUpdates, 0, 'teardown cancels coalesced updates and prevents rescheduling');
+    win.tabs.off('update', countLateUpdate);
+    console.log('PASS close during a pending update cancels timers and safely ignores late window callbacks');
   } finally {
     agent.stop();
-    win.window.destroy();
+    if (!win.window.isDestroyed()) win.window.destroy();
     settings.flush();
     history.flush();
     await mcp.shutdown();
