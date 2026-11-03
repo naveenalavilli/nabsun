@@ -734,12 +734,19 @@ function buildMenu(deps: IpcDeps) {
         { type: 'separator' },
         { label: 'Toggle Assistant', accelerator: 'CmdOrCtrl+Shift+A', click: run('toggle-sidebar') },
         { type: 'separator' },
-        { label: 'Developer Tools (page)', accelerator: 'F12', click: run('devtools') },
-        {
-          label: 'Developer Tools (browser UI)',
-          accelerator: 'CmdOrCtrl+Shift+I',
-          click: () => deps.win.shell.webContents.openDevTools({ mode: 'detach' }),
-        },
+        { label: 'Toggle Page Developer Tools', accelerator: 'F12', click: run('devtools') },
+      ],
+    },
+    {
+      label: 'Developer',
+      submenu: [
+        { label: 'Toggle Page Developer Tools', accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: run('devtools') },
+        { label: 'Open Page Developer Tools in a Separate Window', click: run('devtools-detached') },
+        { label: 'View Page Source', click: run('view-source') },
+        { type: 'separator' },
+        { label: 'Inspect Nabsun Browser UI', click: () => {
+          if (!deps.win.window.isDestroyed() && !deps.win.shell.webContents.isDestroyed()) deps.win.shell.webContents.openDevTools({ mode: 'detach' });
+        } },
       ],
     },
     {

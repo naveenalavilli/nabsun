@@ -144,6 +144,12 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.workspace, (_e, name: unknown) => {
     if (name === null || name === 'settings' || name === 'onboarding') win.openWorkspace(name);
   });
+  ipcMain.on(CH.pageDevTools, (_e, action: unknown) => {
+    if (action === 'toggle' || action === 'detach') {
+      win.openWorkspace(null);
+      win.tabs.pageDevTools(action);
+    }
+  });
   ipcMain.on(CH.assistantView, (_e, name: string) => {
     if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
       win.showAssistantCommand({ command: 'show-view', arg: name });
@@ -940,7 +946,9 @@ export function handleCommand(deps: IpcDeps, command: string, arg?: unknown): vo
       win.send(CH.overlayCommand, { command: 'focus-find' });
       break;
     case 'devtools':
-      win.tabs.byId(active ?? '')?.wc.openDevTools({ mode: 'detach' });
+    case 'devtools-detached':
+      win.openWorkspace(null);
+      win.tabs.pageDevTools(command === 'devtools-detached' ? 'detach' : 'toggle');
       break;
     default:
       win.send(CH.overlayCommand, { command, arg });

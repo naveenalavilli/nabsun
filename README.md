@@ -45,10 +45,11 @@ browser** or Escape to return to the same tab; your chat and assistant layout
 are preserved. The setup tour is available from **Your launchpad**.
 
 Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
-Use **Detach** to move it from the browser sidebar into a separate window, or
-**Attach** to bring it back. Your choice is saved. Use **Hide** or close the
+Open **Assistant options (⋯)** for **Detach assistant** to move it into a separate
+window, or **Attach assistant** to bring it back. Your choice is saved. Use the
+header's **Hide assistant** button or close the
 detached window to hide the assistant; reopening preserves your chat and draft.
-Use **Text size** controls or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
+Use **Text size** in Assistant options or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
 or reset the assistant text. The zoom level is saved independently of website zoom.
 **Stop** cancels active assistant work and browser tool calls, including CLI subprocesses.
 Send more prompts while a reply is running to queue follow-ups in the same chat.
@@ -57,6 +58,29 @@ it starts. **Stop** also clears queued prompts. Queues remain available when you
 switch chats or hide the assistant, and last until the app closes. **Include page**
 uses the page open when that queued prompt starts.
 The built-in model is suitable for simple tasks; use a larger model for complex work.
+
+Chat history, Settings, Extensions, Bookmarks, and Saved passwords are also in
+Assistant options. New chat and Hide remain directly in the compact header.
+
+## Developer tools
+
+Use the browser toolbar's **Page developer tools** button, **F12**, or
+**Ctrl+Shift+I** on Windows/Linux (**Option+Command+I** on Mac) to toggle
+Chromium DevTools for the active webpage. Inspect HTML/CSS in Elements, run
+JavaScript in Console, and use Network, Sources, Performance, Memory, and
+Application tools supplied by the bundled Chromium version.
+
+DevTools opens docked on the right. Its own dock controls let you change the
+layout; **Developer → Open Page Developer Tools in a Separate Window** opens
+it separately. Right-click a page and choose **Inspect element** to inspect
+that location. View Page Source remains available with **Ctrl/Cmd+U**.
+**Developer → Inspect Nabsun Browser UI** is a separate action for debugging
+Nabsun itself; normal page shortcuts do not inspect the browser UI.
+
+These are Chromium's tools, rather than Firefox-specific tooling. Extension
+and panel availability depends on the Electron/Chromium version.
+
+## Connect an assistant
 
 To connect **Codex** or **Claude Code**:
 

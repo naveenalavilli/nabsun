@@ -122,6 +122,30 @@ async function main() {
       console.log('PASS Windows caption controls minimize, maximize/restore, and request close; macOS layout reserves native traffic lights');
     }
     const browserTab = win.tabs.create('about:blank');
+    await until(() => !browserTab.wc.isLoading());
+    const pageWidth = await browserTab.wc.executeJavaScript('innerWidth');
+    await win.shell.webContents.executeJavaScript('document.querySelector("#developer-tools-btn").click()');
+    await until(() => browserTab.wc.isDevToolsOpened());
+    assert.equal(win.shell.webContents.isDevToolsOpened(), false, 'developer shortcut targets the page, not browser UI');
+    await until(async () => await browserTab.wc.executeJavaScript('innerWidth') < pageWidth);
+    await until(() => Boolean(browserTab.wc.devToolsWebContents?.getURL().startsWith('devtools://')));
+    win.tabs.pageDevTools('toggle');
+    await until(() => !browserTab.wc.isDevToolsOpened());
+    browserTab.wc.sendInputEvent({ type: 'keyDown', keyCode: 'F12' });
+    browserTab.wc.sendInputEvent({ type: 'keyUp', keyCode: 'F12' });
+    await until(() => browserTab.wc.isDevToolsOpened());
+    win.tabs.pageDevTools('toggle');
+    await until(() => !browserTab.wc.isDevToolsOpened());
+    browserTab.wc.sendInputEvent({ type: 'keyDown', keyCode: 'I', modifiers: process.platform === 'darwin' ? ['meta', 'alt'] : ['control', 'shift'] });
+    browserTab.wc.sendInputEvent({ type: 'keyUp', keyCode: 'I', modifiers: process.platform === 'darwin' ? ['meta', 'alt'] : ['control', 'shift'] });
+    await until(() => browserTab.wc.isDevToolsOpened());
+    win.tabs.pageDevTools('toggle');
+    await until(() => !browserTab.wc.isDevToolsOpened());
+    win.tabs.pageDevTools('detach');
+    await until(() => browserTab.wc.isDevToolsOpened());
+    win.tabs.pageDevTools('toggle');
+    await until(() => !browserTab.wc.isDevToolsOpened());
+    console.log('PASS page DevTools opens docked, toggles from familiar shortcuts, and supports a separate window');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#settings-btn").click()');
     await until(() => win.shell.webContents.executeJavaScript('!!document.querySelector("#settings-overview")'));
     assert.equal(browserTab.view.getVisible(), false, 'native page is hidden behind settings');
@@ -212,6 +236,32 @@ async function main() {
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0], 'browser retains its full width');
     assert.equal(await win.assistant.webContents.executeJavaScript('getComputedStyle(document.querySelector("#topchrome")).display'), 'none');
     console.log('PASS separate assistant window and full-width browser');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-menu summary").click()');
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-menu").open'), true);
+    const compactHeader = await win.assistant.webContents.executeJavaScript(`(() => {
+      const head = document.querySelector('#sidebar-head').getBoundingClientRect();
+      const zoom = document.querySelector('#assistant-zoom').getBoundingClientRect();
+      const options = document.querySelector('.assistant-options').getBoundingClientRect();
+      return { height: head.height, zoom: zoom.height, fits: options.left >= 0 && options.right <= innerWidth };
+    })()`);
+    assert.ok(compactHeader.height < 55, JSON.stringify(compactHeader));
+    assert.ok(compactHeader.zoom > 0 && compactHeader.fits);
+    for (const zoom of [0.75, 2]) {
+      win.assistant.webContents.setZoomFactor(zoom);
+      const fits = await win.assistant.webContents.executeJavaScript(`(() => {
+        const menu = document.querySelector('.assistant-options').getBoundingClientRect();
+        const head = document.querySelector('.assistant-titlebar');
+        return menu.left >= 0 && menu.right <= innerWidth && head.scrollWidth <= head.clientWidth;
+      })()`);
+      assert.ok(fits, `assistant header and menu fit at ${zoom * 100}% zoom`);
+    }
+    win.assistant.webContents.setZoomFactor(1);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-menu summary").focus()');
+    win.assistant.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    win.assistant.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    await until(() => win.assistant.webContents.executeJavaScript('!document.querySelector("#assistant-menu").open'));
+    fs.writeFileSync(path.join(artifacts, 'assistant-clean-header.png'), (await win.assistant.webContents.capturePage()).toPNG());
+    console.log('PASS compact assistant header keeps zoom and tools in a keyboard-dismissible overflow menu');
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Preserved draft"; document.querySelector("#assistant-zoom-in").click()');
     await until(() => settings.get().assistantZoom === 1.1);
@@ -353,6 +403,7 @@ async function main() {
       win.hideOverlay();
       win.applySettings(settings.get());
       win.tabs.emitUpdate();
+      win.tabs.pageDevTools('toggle');
     }, 'late UI callbacks after destruction must be harmless');
     assert.deepEqual(win.state, closedState, 'closed windows expose their last safe state');
     assert.deepEqual(win.contentBounds, closedBounds, 'late coordinate reads do not touch a destroyed window');

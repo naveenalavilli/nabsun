@@ -382,6 +382,14 @@ export class TabManager extends EventEmitter {
   private wire(tab: Tab) {
     const wc = tab.wc;
     const update = () => this.emitUpdate();
+    wc.on('before-input-event', (event, input) => {
+      const standardShortcut = input.key.toLowerCase() === 'i' &&
+        (process.platform === 'darwin' ? input.meta && input.alt : input.control && input.shift);
+      if (input.type === 'keyDown' && (input.key === 'F12' || standardShortcut)) {
+        event.preventDefault();
+        this.pageDevTools('toggle');
+      }
+    });
 
     wc.on('page-title-updated', (_e, title) => {
       this.opts.history.updateTitle(wc.getURL(), title);
@@ -475,6 +483,14 @@ export class TabManager extends EventEmitter {
   }
 
   private disposed = false;
+  /** Chromium's own inspector supplies Elements, Console, Network, Sources, and more. */
+  pageDevTools(action: 'toggle' | 'detach' = 'toggle') {
+    if (this.disposed || this.opts.window.isDestroyed()) return;
+    const wc = this.active?.liveWc;
+    if (!wc) return;
+    if (action === 'toggle' && wc.isDevToolsOpened()) wc.closeDevTools();
+    else wc.openDevTools({ mode: action === 'detach' ? 'undocked' : 'right', activate: true });
+  }
   private updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   emitUpdate() {

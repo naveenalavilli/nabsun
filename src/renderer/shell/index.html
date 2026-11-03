@@ -35,6 +35,7 @@
           <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
           <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
           <button id="update-btn" class="pill" hidden>Update available</button>
+          <button id="developer-tools-btn" class="icon-btn" title="Page developer tools (F12)" aria-label="Page developer tools"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 5-4 5 4 5m8-10 4 5-4 5m-3-12-2 14"/></svg></button>
           <button id="browser-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button>
           <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
           <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
@@ -75,23 +76,26 @@
 
         <aside id="sidebar" aria-label="AI assistant">
           <div id="sidebar-head">
-            <div id="assistant-zoom" role="toolbar" aria-label="Assistant text size">
-              <span>Text size</span>
-              <button id="assistant-detach" title="Detach assistant">Detach</button>
-              <button id="assistant-hide" title="Hide assistant">Hide</button>
-              <button id="assistant-zoom-out" title="Smaller text (Ctrl+-)" aria-label="Smaller text">A−</button>
-              <button id="assistant-zoom-reset" title="Reset text size (Ctrl+0)" aria-label="Reset text size">100%</button>
-              <button id="assistant-zoom-in" title="Larger text (Ctrl++)" aria-label="Larger text">A+</button>
-              <button id="assistant-extensions" title="Extensions">Extensions</button>
-            </div>
-            <div class="row">
+            <div class="assistant-titlebar">
               <strong id="sidebar-title">Assistant</strong>
               <div class="grow"></div>
-              <button id="bookmarks-btn" class="icon-btn" title="Bookmarks (Ctrl+Shift+O)" aria-label="Bookmarks">★</button>
-              <button id="passwords-btn" class="icon-btn" title="Saved passwords" aria-label="Saved passwords">🔑</button>
-              <button id="history-btn" class="icon-btn" title="Chat history" aria-label="Chat history">🕘</button>
-              <button id="new-chat" class="icon-btn" title="New chat" aria-label="New chat">✎</button>
-              <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+              <button id="new-chat" class="icon-btn" title="New chat" aria-label="New chat"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+              <details id="assistant-menu" class="assistant-menu">
+                <summary class="icon-btn" title="Assistant options" aria-label="Assistant options"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg></summary>
+                <div class="assistant-options" aria-label="Assistant options">
+                  <p class="assistant-menu-label">Assistant</p>
+                  <button id="history-btn">Chat history</button>
+                  <button id="assistant-detach" title="Detach assistant into a separate window">Detach assistant</button>
+                  <div id="assistant-zoom" role="group" aria-label="Assistant text size"><span>Text size</span><button id="assistant-zoom-out" title="Smaller text (Ctrl+-)" aria-label="Smaller text">A&#8722;</button><button id="assistant-zoom-reset" title="Reset text size (Ctrl+0)" aria-label="Reset text size">100%</button><button id="assistant-zoom-in" title="Larger text (Ctrl++)" aria-label="Larger text">A+</button></div>
+                  <div class="assistant-menu-divider"></div>
+                  <p class="assistant-menu-label">Browser</p>
+                  <button id="assistant-extensions">Extensions</button>
+                  <button id="bookmarks-btn">Bookmarks</button>
+                  <button id="passwords-btn">Saved passwords</button>
+                  <button id="settings-btn">Settings</button>
+                </div>
+              </details>
+              <button id="assistant-hide" class="icon-btn" title="Hide assistant" aria-label="Hide assistant"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
             </div>
             <div id="busy-bar" hidden aria-hidden="true"><span></span></div>
           </div>

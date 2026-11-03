@@ -51,6 +51,7 @@ const api: ShellApi = {
     openAssistantView: name => ipcRenderer.send(CH.assistantView, name),
     zoomAssistant: delta => ipcRenderer.send(CH.assistantZoom, delta),
     detachAssistant: detached => ipcRenderer.send(CH.assistantDetach, detached),
+    pageDevTools: action => ipcRenderer.send(CH.pageDevTools, action),
     showOverlay: (kind, payload) => ipcRenderer.send(CH.overlayShow, kind, payload),
   },
 

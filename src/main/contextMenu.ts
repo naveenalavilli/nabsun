@@ -185,6 +185,8 @@ function buildTemplate(
   items.push({
     label: 'Inspect element',
     click: () => {
+      if (wc.isDestroyed()) return;
+      if (!wc.isDevToolsOpened()) wc.openDevTools({ mode: 'right' });
       wc.inspectElement(params.x, params.y);
       if (wc.isDevToolsOpened()) wc.devToolsWebContents?.focus();
     },

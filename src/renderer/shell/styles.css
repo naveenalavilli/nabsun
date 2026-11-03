@@ -300,6 +300,7 @@ html, body {
   border: none; border-radius: 6px; background: transparent;
   color: var(--text-dim); font-size: 15px; cursor: default; padding: 0;
 }
+.icon-btn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
 .icon-btn { transition: background var(--ease), color var(--ease); }
 #toolbar .icon-btn, #tabstrip .icon-btn { color: var(--chrome-dim); }
 #toolbar .icon-btn:hover:not(:disabled), #tabstrip .icon-btn:hover:not(:disabled) {
@@ -473,6 +474,26 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 }
 
 #sidebar-head { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.assistant-titlebar { display:flex; align-items:center; gap:4px; min-height:30px; }
+.assistant-titlebar .icon-btn { width:28px; height:28px; color:var(--text-dim); }
+.assistant-titlebar #sidebar-title { font-size:13px; font-weight:650; }
+#sidebar-head { position:relative; z-index:5; padding:8px 10px; }
+.assistant-menu { position:static; }
+.assistant-menu > summary { list-style:none; cursor:pointer; }
+.assistant-menu > summary::-webkit-details-marker { display:none; }
+.assistant-menu > summary circle { fill:currentColor; stroke:none; }
+.assistant-menu[open] > summary { background:var(--hover-strong); color:var(--text); }
+.assistant-menu > summary:focus-visible { outline:2px solid var(--accent-text); outline-offset:2px; }
+.assistant-options { position:absolute; top:calc(100% + 4px); right:10px; width:min(260px,calc(100vw - 24px)); max-height:calc(100vh - 64px); overflow-y:auto; padding:8px; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-md); }
+.assistant-options > button { display:block; width:100%; text-align:left; padding:9px 10px; border:0; border-radius:7px; background:transparent; color:var(--text); font:inherit; font-size:12px; cursor:pointer; }
+.assistant-options > button:hover { background:var(--hover); }
+.assistant-menu-label { margin:8px 10px 4px; font-size:10px; color:var(--text-dim); font-weight:650; }
+.assistant-menu-divider { height:1px; margin:8px 2px; background:var(--border); }
+.assistant-options #assistant-zoom { margin:6px 2px; padding:8px; gap:6px; }
+.assistant-options #assistant-zoom > span { flex:1 0 100%; font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+.assistant-options #assistant-zoom button { min-width:34px; min-height:30px; padding:4px 8px; border:1px solid var(--border); border-radius:6px; background:var(--bg-raised); color:var(--text); font:inherit; font-size:11px; cursor:pointer; }
+.assistant-options #assistant-zoom button:hover { border-color:var(--accent); }
+.assistant-options button:focus-visible { outline:2px solid var(--accent-text); outline-offset:1px; }
 #sidebar-title { color: var(--text); }
 .row { display: flex; align-items: center; gap: 8px; }
 .grow { flex: 1; }
