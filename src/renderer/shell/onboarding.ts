@@ -8,17 +8,22 @@ export class OnboardingView {
 
   render() {
     this.root.innerHTML = `
-      <div class="welcome-mark" aria-hidden="true">N</div>
+      <div class="welcome-heading"><div class="welcome-mark" aria-hidden="true">N</div><span>Your first few minutes</span></div>
       <p class="welcome-eyebrow">WELCOME TO NABSUN</p>
-      <h1>Your browser.<br>A little more capable.</h1>
-      <p class="welcome-intro">Read less. Find answers. Get things done with an assistant beside your tabs.</p>
+      <h1>A familiar browser.<br>A helpful new way to work.</h1>
+      <p class="welcome-intro">Start with one page and one question. Here is how Nabsun brings your browser and assistant together.</p>
+      <h2 class="welcome-path-heading">Choose your starting point</h2>
+      <div class="welcome-paths"><button class="welcome-choice primary" data-action="local"><strong>Try the built-in assistant</strong><span>Start simple. Runs on your device, with no account or API key. Best for short tasks.</span></button>
+      <button class="welcome-choice" data-action="connect"><strong>Connect Codex or Claude</strong><span>For more demanding tasks. Nabsun guides installation and sign-in; provider access is required.</span></button></div>
+      <div class="welcome-illustration" role="img" aria-label="Illustration: an open webpage beside an assistant, with an approval step before an action">
+        <div class="tour-browser"><div class="tour-chrome"><i></i><i></i><i></i><span> Your open page</span></div><div class="tour-page"><span class="tour-tag">YOUR CONTEXT</span><strong>An article worth exploring</strong><div class="tour-line"></div><div class="tour-line short"></div><div class="tour-picture"><svg viewBox="0 0 180 70" aria-hidden="true"><path d="M0 60 L40 25 L75 48 L120 10 L180 60" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="120" cy="10" r="5" fill="currentColor"/></svg></div><div class="tour-line"></div></div></div>
+        <div class="tour-assistant"><span class="tour-tag">YOUR ASSISTANT</span><div class="tour-question">What are the key points?</div><div class="tour-answer">Read the page. Find the details.<br>Keep the useful context.</div><div class="tour-approval"><span class="tour-check" aria-hidden="true">✓</span><span><strong>You decide</strong><br>Review actions before approving</span></div></div>
+      </div>
       <div class="welcome-steps">
         <div><span>1</span><p><strong>Open a page</strong><br>Browse as usual. Your assistant stays beside you.</p></div>
         <div><span>2</span><p><strong>Ask for what you need</strong><br>Summarize a page, compare options, or walk through a task.</p></div>
         <div><span>3</span><p><strong>Stay in control</strong><br>Review requested actions before approving them. You can stop at any time.</p></div>
       </div>
-      <button class="welcome-choice primary" data-action="local"><strong>Try the built-in assistant</strong><span>Runs on your device. No account needed.</span></button>
-      <button class="welcome-choice" data-action="connect"><strong>Connect Codex or Claude</strong><span>Sign in through your browser. Nabsun handles setup.</span></button>
       <p class="hint">With a connected provider, your messages and any included page content go to that provider. Switch models in Settings → Model.</p>
       <button class="welcome-skip" data-action="skip">Just browse for now</button>
       <p class="hint">You can reopen this guide from Settings.</p>

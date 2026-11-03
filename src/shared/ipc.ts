@@ -56,6 +56,8 @@ export const CH = {
   winClose: 'win:close',
   sidebarToggle: 'sidebar:toggle',
   sidebarResize: 'sidebar:resize',
+  starterPrompt: 'window:starter-prompt',
+  workspace: 'window:workspace',
   assistantView: 'assistant:view',
   assistantZoom: 'assistant:zoom',
   assistantDetach: 'assistant:detach',
@@ -229,6 +231,8 @@ export interface ShellApi {
     close(): void;
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
+    prefillAssistant(prompt: string): void;
+    openWorkspace(name: 'settings' | 'onboarding' | null): void;
     openAssistantView(name: string): void;
     zoomAssistant(delta: number | null): void;
     detachAssistant(detached: boolean): void;

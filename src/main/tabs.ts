@@ -159,6 +159,7 @@ export declare interface TabManager {
 export class TabManager extends EventEmitter {
   private tabs: Tab[] = [];
   private activeId: string | null = null;
+  private contentVisible = true;
   private bounds = { x: 0, y: 0, width: 800, height: 600 };
   private opts: TabManagerOptions;
 
@@ -252,9 +253,9 @@ export class TabManager extends EventEmitter {
       const next = this.tabs[Math.min(idx, this.tabs.length - 1)];
       this.activeId = next?.id ?? null;
       if (next) {
-        next.view.setVisible(true);
+        next.view.setVisible(this.contentVisible);
         this.layoutActive();
-        next.liveWc?.focus();
+        if (this.contentVisible) next.liveWc?.focus();
       }
     }
     this.emitUpdate();
@@ -263,12 +264,12 @@ export class TabManager extends EventEmitter {
   activate(id: string) {
     const tab = this.byId(id);
     if (!tab) return;
-    for (const t of this.tabs) t.view.setVisible(t.id === id);
+    for (const t of this.tabs) t.view.setVisible(this.contentVisible && t.id === id);
     this.activeId = id;
     // Re-adding raises the view above the shell so it is not painted over.
     this.opts.window.contentView.addChildView(tab.view);
     this.layoutActive();
-    tab.liveWc?.focus();
+    if (this.contentVisible) tab.liveWc?.focus();
     this.emitUpdate();
   }
 
@@ -357,6 +358,11 @@ export class TabManager extends EventEmitter {
     if (!tab) return;
     tab.error = null;
     void this.loadUrl(tab, url);
+  }
+
+  setContentVisible(visible: boolean) {
+    this.contentVisible = visible;
+    for (const tab of this.tabs) tab.view.setVisible(visible && tab.id === this.activeId);
   }
 
   /** Content-area rectangle, in window coordinates. */

@@ -46,6 +46,9 @@ export class AppWindow {
   private assistantCommands: unknown[] = [];
   private assistantMessages: { channel: string; payload: unknown }[] = [];
 
+  private shellReady = false;
+  private workspaceName: 'settings' | 'onboarding' | null = null;
+  private workspaceOpen = false;
   private sidebarOpen: boolean;
   private sidebarWidth: number;
   private findOpen = false;
@@ -221,7 +224,7 @@ export class AppWindow {
     this.overlay.setBounds({ x: 0, y: 0, width, height });
     this.tabs.setBounds(this.contentRect());
     if (!this.assistantDetached) {
-      this.assistant.view.setVisible(this.sidebarOpen);
+      this.assistant.view.setVisible(this.sidebarOpen && !this.workspaceOpen);
       const sidebarWidth = this.clampSidebar(this.sidebarWidth);
       this.assistant.view.setBounds({ x: width - sidebarWidth, y: this.chromeHeight(), width: sidebarWidth, height: Math.max(0, height - this.chromeHeight()) });
     } else {
@@ -229,6 +232,21 @@ export class AppWindow {
       this.assistant.view.setBounds({ x: 0, y: 0, width: assistantWidth, height: assistantHeight });
     }
     this.pushState();
+  }
+
+  openWorkspace(name: 'settings' | 'onboarding' | null) {
+    this.workspaceName = name;
+    this.workspaceOpen = name !== null;
+    this.hideOverlay();
+    this.hideExtensionPopup();
+    this.tabs.setContentVisible(!this.workspaceOpen);
+    this.layout();
+    if (this.shellReady) this.shell.webContents.send(CH.overlayCommand, { command: 'workspace', arg: name });
+    if (name) {
+      this.window.show();
+      this.window.focus();
+      this.shell.webContents.focus();
+    } else this.tabs.active?.wc.focus();
   }
 
   /* -------------------------------------------------------------- state -- */
@@ -252,7 +270,12 @@ export class AppWindow {
   send(channel: string, payload?: unknown) {
     if (channel === CH.overlayCommand) {
       const command = (payload as { command?: string })?.command;
-      if (command && ['ask-ai', 'ask-selection', 'open-settings', 'open-bookmarks', 'open-passwords', 'open-downloads', 'open-clear-data'].includes(command)) {
+      if (command === 'open-settings' || command === 'open-clear-data') {
+        this.openWorkspace('settings');
+        if (command === 'open-clear-data') this.shell.webContents.send(channel, { command: 'reveal-clear-data' });
+        return;
+      }
+      if (command && ['ask-ai', 'ask-selection', 'open-bookmarks', 'open-passwords', 'open-downloads'].includes(command)) {
         this.showAssistantCommand(payload);
         return;
       }
@@ -269,6 +292,12 @@ export class AppWindow {
     if (this.shell.webContents.isDestroyed()) return;
     this.shell.webContents.send(channel, payload);
     if (this.assistantReady && !this.assistant.isDestroyed()) this.assistant.webContents.send(channel, payload);
+  }
+
+  readyShell() {
+    this.shellReady = true;
+    this.pushState();
+    if (this.workspaceName) this.shell.webContents.send(CH.overlayCommand, { command: 'workspace', arg: this.workspaceName });
   }
 
   readyAssistant() {
@@ -301,6 +330,7 @@ export class AppWindow {
   /* ------------------------------------------------------------ sidebar -- */
 
   toggleSidebar(open?: boolean) {
+    if ((open ?? !this.sidebarOpen) && this.workspaceOpen) this.openWorkspace(null);
     this.sidebarOpen = open ?? !this.sidebarOpen;
     if (this.sidebarOpen && this.assistantReady) {
       if (this.assistantDetached) {

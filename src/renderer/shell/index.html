@@ -35,6 +35,7 @@
           <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
           <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
           <button id="update-btn" class="pill" hidden>Update available</button>
+          <button id="browser-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button>
           <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
           <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
           <button id="sidebar-toggle" class="icon-btn" title="Toggle assistant (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
@@ -62,6 +63,13 @@
       <main id="body">
         <!-- The Chromium page view is layered over this region by the main process. -->
         <div id="content-placeholder"></div>
+        <section id="workspace" aria-label="Browser settings and setup" hidden>
+          <div class="workspace-top"><span class="workspace-brand">Nabsun <span>/ Your space</span></span><button id="workspace-close">Back to browser</button></div>
+            <section id="view-settings" class="view">
+              <div id="settings-body"></div>
+            </section>
+            <section id="view-onboarding" class="view"><div id="onboarding-body" class="welcome"></div></section>
+        </section>
 
         <div id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize assistant panel"></div>
 
@@ -89,7 +97,7 @@
           </div>
 
           <div id="sidebar-views">
-            <section id="view-onboarding" class="view"><div id="onboarding-body" class="welcome"></div></section>
+
             <section id="view-chat" class="view active">
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
@@ -159,13 +167,7 @@
               <div id="extensions-body"></div>
             </section>
 
-            <section id="view-settings" class="view">
-              <div class="view-head">
-                <button class="link back-to-chat">← Back</button>
-                <strong>Settings</strong>
-              </div>
-              <div id="settings-body"></div>
-            </section>
+
           </div>
         </aside>
       </main>

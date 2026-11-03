@@ -426,18 +426,27 @@ type ViewName =
   | 'passwords';
 
 function showView(name: ViewName) {
+  if (name === 'settings' || name === 'onboarding') {
+    window.nabsun.window.openWorkspace(name);
+    return;
+  }
   if (!assistantWindow) {
+    closeWorkspace();
     window.nabsun.window.openAssistantView(name);
     return;
   }
   for (const view of document.querySelectorAll('.view')) view.classList.remove('active');
   $(`#view-${name}`).classList.add('active');
-  if (name === 'settings') void settingsView.render();
   if (name === 'extensions') void extensionsView.render();
   if (name === 'bookmarks') void bookmarksView.render();
   if (name === 'passwords') void passwordsView.render();
   if (name === 'history') void renderSessions();
-  if (name === 'onboarding') onboarding.render();
+}
+
+function closeWorkspace() {
+  document.documentElement.classList.remove('workspace-open');
+  $('#workspace').hidden = true;
+  window.nabsun.window.openWorkspace(null);
 }
 
 async function renderSessions() {
@@ -496,8 +505,9 @@ const settingsView = new SettingsView((next) => {
 });
 const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
   settings = next;
+  closeWorkspace();
   showView(destination);
-  if (prompt) chat.ask(prompt);
+  if (prompt) window.nabsun.window.prefillAssistant(prompt);
 });
 
 async function refreshSettings() {
@@ -518,7 +528,6 @@ function wireSidebarButtons() {
   $('#assistant-hide').addEventListener('click', () => window.nabsun.window.toggleSidebar(false));
   $('#assistant-extensions').addEventListener('click', () => showView('extensions'));
   window.addEventListener('nabsun:welcome', () => {
-    window.nabsun.window.toggleSidebar(true);
     showView('onboarding');
   });
   $('#new-chat').addEventListener('click', async () => {
@@ -529,6 +538,8 @@ function wireSidebarButtons() {
   $('#extensions-btn').addEventListener('click', () => showView('extensions'));
   $('#bookmarks-btn').addEventListener('click', () => showView('bookmarks'));
   $('#passwords-btn').addEventListener('click', () => showView('passwords'));
+  $('#browser-settings-btn').addEventListener('click', () => showView('settings'));
+  $('#workspace-close').addEventListener('click', closeWorkspace);
   $('#settings-btn').addEventListener('click', () => showView('settings'));
   for (const btn of document.querySelectorAll('.back-to-chat')) {
     btn.addEventListener('click', () => showView('chat'));
@@ -541,6 +552,8 @@ function wireShortcuts() {
     if (ctrl && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       openFind();
+    } else if (e.key === 'Escape' && !assistantWindow && !$('#workspace').hidden) {
+      closeWorkspace();
     } else if (e.key === 'Escape' && !findbar.hidden) {
       closeFind();
     }
@@ -602,6 +615,21 @@ function applyVerbose(verbose: boolean): void {
 
 window.nabsun.onCommand((command, arg) => {
   switch (command) {
+    case 'workspace':
+      if (assistantWindow) break;
+      $('#workspace').hidden = arg === null;
+      document.documentElement.classList.toggle('workspace-open', arg !== null);
+      for (const name of ['settings', 'onboarding']) {
+        $(`#view-${name}`).classList.toggle('active', name === arg);
+      }
+      if (arg === 'settings') void settingsView.render();
+      if (arg === 'onboarding') onboarding.render();
+      $('#workspace-close').focus();
+      break;
+    case 'prefill-prompt':
+      showView('chat');
+      chat.ask(String(arg ?? ''));
+      break;
     case 'show-view':
       showView(arg as ViewName);
       break;
@@ -635,6 +663,9 @@ window.nabsun.onCommand((command, arg) => {
       showView('settings');
       void revealWhenReady('clear-data-block');
       break;
+    case 'reveal-clear-data':
+      void revealWhenReady('clear-data-block');
+      break;
   }
 });
 
@@ -649,6 +680,7 @@ async function revealWhenReady(id: string, timeoutMs = 2000): Promise<void> {
   while (Date.now() < deadline) {
     const target = document.getElementById(id);
     if (target) {
+      $('#settings-body').dispatchEvent(new CustomEvent('settings:reveal', { detail: 'browsing' }));
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
     }
@@ -695,8 +727,7 @@ async function boot() {
   await bookmarksView.refresh();
   if (assistantWindow) await chat.start();
   window.nabsun.ready();
-  if (assistantWindow && !settings.onboardingCompleted) {
-    window.nabsun.window.toggleSidebar(true);
+  if (!assistantWindow && !settings.onboardingCompleted) {
     showView('onboarding');
   }
 }

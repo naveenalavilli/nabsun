@@ -15,9 +15,13 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return node;
 };
 
+let fieldId = 0;
 function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
   const wrap = el('div', { className: 'field' });
-  wrap.append(el('label', { textContent: label }), control);
+  const caption = el('label', { textContent: label });
+  const input = control.matches('input, select, textarea') ? control : control.querySelector('input, select, textarea');
+  if (input) { input.id ||= `setting-field-${++fieldId}`; caption.htmlFor = input.id; }
+  wrap.append(caption, control);
   if (hint) wrap.append(el('div', { className: 'hint', textContent: hint }));
   return wrap;
 }
@@ -32,13 +36,16 @@ function checkbox(
   input.addEventListener('change', () => onChange(input.checked));
   const text = el('div', {}, [el('span', { textContent: label })]);
   if (hint) text.append(el('div', { className: 'hint', textContent: hint }));
-  return el('div', { className: 'check' }, [input, text]);
+  return el('label', { className: 'check' }, [input, text]);
 }
 
 export class SettingsView {
   private root = document.querySelector<HTMLElement>('#settings-body')!;
   private settings: Settings | null = null;
   private credentials: ProviderStatus[] = [];
+  private paintAbort = new AbortController();
+  private activeCategory = 'overview';
+  private searchQuery = '';
   private saveError = '';
   private paintGeneration = 0;
   private approvalSave: Promise<void> = Promise.resolve();
@@ -59,9 +66,17 @@ export class SettingsView {
   constructor(private readonly onChanged: (s: Settings) => void) {}
 
   async render(): Promise<void> {
-    this.settings = await window.nabsun.settings.get();
-    this.credentials = await window.nabsun.settings.credentialStatus();
-    this.paint();
+    try {
+      this.settings = await window.nabsun.settings.get();
+      this.credentials = await window.nabsun.settings.credentialStatus();
+      this.paint();
+    } catch {
+      const error = el('p', { className: 'settings-save-error', textContent: 'Could not load settings. Please try again.' });
+      error.setAttribute('role', 'alert');
+      const retry = el('button', { className: 'ghost', textContent: 'Try again' });
+      retry.addEventListener('click', () => void this.render());
+      this.root.replaceChildren(error, retry);
+    }
   }
 
   private async patch(patch: Partial<Settings>) {
@@ -77,6 +92,8 @@ export class SettingsView {
   }
 
   private paint() {
+    this.paintAbort.abort();
+    this.paintAbort = new AbortController();
     const generation = ++this.paintGeneration;
     const s = this.settings;
     if (!s) return;
@@ -86,18 +103,100 @@ export class SettingsView {
       error.setAttribute('role', 'alert');
       this.root.append(error);
     }
-    const welcome = el('button', { textContent: 'Getting started' });
+    const layout = el('div', { className: 'settings-layout' });
+    const rail = el('nav', { className: 'settings-rail' });
+    rail.setAttribute('aria-label', 'Settings categories');
+    rail.append(el('p', { className: 'settings-eyebrow', textContent: 'MAKE IT YOURS' }), el('h1', { textContent: 'Settings' }));
+    const search = el('input', { type: 'search', placeholder: 'Find a setting', value: this.searchQuery });
+    search.setAttribute('aria-label', 'Find a setting');
+    rail.append(search);
+    const content = el('div', { className: 'settings-content', id: 'settings-content' });
+    content.tabIndex = -1;
+    const categories: [string, string, string, string][] = [
+      ['overview', 'Your launchpad', 'A good place to begin', 'start welcome setup'],
+      ['model', 'Models & accounts', 'Choose the intelligence behind your browser', 'provider api key local ollama codex claude token engine'],
+      ['appearance', 'Appearance', 'Make Nabsun feel like home', 'theme color light dark style'],
+      ['assistant', 'Assistant & permissions', 'Decide how your assistant works', 'approval autopilot privacy memory soul reasoning steps screenshots'],
+      ['browsing', 'Browsing & data', 'Your everyday browser preferences', 'homepage search downloads passwords clear history cookies cache'],
+      ['integrations', 'Integrations', 'Connect your tools and workflows', 'mcp plugins bridge external agents'],
+      ['updates', 'App updates', 'Keep your browser current', 'version release download'],
+      ['advanced', 'Configuration', 'Files and advanced preferences', 'paths profile config reset'],
+    ];
+    const panels = new Map<string, HTMLElement>();
+    const buttons = new Map<string, HTMLButtonElement>();
+    const overview = el('div', { className: 'settings-overview' });
+    overview.append(el('p', { className: 'settings-eyebrow', textContent: 'YOUR BROWSER, YOUR WAY' }),
+      el('h2', { textContent: 'A little setup. A lot of possibility.' }),
+      el('p', { className: 'settings-lead', textContent: 'Start with the essentials, then make this space your own. Changes save as you go.' }));
+    const welcome = el('button', { className: 'setup-banner', textContent: 'New here? Take the visual getting-started tour \u2192' });
     welcome.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
-    this.root.append(welcome);
-    this.root.append(updatesSection());
-    this.root.append(appearanceSelector(s, next => { this.settings = next; this.onChanged(next); }));
-    this.root.append(this.modelSection(s), this.behaviourSection(s), this.browsingSection(s));
-    void this.integrationsSection().then((node) => {
+    overview.append(welcome);
+    const cards = el('div', { className: 'settings-cards' });
+    const select = (id: string, focus = false) => {
+      this.activeCategory = id;
+      for (const [key, panel] of panels) panel.hidden = key !== id;
+      for (const [key, button] of buttons) button.setAttribute('aria-current', key === id ? 'page' : 'false');
+      content.scrollTop = 0;
+      if (focus) content.focus();
+    };
+    const mount = (id: string, node: HTMLElement) => {
+      const info = categories.find(c => c[0] === id)!;
+      const panel = el('section', { className: 'settings-category', id: `settings-${id}` });
+      panel.setAttribute('aria-label', info[1]);
+      if (id !== 'overview') panel.append(el('h2', { textContent: info[1] }), el('p', { className: 'settings-lead', textContent: info[2] }));
+      panel.append(node);
+      panels.set(id, panel);
+      content.append(panel);
+      panel.hidden = this.activeCategory !== id;
+    };
+    for (const [id, title, description] of categories) {
+      const button = el('button', { textContent: title });
+      button.setAttribute('aria-controls', `settings-${id}`);
+      button.addEventListener('click', () => select(id, true));
+      buttons.set(id, button); rail.append(button);
+      if (id !== 'overview' && id !== 'advanced') {
+        const card = el('button', { className: 'settings-card' }, [el('span', { className: 'settings-card-mark', textContent: String(cards.childElementCount + 1).padStart(2, '0') }), el('strong', { textContent: title }), el('span', { textContent: description }), el('span', { className: 'settings-card-link', textContent: 'Explore \u2192' })]);
+        card.addEventListener('click', () => select(id, true)); cards.append(card);
+      }
+    }
+    const empty = el('p', { className: 'hint', textContent: 'No categories match. Try model, theme, or privacy.', hidden: true });
+    rail.append(empty, el('p', { className: 'hint', textContent: 'Your preferences save automatically. Accounts and browser actions keep their existing permission controls.' }));
+    const filter = () => {
+      this.searchQuery = search.value;
+      const query = search.value.trim().toLowerCase();
+      let matches = 0;
+      for (const [id, title, description, keywords] of categories) {
+        const match = `${title} ${description} ${keywords}`.toLowerCase().includes(query);
+        buttons.get(id)!.hidden = !match;
+        if (match) matches++;
+      }
+      empty.hidden = matches > 0;
+    };
+    search.addEventListener('input', filter);
+    search.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { const first = [...buttons].find(([, b]) => !b.hidden); if (first) select(first[0], true); }
+    });
+    overview.append(cards);
+    mount('overview', overview);
+    mount('updates', updatesSection());
+    mount('appearance', appearanceSelector(s, next => { this.settings = next; this.onChanged(next); }));
+    mount('model', this.modelSection(s));
+    mount('assistant', this.behaviourSection(s));
+    mount('browsing', this.browsingSection(s));
+    layout.append(rail, content); this.root.append(layout);
+    // Expose category selection for commands such as Clear browsing data.
+    this.root.addEventListener('settings:reveal', event => select((event as CustomEvent<string>).detail, true), { signal: this.paintAbort.signal });
+    select(this.activeCategory); filter();
+    void this.integrationsSection().then(node => {
       if (generation !== this.paintGeneration) return;
-      this.root.append(node);
-      void this.advancedSection().then((adv) => {
-        if (generation === this.paintGeneration) this.root.append(adv);
-      });
+      mount('integrations', node);
+    }).catch(() => {
+      if (generation === this.paintGeneration) mount('integrations', el('p', { textContent: 'Could not load integrations. Reopen Settings to try again.' }));
+    });
+    void this.advancedSection().then(node => {
+      if (generation === this.paintGeneration) mount('advanced', node);
+    }).catch(() => {
+      if (generation === this.paintGeneration) mount('advanced', el('p', { textContent: 'Could not load configuration. Reopen Settings to try again.' }));
     });
   }
 
