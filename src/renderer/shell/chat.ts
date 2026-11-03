@@ -150,15 +150,16 @@ export class ChatView {
     this.stopBtn.hidden = !working;
     this.busyBar.hidden = !working;
     const state = this.sessionId ? this.queues.get(this.sessionId) : undefined;
-    this.sendBtn.textContent = state?.active ? 'Queue' : 'Send';
-    this.sendBtn.setAttribute('aria-label', state?.active ? 'Queue message' : 'Send');
+    this.sendBtn.textContent = state?.active ? 'Send next' : 'Send';
+    this.sendBtn.setAttribute('aria-label', state?.active ? 'Send after the current reply' : 'Send');
+    this.sendBtn.title = state?.active ? 'Your message will wait until the current reply is finished.' : 'Send your message';
     this.stopBtn.title = 'Stop active work and cancel all queued prompts';
     if (!this.queuePanel) return;
     this.queuePanel.replaceChildren();
     this.queuePanel.hidden = !state?.pending.length;
     if (!state?.pending.length) return;
     const heading = document.createElement('strong');
-    heading.textContent = `Queued (${state.pending.length})`;
+    heading.textContent = `Up next (${state.pending.length})`;
     this.queuePanel.append(heading);
     for (const prompt of state.pending) {
       const row = document.createElement('div');
@@ -631,14 +632,31 @@ export class ChatView {
     const el = document.createElement('div');
     el.className = 'empty-state';
     const h = document.createElement('h3');
-    h.textContent = 'Ask about this page, or hand me a task.';
+    h.textContent = 'What would you like help with?';
     const p = document.createElement('div');
     p.textContent =
-      'I can read what you are looking at, search, open tabs, fill forms and click through a flow. Actions that change something ask you first.';
-    const p2 = document.createElement('div');
-    p2.style.marginTop = '12px';
-    p2.textContent = 'Ctrl+L address bar · Ctrl+Shift+P commands · Ctrl+Shift+A toggle this panel';
-    el.append(h, p, p2);
+      'Open a website, then ask a question about it. You can start with an example below.';
+    const examples = document.createElement('div');
+    examples.className = 'starter-questions';
+    for (const [id, label, prompt] of [
+      ['summary', 'Summarize this page', 'Summarize this page in three short bullet points.'],
+      ['explain', 'Explain it simply', 'Explain this page in simple words. Start with the most important point.'],
+      ['help', 'Show me what you can do', 'What can you help me do in this browser?'],
+    ]) {
+      const button = document.createElement('button');
+      button.dataset.starter = id;
+      button.textContent = label;
+      button.addEventListener('click', () => this.ask(prompt));
+      examples.append(button);
+    }
+    const hint = document.createElement('p');
+    hint.className = 'starter-hint';
+    hint.textContent = 'An example fills the message box. Nothing is sent until you press Send. Use Stop whenever you want to cancel.';
+    const tour = document.createElement('button');
+    tour.className = 'starter-tour';
+    tour.textContent = 'Getting started guide';
+    tour.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
+    el.append(h, p, examples, hint, tour);
     this.transcript.appendChild(el);
   }
 

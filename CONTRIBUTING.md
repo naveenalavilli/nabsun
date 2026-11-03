@@ -42,6 +42,23 @@ Live provider tests are opt-in and may use account quota.
 
 ## Code conventions
 
+### Usability
+
+Nabsun's primary audience is general browser users, including people trying
+an AI assistant for the first time.
+
+- Use plain language and familiar browser actions in everyday screens.
+- Offer one recommended starting path; keep account connections optional and
+  technical configuration behind clearly marked advanced controls.
+- Make examples editable and require an explicit Send. Keep Stop and the
+  browse-only path easy to find, and explain when page content is shared.
+- Keep developer tooling in the Developer menu and shortcuts, rather than
+  adding it to the everyday toolbar. Preserve advanced features for those who need them.
+- Check the first-use choices on small windows, and check keyboard access,
+  zoom, and light/dark themes when changing the interface.
+
+### Implementation
+
 - Keep `src/shared/` independent of Electron and Node runtime imports.
 - Render untrusted content as text or safe DOM nodes, never raw HTML.
 - Declare each tool's risk and preserve approval, target validation, and cancellation.

@@ -107,6 +107,19 @@ async function main() {
       if (!root.querySelector('[role=alert]')?.textContent.includes('Could not save') || view.settings.theme !== 'light') throw Error('Settings save failure was hidden');
     })()`);
     console.log('PASS failed settings save preserves prior value and ignores stale asynchronous sections');
+    await win.webContents.executeJavaScript(`(() => {
+      ${settingsUi.outputFiles[0].text}
+      const root = document.querySelector('#settings-body');
+      const view = new SettingsUi.SettingsView(() => {});
+      view.credentials = [{ id: 'local', kind: 'local', label: 'Built-in assistant', hasCredentials: true }];
+      const panel = view.modelSection({ provider: 'local', localModel: { serverPath: '', modelPath: '', contextSize: 8192, threads: 0 } });
+      root.replaceChildren(panel);
+      const advanced = panel.querySelector('.settings-advanced');
+      if (!advanced || advanced.open || advanced.querySelectorAll('input').length !== 4) throw Error('Advanced local controls must be preserved but collapsed');
+      advanced.querySelector('summary').click();
+      if (!advanced.open) throw Error('Advanced controls cannot be opened');
+    })()`);
+    console.log('PASS advanced local settings remain available behind a closed disclosure');
   } finally { win.destroy(); }
 }
 main().then(() => app.exit(0), error => { console.error(error); app.exit(1); });

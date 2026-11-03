@@ -116,14 +116,14 @@ export class SettingsView {
     const content = el('div', { className: 'settings-content', id: 'settings-content' });
     content.tabIndex = -1;
     const categories: [string, string, string, string][] = [
-      ['overview', 'Your launchpad', 'A good place to begin', 'start welcome setup'],
-      ['model', 'Models & accounts', 'Choose the intelligence behind your browser', 'provider api key local ollama codex claude token engine'],
+      ['overview', 'Getting started', 'A good place to begin', 'start welcome setup'],
+      ['model', 'Assistant choice', 'Choose the helper you want to use', 'provider api key local ollama codex claude token engine'],
       ['appearance', 'Appearance', 'Make Nabsun feel like home', 'theme color light dark style'],
       ['assistant', 'Assistant & permissions', 'Decide how your assistant works', 'approval autopilot privacy memory soul reasoning steps screenshots'],
       ['browsing', 'Browsing & data', 'Your everyday browser preferences', 'homepage search downloads passwords clear history cookies cache'],
-      ['integrations', 'Integrations', 'Connect your tools and workflows', 'mcp plugins bridge external agents'],
+      ['integrations', 'Advanced connections', 'Optional tools for experienced users', 'mcp plugins bridge external agents'],
       ['updates', 'App updates', 'Keep your browser current', 'version release download'],
-      ['advanced', 'Configuration', 'Files and advanced preferences', 'paths profile config reset'],
+      ['advanced', 'Advanced settings', 'Files and advanced preferences', 'paths profile config reset'],
     ];
     const panels = new Map<string, HTMLElement>();
     const buttons = new Map<string, HTMLButtonElement>();
@@ -217,7 +217,7 @@ export class SettingsView {
       await this.patch({ provider: providerSelect.value as ProviderId });
       this.paint();
     });
-    set.append(field('Provider', providerSelect));
+    set.append(field('Assistant', providerSelect));
 
     const current = this.credentials.find((c) => c.id === s.provider);
 
@@ -322,9 +322,21 @@ export class SettingsView {
             // navigation, search, fetch_url and any enabled integration all
             // reach the network, and claiming otherwise here would be read as a
             // guarantee about the whole application.
-            ? 'Runs on this machine: your prompts and page content are not sent to any model provider. The browser itself still uses the network for browsing, search and integrations.'
-            : 'The weights are not on disk yet. Run `npm run fetch:model` in the source tree, or point the fields below at a llama-server and a .gguf file you already have.',
+            ? 'Answers are generated on your computer. Your questions and included page text are not sent to an online AI service. Browsing websites still uses the internet.'
+            : 'The built-in assistant files could not be found. Reinstall Nabsun from the official release, or choose another assistant above. If you built Nabsun from source, see the setup instructions in the README.',
         ),
+        field(
+          'When to switch',
+          el('div', {
+            className: 'hint',
+            textContent:
+              'The built-in assistant is best for short, simple tasks. For longer research or more demanding questions, choose a more capable assistant above — your settings for it are kept.',
+          }),
+        ),
+      );
+      const advanced = el('details', { className: 'settings-advanced' });
+      advanced.append(el('summary', { textContent: 'Advanced settings for the built-in assistant' }));
+      advanced.append(
         field(
           'Model file',
           localInput('modelPath', 'Leave blank to use the bundled model'),
@@ -345,15 +357,8 @@ export class SettingsView {
           numberInput('threads', 0, 'Threads; 0 lets llama.cpp choose'),
           '0 lets llama.cpp choose based on your CPU.',
         ),
-        field(
-          'When to switch',
-          el('div', {
-            className: 'hint',
-            textContent:
-              'A 1.7B model handles routine navigation well and costs nothing to run. For long multi-step research or careful reasoning, switch the provider above to a larger model — your settings for it are kept.',
-          }),
-        ),
       );
+      set.append(advanced);
       return set;
     }
 

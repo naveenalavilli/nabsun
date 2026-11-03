@@ -507,6 +507,10 @@ const settingsView = new SettingsView((next) => {
 const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
   settings = next;
   closeWorkspace();
+  if (destination === 'browse') {
+    window.nabsun.window.toggleSidebar(false);
+    return;
+  }
   showView(destination);
   if (prompt) window.nabsun.window.prefillAssistant(prompt);
 });
@@ -525,6 +529,20 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  const menu = $<HTMLDetailsElement>('#assistant-menu');
+  menu.addEventListener('click', event => {
+    const button = (event.target as HTMLElement).closest('button');
+    if (button && !button.closest('#assistant-zoom')) menu.open = false;
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!menu.contains(event.target as Node)) menu.open = false;
+  });
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation(); menu.open = false;
+      menu.querySelector<HTMLElement>('summary')!.focus();
+    }
+  });
   $('#assistant-detach').addEventListener('click', () => window.nabsun.window.detachAssistant(!state?.assistantDetached));
   $('#assistant-hide').addEventListener('click', () => window.nabsun.window.toggleSidebar(false));
   $('#assistant-extensions').addEventListener('click', () => showView('extensions'));
@@ -550,7 +568,10 @@ function wireSidebarButtons() {
 function wireShortcuts() {
   window.addEventListener('keydown', (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
-    if (ctrl && e.key.toLowerCase() === 'f') {
+    if (e.key === 'F12' || (e.key.toLowerCase() === 'i' && (window.nabsun.platform === 'darwin' ? e.metaKey && e.altKey : e.ctrlKey && e.shiftKey))) {
+      e.preventDefault();
+      window.nabsun.window.pageDevTools('toggle');
+    } else if (ctrl && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       openFind();
     } else if (e.key === 'Escape' && !assistantWindow && !$('#workspace').hidden) {
@@ -568,7 +589,7 @@ window.nabsun.onWindowState((next) => {
   maximize.setAttribute('aria-label', maximize.title);
   state = next;
   document.documentElement.classList.toggle('assistant-attached', !next.assistantDetached && next.sidebarOpen);
-  $('#assistant-detach').textContent = next.assistantDetached ? 'Attach' : 'Detach';
+  $('#assistant-detach').textContent = next.assistantDetached ? 'Attach assistant' : 'Detach assistant';
   $('#assistant-detach').title = next.assistantDetached ? 'Attach assistant to browser' : 'Detach assistant into a separate window';
   $('#sidebar-resizer').style.right = `${next.sidebarWidth}px`;
   window.__activeTabId = next.activeTabId;

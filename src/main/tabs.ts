@@ -382,6 +382,14 @@ export class TabManager extends EventEmitter {
   private wire(tab: Tab) {
     const wc = tab.wc;
     const update = () => this.emitUpdate();
+    wc.on('before-input-event', (event, input) => {
+      const standardShortcut = input.key.toLowerCase() === 'i' &&
+        (process.platform === 'darwin' ? input.meta && input.alt : input.control && input.shift);
+      if (input.type === 'keyDown' && (input.key === 'F12' || standardShortcut)) {
+        event.preventDefault();
+        this.pageDevTools('toggle');
+      }
+    });
 
     wc.on('page-title-updated', (_e, title) => {
       this.opts.history.updateTitle(wc.getURL(), title);
@@ -474,16 +482,24 @@ export class TabManager extends EventEmitter {
     });
   }
 
-  private updateScheduled = false;
+  private disposed = false;
+  /** Chromium's own inspector supplies Elements, Console, Network, Sources, and more. */
+  pageDevTools(action: 'toggle' | 'detach' = 'toggle') {
+    if (this.disposed || this.opts.window.isDestroyed()) return;
+    const wc = this.active?.liveWc;
+    if (!wc) return;
+    if (action === 'toggle' && wc.isDevToolsOpened()) wc.closeDevTools();
+    else wc.openDevTools({ mode: action === 'detach' ? 'undocked' : 'right', activate: true });
+  }
+  private updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   emitUpdate() {
     // Chromium fires navigation/loading events in bursts; coalescing them into
     // one frame keeps the shell from re-rendering dozens of times per load.
-    if (this.updateScheduled) return;
-    this.updateScheduled = true;
-    setTimeout(() => {
-      this.updateScheduled = false;
-      this.emit('update');
+    if (this.disposed || this.updateTimer) return;
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = null;
+      if (!this.disposed) this.emit('update');
     }, 16);
   }
 
@@ -590,9 +606,13 @@ export class TabManager extends EventEmitter {
   }
 
   destroyAll() {
-    for (const tab of this.tabs) tab.destroy();
+    this.disposed = true;
+    if (this.updateTimer) clearTimeout(this.updateTimer);
+    this.updateTimer = null;
+    const tabs = this.tabs;
     this.tabs = [];
     this.activeId = null;
+    for (const tab of tabs) tab.destroy();
   }
 }
 

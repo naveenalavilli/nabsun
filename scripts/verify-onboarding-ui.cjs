@@ -47,14 +47,17 @@ async function main() {
       main.querySelector('form').dispatchEvent(new Event('submit', {cancelable:true})); await tick();
       check('invalid custom ID does not change model', settings.models['claude-cli'] === 'sonnet');
       const welcome = new Welcome.OnboardingView(main, (...args) => { finished = args; });
-      welcome.render(); fail = true; main.querySelector('[data-action=local]').click(); await tick();
+      welcome.render();
+      check('account connection is optional and collapsed on first visit', !main.querySelector('.welcome-optional').open);
+      check('browse-only choice appears before the illustration', !!(main.querySelector('[data-action=skip]').compareDocumentPosition(main.querySelector('.welcome-illustration')) & Node.DOCUMENT_POSITION_FOLLOWING));
+      fail = true; main.querySelector('[data-action=local]').click(); await tick();
       check('setup failure remains retryable', !finished && !main.querySelector('button').disabled && main.textContent.includes('Could not save'));
       fail = false; main.querySelector('[data-action=local]').click(); await tick();
       check('local setup completes and prefills without sending', settings.onboardingCompleted && settings.provider === 'local' && finished[1] === 'chat' && !!finished[2]);
-      welcome.render(); main.querySelector('[data-action=connect]').click(); await tick();
+      welcome.render(); main.querySelector('.welcome-optional').open = true; main.querySelector('[data-action=connect]').click(); await tick();
       check('connect opens existing connection manager without changing provider', finished[1] === 'extensions' && settings.provider === 'local');
       settings.provider = 'claude-cli'; welcome.render(); main.querySelector('[data-action=skip]').click(); await tick();
-      check('skip preserves existing provider', finished[1] === 'chat' && settings.provider === 'claude-cli');
+      check('browse-only choice preserves the assistant choice without opening chat', finished[1] === 'browse' && settings.provider === 'claude-cli');
       return results;
     })()`);
     results.forEach(name => console.log('PASS ' + name));
@@ -66,7 +69,7 @@ async function main() {
         await win.webContents.executeJavaScript(`document.documentElement.dataset.theme = '${theme}'`);
         const fits = await win.webContents.executeJavaScript(`(() => {
           const root = document.querySelector('main');
-          root.scrollTop = root.scrollHeight;
+          root.querySelector('[data-action=skip]').scrollIntoView({ block: 'center' });
           const skip = root.querySelector('[data-action=skip]').getBoundingClientRect();
           return root.scrollWidth <= root.clientWidth && skip.bottom <= innerHeight && skip.top >= 0;
         })()`);
