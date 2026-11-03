@@ -60,10 +60,26 @@ export async function verifyEngineManifest(dir, manifest, { linksOnly = false } 
 }
 
 /** Exercise the native loader, including dependencies not listed explicitly. */
-export function assertEngineStarts(server) {
+export function assertEngineStarts(server, { platform = process.platform, run = execFileSync } = {}) {
   // A freshly signed Mac payload can spend tens of seconds in the OS loader
   // on its first launch, before llama.cpp has executed any application code.
-  execFileSync(server, ['--version'], { timeout: 60_000, windowsHide: true, stdio: 'pipe' });
+  const probe = timeout => run(server, ['--version'], {
+    timeout, killSignal: 'SIGKILL', windowsHide: true, stdio: 'pipe',
+  });
+  try {
+    probe(60_000);
+  } catch (error) {
+    // A cold signed bundle can exceed the first budget while macOS verifies
+    // its native libraries. Retry that timeout only; loader errors must fail.
+    if (platform !== 'darwin' || error.code !== 'ETIMEDOUT') throw error;
+    console.warn('[payload] macOS engine probe exceeded 60s; retrying once with a 180s first-launch budget.');
+    try {
+      probe(180_000);
+    } catch (retryError) {
+      if (retryError.code !== 'ETIMEDOUT') throw retryError;
+      throw new Error('macOS engine --version timed out on both attempts (60s and 180s). The engine has not been verified; inspect signing and loader diagnostics.', { cause: retryError });
+    }
+  }
 }
 
 /** Weights remain usable with a manually installed engine on other platforms. */
