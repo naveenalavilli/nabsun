@@ -117,6 +117,14 @@ async function main() {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     })()`);
     assert.equal(await settingsUI().executeJavaScript('document.querySelector("#settings-assistant").hidden'), false);
+    const thinkingBefore = settings.get().extendedThinking;
+    await settingsUI().executeJavaScript('document.querySelector("#settings-assistant input[role=switch]").focus()');
+    settingsUI().sendInputEvent({ type: 'keyDown', keyCode: 'Space' });
+    settingsUI().sendInputEvent({ type: 'keyUp', keyCode: 'Space' });
+    await until(() => settings.get().extendedThinking !== thinkingBefore);
+    assert.equal(await settingsUI().executeJavaScript('getComputedStyle(document.querySelector("#settings-assistant input[role=switch]")).appearance'), 'none');
+    settings.set({ extendedThinking: thinkingBefore });
+    console.log('PASS styled settings switches remain keyboard operable and persist changes');
     await settingsUI().executeJavaScript(`(() => {
       const input = document.querySelector('.settings-rail input');
       input.value = ''; input.dispatchEvent(new Event('input'));

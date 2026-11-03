@@ -33,6 +33,9 @@ function checkbox(
   onChange: (v: boolean) => void,
 ): HTMLElement {
   const input = el('input', { type: 'checkbox', checked });
+  input.className = 'settings-toggle';
+  input.setAttribute('role', 'switch');
+  input.setAttribute('aria-label', label);
   input.addEventListener('change', () => onChange(input.checked));
   const text = el('div', {}, [el('span', { textContent: label })]);
   if (hint) text.append(el('div', { className: 'hint', textContent: hint }));
@@ -619,7 +622,7 @@ export class SettingsView {
     ] as const) {
       const input = el('input', { type: 'checkbox', checked: key === 'history' });
       boxes[key] = input;
-      wrap.append(el('div', { className: 'check' }, [input, el('span', { textContent: label })]));
+      wrap.append(el('label', { className: 'check' }, [input, el('span', { textContent: label })]));
     }
 
     const status = el('div', { className: 'hint' });

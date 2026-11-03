@@ -1003,3 +1003,28 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .welcome-choice:not(.primary):hover { border-color:var(--accent); background:var(--bg-raised); }
 .welcome-choice strong { font-size:14px; }
 .welcome-skip { padding:9px 12px; border:1px solid var(--border-strong); border-radius:8px; background:transparent; color:var(--text-dim); font:inherit; cursor:pointer; }
+
+/* One control language throughout Settings and setup, including native form semantics. */
+#workspace button, #workspace input, #workspace select, #workspace textarea { font-family:inherit; }
+.settings-category button:not(.settings-card) { min-height:38px; padding:9px 15px; border-radius:9px; cursor:pointer; }
+.settings-category button:disabled, #workspace button:disabled { cursor:wait; opacity:.55; }
+.settings-category fieldset { border:1px solid var(--border); background:var(--bg-input); box-shadow:var(--shadow-sm); }
+.settings-category legend { float:left; width:100%; padding:0; margin:0 0 20px; color:var(--text); font-size:14px; font-weight:700; text-transform:none; letter-spacing:-.01em; }
+.settings-category legend + * { clear:both; }
+.settings-category .field input:not([type=checkbox]), .settings-category .field select, .settings-category .field textarea { border:1px solid var(--border); border-radius:9px; padding:11px 13px; background:var(--bg); transition:border-color var(--ease),box-shadow var(--ease); }
+.settings-category .field input:hover, .settings-category .field textarea:hover { border-color:var(--border-strong); }
+.settings-category .field select { appearance:none; padding-right:38px; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%238d8c82' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
+.settings-category .model-select-control > select, .settings-category .color-mode-control > select { background-image:none; }
+.settings-category input[type=number] { appearance:textfield; }
+.settings-category input[type=number]::-webkit-inner-spin-button, .settings-category input[type=number]::-webkit-outer-spin-button { appearance:none; margin:0; }
+.settings-category .check { display:flex; gap:14px; align-items:center; padding:14px 0; }
+.settings-category .check input[type=checkbox] { appearance:none; position:relative; width:19px; height:19px; min-height:0; margin:0; border:1.5px solid var(--border-strong); border-radius:5px; background:var(--bg); cursor:pointer; }
+.settings-category .check input[type=checkbox]:checked { border-color:var(--accent); background:var(--accent); }
+.settings-category .check input[type=checkbox]:checked::after { content:''; position:absolute; left:5px; top:2px; width:5px; height:9px; border:solid var(--on-accent); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.settings-category .check input.settings-toggle { width:38px; height:22px; border:1px solid var(--border-strong); border-radius:999px; background:var(--sunken); transition:background var(--ease),border-color var(--ease); }
+.settings-category .check input.settings-toggle::after, .settings-category .check input.settings-toggle:checked::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border:0; border-radius:50%; background:var(--text-dim); transform:none; transition:transform var(--ease); }
+.settings-category .check input.settings-toggle:checked { background:var(--accent); border-color:var(--accent); }
+.settings-category .check input.settings-toggle:checked::after { background:var(--on-accent); transform:translateX(16px); }
+.settings-category .check input:disabled { cursor:not-allowed; opacity:.5; }
+#workspace select:focus-visible, #workspace textarea:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
+@media(forced-colors:active) { .settings-category .check input[type=checkbox] { appearance:auto; } .settings-category .check input::after { display:none; } .settings-category .field select { appearance:auto; background-image:none; } }
