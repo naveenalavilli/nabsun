@@ -25,6 +25,7 @@ export interface TabState {
 }
 
 export interface WindowState {
+  maximized?: boolean;
   tabs: TabState[];
   activeTabId: string | null;
   sidebarOpen: boolean;

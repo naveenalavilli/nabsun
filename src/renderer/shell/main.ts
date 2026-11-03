@@ -8,6 +8,7 @@ import { startUpdateChecks } from './updates';
 
 const assistantWindow = new URLSearchParams(location.search).get('assistant') === '1';
 document.documentElement.classList.add(assistantWindow ? 'assistant-window' : 'browser-window');
+document.documentElement.dataset.platform = window.nabsun.platform;
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
@@ -561,6 +562,10 @@ function wireShortcuts() {
 }
 
 window.nabsun.onWindowState((next) => {
+  document.documentElement.classList.toggle('window-maximized', !!next.maximized);
+  const maximize = $('#win-max');
+  maximize.title = next.maximized ? 'Restore down' : 'Maximize';
+  maximize.setAttribute('aria-label', maximize.title);
   state = next;
   document.documentElement.classList.toggle('assistant-attached', !next.assistantDetached && next.sidebarOpen);
   $('#assistant-detach').textContent = next.assistantDetached ? 'Attach' : 'Detach';

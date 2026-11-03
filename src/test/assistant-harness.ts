@@ -93,6 +93,32 @@ async function main() {
     assert.equal(win.state.assistantDetached, false, 'assistant starts attached by default');
     assert.equal(win.assistant.isVisible(), false);
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0] - win.state.sidebarWidth - 3);
+    if (process.platform === 'win32') {
+      win.window.show();
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-max").click()');
+      await until(() => win.window.isMaximized());
+      await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#win-max").getAttribute("aria-label") === "Restore down"'));
+      assert.equal(await win.shell.webContents.executeJavaScript('getComputedStyle(document.querySelector("#win-max .restore-icon")).display'), 'block');
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-max").click()');
+      await until(() => !win.window.isMaximized());
+      await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#win-max").getAttribute("aria-label") === "Maximize"'));
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-min").click()');
+      await until(() => win.window.isMinimized());
+      win.window.restore();
+      let closeRequested = false;
+      win.window.once('close', event => { event.preventDefault(); closeRequested = true; });
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-close").click()');
+      await until(() => closeRequested);
+      const macLayout = await win.shell.webContents.executeJavaScript(`(() => {
+        document.documentElement.dataset.platform = 'darwin';
+        const result = { controls: getComputedStyle(document.querySelector('#window-controls')).display, inset: parseFloat(getComputedStyle(document.querySelector('#tabstrip')).paddingLeft) };
+        document.documentElement.dataset.platform = 'win32';
+        return result;
+      })()`);
+      assert.equal(macLayout.controls, 'none');
+      assert.ok(macLayout.inset >= 90);
+      console.log('PASS Windows caption controls minimize, maximize/restore, and request close; macOS layout reserves native traffic lights');
+    }
     const browserTab = win.tabs.create('about:blank');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#settings-btn").click()');
     await until(() => win.shell.webContents.executeJavaScript('!!document.querySelector("#settings-overview")'));

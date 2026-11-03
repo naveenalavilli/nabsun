@@ -198,6 +198,7 @@ export interface CredentialSaveResult {
 
 /** The surface exposed on `window.nabsun` inside the shell renderer. */
 export interface ShellApi {
+  readonly platform: string;
   updates: { check(manual?: boolean): Promise<UpdateStatus>; open(): Promise<void> };
   onWindowState(cb: (state: WindowState) => void): () => void;
   onAgentEvent(cb: (event: AgentEvent) => void): () => void;

@@ -270,13 +270,20 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-#window-controls { display: flex; -webkit-app-region: no-drag; align-self: flex-start; }
-.win-btn {
-  width: 44px; height: 30px; border: none; background: transparent;
-  color: var(--chrome-dim); font-family: "Segoe MDL2 Assets"; font-size: 10px; cursor: default;
-}
-.win-btn:hover { background: var(--chrome-hover-strong); color: var(--chrome-text); }
-.win-btn.danger:hover { background: #e81123; color: var(--on-accent); }
+#window-controls { display:flex; -webkit-app-region:no-drag; align-self:flex-start; flex-shrink:0; }
+.win-btn { display:grid; place-items:center; width:46px; height:38px; padding:0; border:0; border-radius:0; background:transparent; color:var(--chrome-text); cursor:default; }
+.win-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1; pointer-events:none; }
+.win-btn:hover { background:var(--chrome-hover-strong); }
+.win-btn:active { background:var(--chrome-hover); }
+.win-btn.close-window:hover { background:#c42b1c; color:#fff; }
+.win-btn.close-window:active { background:#a32418; color:#fff; }
+.win-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+.win-btn .restore-icon { display:none; }
+.window-maximized .win-btn .maximize-icon { display:none; }
+.window-maximized .win-btn .restore-icon { display:block; }
+/* Real macOS controls occupy the top-left titlebar, outside the renderer. */
+[data-platform=darwin] #window-controls { display:none; }
+[data-platform=darwin] #tabstrip { padding-left:90px; }
 
 /* ---------------------------------------------------------------- toolbar */
 

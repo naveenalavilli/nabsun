@@ -9,6 +9,7 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 }
 
 const api: ShellApi = {
+  platform: process.platform,
   updates: {
     check: manual => ipcRenderer.invoke(CH.updateCheck, manual),
     open: () => ipcRenderer.invoke(CH.updateOpen),

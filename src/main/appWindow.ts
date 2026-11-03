@@ -76,7 +76,9 @@ export class AppWindow {
       height: Math.min(1000, Math.round(display.height * 0.92)),
       minWidth: 900,
       minHeight: 600,
-      frame: false,
+      // macOS supplies genuine traffic lights; Windows uses caption buttons in the tab strip.
+      frame: process.platform === 'darwin',
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 14, y: 12 } } : {}),
       // Painted before the renderer has anything up, so it should be the
       // theme's paper rather than a dark flash on a light desktop.
       backgroundColor: '#f4f2eb',
@@ -253,6 +255,7 @@ export class AppWindow {
 
   get state(): WindowState {
     return {
+      maximized: this.window.isMaximized(),
       tabs: this.tabs.states,
       activeTabId: this.tabs.activeTabId,
       sidebarOpen: this.sidebarOpen,
