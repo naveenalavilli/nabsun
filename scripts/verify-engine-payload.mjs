@@ -12,6 +12,32 @@ async function fixture(t) {
   return dir;
 }
 
+test('macOS cold-loader timeout retries once and still requires a successful launch', () => {
+  let calls = 0;
+  assert.doesNotThrow(() => assertEngineStarts('fixture', { platform: 'darwin', run: (_server, args, options) => {
+    calls++;
+    assert.deepEqual(args, ['--version']);
+    assert.equal(options.killSignal, 'SIGKILL');
+    if (calls === 1) throw Object.assign(new Error('cold loader'), { code: 'ETIMEDOUT' });
+    assert.ok(options.timeout > 60_000);
+  } }));
+  assert.equal(calls, 2);
+  calls = 0;
+  assert.throws(() => assertEngineStarts('fixture', { platform: 'darwin', run: () => {
+    calls++; throw Object.assign(new Error('hung engine'), { code: 'ETIMEDOUT' });
+  } }), /timed out on both attempts/);
+  assert.equal(calls, 2, 'a hung engine must fail after a bounded retry');
+});
+
+test('loader failures and non-macOS timeouts are not retried or hidden', () => {
+  for (const [platform, code] of [['darwin', 'ENOENT'], ['darwin', undefined], ['win32', 'ETIMEDOUT'], ['linux', 'ETIMEDOUT']]) {
+    let calls = 0;
+    const failure = Object.assign(new Error('native loader failure'), { code });
+    assert.throws(() => assertEngineStarts('fixture', { platform, run: () => { calls++; throw failure; } }), error => error === failure);
+    assert.equal(calls, 1);
+  }
+});
+
 test('changed engine files and old manifests are rejected', async t => {
   const dir = await fixture(t);
   await fs.writeFile(path.join(dir, 'engine'), 'original');
