@@ -93,6 +93,117 @@ async function main() {
     assert.equal(win.state.assistantDetached, false, 'assistant starts attached by default');
     assert.equal(win.assistant.isVisible(), false);
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0] - win.state.sidebarWidth - 3);
+    if (process.platform === 'win32') {
+      win.window.show();
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-max").click()');
+      await until(() => win.window.isMaximized());
+      await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#win-max").getAttribute("aria-label") === "Restore down"'));
+      assert.equal(await win.shell.webContents.executeJavaScript('getComputedStyle(document.querySelector("#win-max .restore-icon")).display'), 'block');
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-max").click()');
+      await until(() => !win.window.isMaximized());
+      await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#win-max").getAttribute("aria-label") === "Maximize"'));
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-min").click()');
+      await until(() => win.window.isMinimized());
+      win.window.restore();
+      let closeRequested = false;
+      win.window.once('close', event => { event.preventDefault(); closeRequested = true; });
+      await win.shell.webContents.executeJavaScript('document.querySelector("#win-close").click()');
+      await until(() => closeRequested);
+      const macLayout = await win.shell.webContents.executeJavaScript(`(() => {
+        document.documentElement.dataset.platform = 'darwin';
+        const result = { controls: getComputedStyle(document.querySelector('#window-controls')).display, inset: parseFloat(getComputedStyle(document.querySelector('#tabstrip')).paddingLeft) };
+        document.documentElement.dataset.platform = 'win32';
+        return result;
+      })()`);
+      assert.equal(macLayout.controls, 'none');
+      assert.ok(macLayout.inset >= 90);
+      console.log('PASS Windows caption controls minimize, maximize/restore, and request close; macOS layout reserves native traffic lights');
+    }
+    const browserTab = win.tabs.create('about:blank');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#settings-btn").click()');
+    await until(() => win.shell.webContents.executeJavaScript('!!document.querySelector("#settings-overview")'));
+    assert.equal(browserTab.view.getVisible(), false, 'native page is hidden behind settings');
+    assert.equal(win.assistant.view.getVisible(), false, 'attached assistant does not cover settings');
+    const settingsUI = () => win.shell.webContents;
+    const layout = await settingsUI().executeJavaScript(`(() => {
+      const root = document.querySelector('#workspace');
+      const rail = document.querySelector('.settings-rail');
+      const cards = document.querySelectorAll('.settings-card');
+      return { width: root.getBoundingClientRect().width, window: innerWidth, categories: rail.querySelectorAll('button').length, cards: cards.length };
+    })()`);
+    assert.equal(layout.width, layout.window, 'settings uses the full browser content width');
+    assert.equal(layout.categories, 8);
+    assert.equal(layout.cards, 6);
+    win.send(CH.overlayCommand, { command: 'open-clear-data' });
+    await until(() => settingsUI().executeJavaScript('!document.querySelector("#settings-browsing")?.hidden'));
+    assert.equal(win.assistant.view.getVisible(), false, 'clear-data command stays in the browser workspace');
+    await settingsUI().executeJavaScript(`(() => {
+      const input = document.querySelector('.settings-rail input');
+      input.value = 'privacy'; input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    })()`);
+    assert.equal(await settingsUI().executeJavaScript('document.querySelector("#settings-assistant").hidden'), false);
+    const thinkingBefore = settings.get().extendedThinking;
+    await settingsUI().executeJavaScript('document.querySelector("#settings-assistant input[role=switch]").focus()');
+    settingsUI().sendInputEvent({ type: 'keyDown', keyCode: 'Space' });
+    settingsUI().sendInputEvent({ type: 'keyUp', keyCode: 'Space' });
+    await until(() => settings.get().extendedThinking !== thinkingBefore);
+    assert.equal(await settingsUI().executeJavaScript('getComputedStyle(document.querySelector("#settings-assistant input[role=switch]")).appearance'), 'none');
+    settings.set({ extendedThinking: thinkingBefore });
+    console.log('PASS styled settings switches remain keyboard operable and persist changes');
+    await settingsUI().executeJavaScript(`(() => {
+      const input = document.querySelector('.settings-rail input');
+      input.value = ''; input.dispatchEvent(new Event('input'));
+      document.querySelector('[aria-controls="settings-overview"]').click();
+    })()`);
+    const artifacts = path.resolve(__dirname, '../../../.review-artifacts');
+    fs.mkdirSync(artifacts, { recursive: true });
+    await delay(150);
+    const visibleSettings = await settingsUI().executeJavaScript(`(() => {
+      const rail = document.querySelector('.settings-rail').getBoundingClientRect();
+      const card = document.querySelector('.settings-card').getBoundingClientRect();
+      return { rail: rail.height, card: card.height, active: document.querySelector('#view-settings').className };
+    })()`);
+    assert.ok(visibleSettings.rail > 100 && visibleSettings.card > 50, JSON.stringify(visibleSettings));
+    fs.writeFileSync(path.join(artifacts, 'settings-workspace.png'), (await settingsUI().capturePage()).toPNG());
+    await until(() => settingsUI().executeJavaScript('!!document.querySelector("#settings-integrations") && !!document.querySelector("#settings-advanced")'));
+    for (const [width, height] of [[900, 600], [1680, 950]]) {
+      win.window.setContentSize(width, height);
+      await delay(50);
+      for (const theme of ['light', 'dark']) {
+        await settingsUI().executeJavaScript(`document.documentElement.dataset.theme = '${theme}'`);
+        for (const category of ['overview', 'model', 'appearance', 'assistant', 'browsing', 'integrations', 'updates', 'advanced']) {
+          const fits = await settingsUI().executeJavaScript(`(() => {
+            document.querySelector('[aria-controls="settings-${category}"]').click();
+            const panel = document.querySelector('#settings-${category}');
+            const content = document.querySelector('.settings-content');
+            return !panel.hidden && panel.getBoundingClientRect().height > 0 && content.scrollWidth <= content.clientWidth;
+          })()`);
+          assert.ok(fits, `${category} fits ${width}x${height} ${theme}`);
+        }
+      }
+    }
+    await settingsUI().executeJavaScript(`document.documentElement.dataset.theme = 'light'; document.querySelector('[aria-controls="settings-overview"]').click()`);
+    console.log('PASS all settings categories fit small/large windows in light/dark mode');
+    await settingsUI().executeJavaScript('document.querySelector(".setup-banner").click()');
+    await until(() => settingsUI().executeJavaScript('document.querySelector("#view-onboarding").classList.contains("active")'));
+    assert.equal(await settingsUI().executeJavaScript('!!document.querySelector(".welcome-illustration[role=img]")'), true);
+    await delay(150);
+    fs.writeFileSync(path.join(artifacts, 'settings-welcome.png'), (await settingsUI().capturePage()).toPNG());
+    await settingsUI().executeJavaScript('document.querySelector("[data-action=local]").click()');
+    await until(() => browserTab.view.getVisible());
+    await until(() => win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value === "What can you help me do in this browser?"'));
+    assert.equal(provider.requests.length, 0, 'setup prefills a prompt without sending it');
+    assert.equal(settings.get().provider, 'local', 'setup selects the built-in provider');
+    settings.set({ provider: 'anthropic' });
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = ""');
+    assert.equal(win.assistant.view.getVisible(), true, 'return restores attached assistant');
+    assert.equal(win.tabs.activeTabId, browserTab.id, 'settings preserves the active tab');
+    console.log('PASS full settings workspace, category search, visual setup, and return preserve browser state');
+    win.openWorkspace('settings');
+    win.toggleSidebar(true);
+    await until(() => settingsUI().executeJavaScript('document.querySelector("#workspace").hidden'));
+    assert.equal(win.assistant.view.getVisible(), true, 'approval requests can reveal the assistant');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#assistant-detach").click()');
     await until(() => win.assistant.isVisible());
     assert.equal(sessionCount(), 1, 'only the assistant creates a chat');

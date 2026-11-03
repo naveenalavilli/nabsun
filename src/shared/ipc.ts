@@ -56,6 +56,8 @@ export const CH = {
   winClose: 'win:close',
   sidebarToggle: 'sidebar:toggle',
   sidebarResize: 'sidebar:resize',
+  starterPrompt: 'window:starter-prompt',
+  workspace: 'window:workspace',
   assistantView: 'assistant:view',
   assistantZoom: 'assistant:zoom',
   assistantDetach: 'assistant:detach',
@@ -196,6 +198,7 @@ export interface CredentialSaveResult {
 
 /** The surface exposed on `window.nabsun` inside the shell renderer. */
 export interface ShellApi {
+  readonly platform: string;
   updates: { check(manual?: boolean): Promise<UpdateStatus>; open(): Promise<void> };
   onWindowState(cb: (state: WindowState) => void): () => void;
   onAgentEvent(cb: (event: AgentEvent) => void): () => void;
@@ -229,6 +232,8 @@ export interface ShellApi {
     close(): void;
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
+    prefillAssistant(prompt: string): void;
+    openWorkspace(name: 'settings' | 'onboarding' | null): void;
     openAssistantView(name: string): void;
     zoomAssistant(delta: number | null): void;
     detachAssistant(detached: boolean): void;

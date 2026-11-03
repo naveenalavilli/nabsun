@@ -85,10 +85,12 @@ export function registerIpc(deps: IpcDeps): void {
   /* ---------------------------------------------------------------- tabs */
 
   ipcMain.handle(CH.tabNew, (_e, url?: string, opts?: { background?: boolean }) => {
+    if (!opts?.background && _e.sender === win.shell.webContents) win.openWorkspace(null);
     return win.tabs.create(url, { background: opts?.background }).id;
   });
   ipcMain.on(CH.tabClose, (_e, id: string) => win.tabs.close(id));
   ipcMain.on(CH.tabActivate, (_e, id: string) => {
+    win.openWorkspace(null);
     win.tabs.activate(id);
     // The user moved: a running assistant follows them rather than staying on
     // a tab it picked earlier.
@@ -96,6 +98,7 @@ export function registerIpc(deps: IpcDeps): void {
   });
   ipcMain.on(CH.tabReorder, (_e, id: string, index: number) => win.tabs.reorder(id, index));
   ipcMain.on(CH.tabNavigate, (_e, id: string, input: string) => {
+    win.openWorkspace(null);
     win.tabs.navigate(id, resolveNavigationInput(input, settings.get().searchEngine));
   });
   ipcMain.on(CH.tabBack, (_e, id: string) => {
@@ -135,6 +138,12 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.winClose, () => win.window.close());
   ipcMain.on(CH.sidebarToggle, (_e, open?: boolean) => win.toggleSidebar(open));
   ipcMain.on(CH.sidebarResize, (_e, width: number) => win.resizeSidebar(width));
+  ipcMain.on(CH.starterPrompt, (_e, prompt: unknown) => {
+    if (typeof prompt === 'string' && prompt.length <= 2000) win.showAssistantCommand({ command: 'prefill-prompt', arg: prompt });
+  });
+  ipcMain.on(CH.workspace, (_e, name: unknown) => {
+    if (name === null || name === 'settings' || name === 'onboarding') win.openWorkspace(name);
+  });
   ipcMain.on(CH.assistantView, (_e, name: string) => {
     if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
       win.showAssistantCommand({ command: 'show-view', arg: name });
@@ -148,7 +157,7 @@ export function registerIpc(deps: IpcDeps): void {
   });
   ipcMain.on(CH.shellReady, (event) => {
     if (event.sender === win.assistant.webContents) win.readyAssistant();
-    else win.pushState();
+    else win.readyShell();
   });
 
   /* ---------------------------------------------------------------- find */
@@ -889,14 +898,12 @@ export function handleCommand(deps: IpcDeps, command: string, arg?: unknown): vo
     }
 
     case 'clear-data':
-      win.toggleSidebar(true);
       win.send(CH.overlayCommand, { command: 'open-clear-data' });
       break;
     case 'toggle-sidebar':
       win.toggleSidebar();
       break;
     case 'open-settings':
-      win.toggleSidebar(true);
       win.send(CH.overlayCommand, { command: 'open-settings' });
       break;
     case 'open-bookmarks':

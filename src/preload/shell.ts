@@ -9,6 +9,7 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 }
 
 const api: ShellApi = {
+  platform: process.platform,
   updates: {
     check: manual => ipcRenderer.invoke(CH.updateCheck, manual),
     open: () => ipcRenderer.invoke(CH.updateOpen),
@@ -45,6 +46,8 @@ const api: ShellApi = {
     close: () => ipcRenderer.send(CH.winClose),
     toggleSidebar: (open) => ipcRenderer.send(CH.sidebarToggle, open),
     resizeSidebar: (width) => ipcRenderer.send(CH.sidebarResize, width),
+    prefillAssistant: prompt => ipcRenderer.send(CH.starterPrompt, prompt),
+    openWorkspace: name => ipcRenderer.send(CH.workspace, name),
     openAssistantView: name => ipcRenderer.send(CH.assistantView, name),
     zoomAssistant: delta => ipcRenderer.send(CH.assistantZoom, delta),
     detachAssistant: detached => ipcRenderer.send(CH.assistantDetach, detached),

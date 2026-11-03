@@ -35,7 +35,14 @@ available** in the toolbar to download one, or use **Settings > App updates** to
 check manually. Updates require downloading and running the new installer.
 
 The first-run guide lets you try the built-in assistant, connect Codex or Claude,
-or start browsing. Reopen it from **Settings → Getting started**.
+or start browsing. Reopen it from **Settings → Your launchpad**.
+
+Open **Settings** with the gear in the browser toolbar or assistant. Settings
+and the visual getting-started guide use the full browser content area. Choose
+a category from the left, or search for a category such as model, theme, or
+privacy and press Enter. Preferences save as you change them. Use **Back to
+browser** or Escape to return to the same tab; your chat and assistant layout
+are preserved. The setup tour is available from **Your launchpad**.
 
 Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
 Use **Detach** to move it from the browser sidebar into a separate window, or
