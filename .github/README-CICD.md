@@ -47,6 +47,12 @@ existing tag creates that tag and a **draft GitHub release** with the artifacts.
 A maintainer must publish the draft. Pull requests, ordinary tag-triggered runs,
 and manual workflow runs do not take this release path.
 
+[RELEASE_NOTES.md](../RELEASE_NOTES.md) is the maintained change history. The
+workflow's generated commit list is supporting metadata; before publishing a
+draft, use the matching maintained entry for its user-facing changes and keep
+the download/platform instructions. Update the entry's publication status and
+America/Chicago date only after the release is published.
+
 `scripts/release.mjs` prepares a version-bump branch and pull request. Inspect
 its `--dry-run` output before using it; local installer generation alone does
 not create a release.

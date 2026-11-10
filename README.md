@@ -3,7 +3,7 @@
 **A browser with an AI assistant built in.** Read pages, compare tabs, and complete
 browser tasks using a bundled local model, a cloud provider, Codex, or Claude Code.
 
-[Website](https://nabsun.com) · [Downloads](https://github.com/naveenalavilli/nabsun/releases/latest) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Website](https://nabsun.com) · [Downloads](https://github.com/naveenalavilli/nabsun/releases/latest) · [Release notes](RELEASE_NOTES.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 [![Watch the Nabsun demo on YouTube](https://i.ytimg.com/vi/mCyKPYy7OHw/hqdefault.jpg)](https://www.youtube.com/watch?v=mCyKPYy7OHw)
 

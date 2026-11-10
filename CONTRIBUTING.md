@@ -79,3 +79,8 @@ signed public distribution. Linux release packaging is not supported.
 
 Local packages do not publish a release. CI creates a draft release when a new
 package version lands on `main`; see the CI guide for the exact conditions.
+
+Maintain user-facing changes in [RELEASE_NOTES.md](RELEASE_NOTES.md). A version
+bump should include its matching entry. Before publishing a GitHub draft, copy
+that entry into the release description, retaining download/platform instructions.
+Mark it published only after publication, using the actual date in America/Chicago.
