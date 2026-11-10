@@ -67,6 +67,9 @@ async function main() {
     assert.equal(environment.privateInherited, false);
     assert.equal(environment.explicit, 'fixture');
     const allowed = new Set(Object.keys(mcpEnvironment(config.env)));
+    // CoreFoundation can synthesize this OS locale variable during child
+    // startup even when it was absent from the Node parent's environment.
+    if (process.platform === 'darwin') allowed.add('__CF_USER_TEXT_ENCODING');
     for (const key of environment.keys)
       assert.ok(allowed.has(key), 'Unexpected inherited variable: ' + key);
     console.log(

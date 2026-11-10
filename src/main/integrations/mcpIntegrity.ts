@@ -36,6 +36,7 @@ export function mcpEnvironment(explicit: Record<string, string> = {}) {
           'LC_ALL',
           'LC_CTYPE',
           'TMPDIR',
+          '__CF_USER_TEXT_ENCODING',
         ];
   const inherited: Record<string, string> = {};
   for (const key of names) {

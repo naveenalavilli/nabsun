@@ -77,6 +77,22 @@ async function main() {
         'input-fixture',
       );
     await run('browser_type', { ref: ref('Name'), text: 'Nabsun \u2600 test' });
+    await tab.wc.executeJavaScript(
+      `document.querySelector('[aria-label="Name"]').addEventListener('mousedown',event=>{event.preventDefault();document.querySelector('[aria-label="Password"]').focus()},{once:true})`,
+    );
+    await assert.rejects(
+      run('browser_type', {
+        ref: ref('Name'),
+        text: 'must not reach a different field',
+      }),
+      /Focus moved/,
+    );
+    assert.equal(
+      await tab.wc.executeJavaScript(
+        'document.querySelector("input[type=password]").value',
+      ),
+      '',
+    );
     assert.equal(
       await tab.wc.executeJavaScript('document.querySelector("input").value'),
       'Nabsun \u2600 test',

@@ -56,7 +56,9 @@ async function trustedClick(ctx:ToolContext, tab:Tab, ref:string, button='left',
 async function trustedType(ctx:ToolContext,tab:Tab,ref:string,text:string,submit:boolean):Promise<string> {
   if(text.length>32768)throw Error('Text entry is limited to 32768 characters per call.');
   return withTrustedInput(tab.wc,ctx.signal,async send=>{
-    const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)},'text')`,ctx.signal);
+    let point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)},'text')`,ctx.signal);
+    await send('Input.dispatchMouseEvent',mouse('mouseMoved',point.x,point.y,'none'));
+    point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)},'text')`,ctx.signal);
     if(!point.multiline && /[\n\r\t]/.test(text))throw Error('This single-line field cannot accept the requested value with line breaks or tabs. Nothing was typed or submitted.');
     const focused=()=>ctx.tabs.callBridge<{value:string}>(tab,`window.__nabsunAgent.focusedInput(${JSON.stringify(ref)})`,ctx.signal);
     await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y));

@@ -34,6 +34,7 @@ export async function withTrustedInput<T>(
   );
   await previous.catch(() => {});
   let attached = false;
+  let focusEmulated = false;
   let heldMouse: Record<string, unknown> | null = null;
   const heldKeys = new Map<string, Record<string, unknown>>();
   const live = () => {
@@ -50,6 +51,16 @@ export async function withTrustedInput<T>(
     attached = true;
     const send: ProtocolSend = async (method, params = {}, sessionId) => {
       live();
+      if (method.startsWith('Input.') && !focusEmulated) {
+        // Chromium otherwise drops focus on inactive/headless Linux windows.
+        // Emulate page focus only for this gesture; DOM target checks remain
+        // authoritative and still reject a page that redirects field focus.
+        await wc.debugger.sendCommand('Emulation.setFocusEmulationEnabled', {
+          enabled: true,
+        });
+        focusEmulated = true;
+        live();
+      }
       if (method === 'Input.dispatchMouseEvent') {
         if (params.type === 'mousePressed') heldMouse = params;
         if (params.type === 'mouseReleased') heldMouse = null;
@@ -82,6 +93,10 @@ export async function withTrustedInput<T>(
             commands: undefined,
             modifiers: 0,
           })
+          .catch(() => {});
+      if (focusEmulated)
+        await wc.debugger
+          .sendCommand('Emulation.setFocusEmulationEnabled', { enabled: false })
           .catch(() => {});
       wc.debugger.detach();
     }
