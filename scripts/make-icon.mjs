@@ -39,15 +39,15 @@ const coverage = d => Math.min(1, Math.max(0, 0.5 - d));
 const clamp = t => Math.min(1, Math.max(0, t));
 const u = SIZE / 100;
 
-// A circular sun with eight separated, rounded rays. No horizon or tile: the
-// radial silhouette reads as sunshine even before its glossy shading is seen.
+// A glossy half-sun rising above a rounded horizon, with five separated rays
+// following its upper arc. The exterior and the gaps between rays stay transparent.
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
     const nx = (x + 0.5) / u - 50;
-    const ny = (y + 0.5) / u - 50;
+    const ny = (y + 0.5) / u - 63;
     let ray = 0;
-    for (let i = 0; i < 8; i++) {
-      const angle = i * Math.PI / 4;
+    for (let i = 0; i < 5; i++) {
+      const angle = -Math.PI * 5 / 6 + i * Math.PI / 6;
       const along = nx * Math.cos(angle) + ny * Math.sin(angle);
       const across = -nx * Math.sin(angle) + ny * Math.cos(angle);
       const distance = Math.hypot(along - Math.max(36, Math.min(43, along)), across) - 3.1;
@@ -55,14 +55,21 @@ for (let y = 0; y < SIZE; y++) {
     }
     if (ray > 0) setPixel(x, y, mix([255, 184, 23], [255, 108, 12], clamp((ny + 46) / 92)), ray);
     const radius = Math.hypot(nx, ny);
-    const sun = coverage((radius - 28.5) * u);
+    const sun = coverage((radius - 28.5) * u) * coverage((ny - 1) * u);
     if (sun > 0) {
-      let color = mix([255, 198, 24], [255, 91, 12], clamp((ny + 28.5) / 57));
+      let color = mix([255, 198, 24], [255, 91, 12], clamp((ny + 28.5) / 29.5));
       const reflection = Math.exp(-(((nx + 10) / 16) ** 2 + ((ny + 17) / 9) ** 2));
       color = mix(color, [255, 235, 120], reflection * 0.65);
       const rim = clamp((radius - 27.3) / 1.2) * clamp((-ny + 5) / 28);
       color = mix(color, [255, 230, 92], rim * 0.55);
       setPixel(x, y, color, sun);
+    }
+    // Capsule-shaped horizon, with a bright upper edge and warm lower bevel.
+    const bar = coverage((Math.hypot(nx - Math.max(-40, Math.min(40, nx)), ny - 5) - 4) * u);
+    if (bar > 0) {
+      let color = mix([255, 193, 59], [232, 73, 19], clamp((ny - 1) / 8));
+      color = mix(color, [255, 239, 159], Math.exp(-(((ny - 2) / 0.8) ** 2)) * 0.65);
+      setPixel(x, y, color, bar);
     }
   }
 }
