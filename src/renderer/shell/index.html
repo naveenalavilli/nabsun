@@ -12,7 +12,7 @@
       <header id="topchrome">
         <div id="tabstrip">
           <div id="tabs" role="tablist" aria-label="Open tabs"></div>
-          <button id="new-tab" class="icon-btn" title="New tab (Ctrl+T)" aria-label="New tab">+</button>
+          <button id="new-tab" class="icon-btn" title="New tab (Ctrl+T)" aria-label="New tab"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
           <div class="drag-spacer"></div>
           <div id="window-controls" role="group" aria-label="Window controls">
             <button id="win-min" class="win-btn" title="Minimize" aria-label="Minimize"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5h10"/></svg></button>
@@ -22,23 +22,22 @@
         </div>
 
         <div id="toolbar">
-          <button id="nav-back" class="icon-btn" title="Back" aria-label="Back">‹</button>
-          <button id="nav-forward" class="icon-btn" title="Forward" aria-label="Forward">›</button>
-          <button id="nav-reload" class="icon-btn" title="Reload (Ctrl+R)" aria-label="Reload">⟳</button>
+          <button id="nav-back" class="icon-btn" title="Back" aria-label="Back"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11 4-6 6 6 6M5 10h12"/></svg></button>
+          <button id="nav-forward" class="icon-btn" title="Forward" aria-label="Forward"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m9 4 6 6-6 6M3 10h12"/></svg></button>
+          <button id="nav-reload" class="icon-btn" title="Reload (Ctrl+R)" aria-label="Reload"><svg viewBox="0 0 20 20" aria-hidden="true"><g class="reload-icon"><path d="M16 7a6.5 6.5 0 1 0 .4 5M16 3v4h-4"/></g><path class="stop-icon" d="m5 5 10 10M15 5 5 15"/></svg></button>
 
           <button id="omnibox" title="Search or enter address (Ctrl+L)">
             <span id="omnibox-scheme" class="scheme"></span>
             <span id="omnibox-text">Search or enter address</span>
           </button>
 
-          <button id="bookmark" class="icon-btn" title="Bookmark this page" aria-label="Bookmark">☆</button>
-          <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads">⭳<span id="dl-badge" class="badge-dot" hidden></span></button>
+          <button id="bookmark" class="icon-btn" title="Bookmark this page" aria-label="Bookmark"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 2.5 5.1 5.6.8-4.1 4 .9 5.6-4.9-2.6-4.9 2.6.9-5.6-4.1-4 5.6-.8Z"/></svg></button>
+          <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" aria-label="Downloads"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m-4-4 4 4 4-4M3 13v4h14v-4"/></svg><span id="dl-badge" class="badge-dot" hidden></span></button>
           <div id="ext-actions" role="toolbar" aria-label="Extension buttons"></div>
           <button id="update-btn" class="pill" hidden>Update available</button>
-          <button id="browser-settings-btn" class="icon-btn" title="Settings" aria-label="Settings">&#9881;</button>
-          <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions">🧩</button>
-          <button id="ask-page" class="pill" title="Ask the assistant about this page">Ask about page</button>
-          <button id="sidebar-toggle" class="icon-btn" title="Toggle assistant (Ctrl+Shift+A)" aria-label="Toggle assistant">◨</button>
+          <button id="browser-settings-btn" class="icon-btn" title="Settings" aria-label="Settings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 2-.5 2-2 1-2-.5-2 3 1.5 1.5v2L1.5 13l2 3 2-.5 2 1 .5 2h4l.5-2 2-1 2 .5 2-3-1.5-1.5v-2L18.5 8l-2-3-2 .5-2-1L12 2Z"/><circle cx="10" cy="10.5" r="3"/></svg></button>
+          <button id="extensions-btn" class="icon-btn" title="Extensions" aria-label="Extensions"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3H3v5a2.5 2.5 0 1 1 0 5v4h5a2.5 2.5 0 1 1 5 0h4v-5a2.5 2.5 0 1 0 0-5V3h-5a2.5 2.5 0 1 0-5 0Z"/></svg></button>
+          <button id="sidebar-toggle" class="icon-btn" title="Toggle assistant (Ctrl+Shift+A)" aria-label="Toggle assistant" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M11.5 3v14M14.5 7v6"/></svg></button>
         </div>
       </header>
 

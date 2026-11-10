@@ -8,7 +8,7 @@ import { TabManager } from './tabs';
 import { lockUiNavigation } from './uiSecurity';
 
 /** Height of the tab strip plus the toolbar, in CSS pixels. */
-const TOP_CHROME_H = 76;
+const TOP_CHROME_H = 88;
 const FIND_BAR_H = 40;
 const BOOKMARK_BAR_H = 34;
 const INFO_BAR_H = 46;

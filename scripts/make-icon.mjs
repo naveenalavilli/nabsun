@@ -34,56 +34,35 @@ function setPixel(x, y, [r, g, b], alpha = 1) {
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 
-/** Signed distance to a rounded rectangle, for cheap anti-aliasing. */
-function roundedRectSdf(px, py, cx, cy, halfW, halfH, radius) {
-  const dx = Math.abs(px - cx) - (halfW - radius);
-  const dy = Math.abs(py - cy) - (halfH - radius);
-  const outside = Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
-  return outside + Math.min(Math.max(dx, dy), 0) - radius;
-}
-
-/** Coverage from a signed distance: 1 inside, 0 outside, smooth across the edge. */
-const coverage = (d) => Math.min(1, Math.max(0, 0.5 - d));
-
-/* ----------------------------------------------------------------- shape -- */
-
-// A freestanding rising sun: no tile or opaque backdrop. Keep generous optical
-// margins while making the mark large enough for taskbar and Dock sizes.
+/** Coverage from a signed distance, with a one-pixel antialiased edge. */
+const coverage = d => Math.min(1, Math.max(0, 0.5 - d));
+const clamp = t => Math.min(1, Math.max(0, t));
 const u = SIZE / 100;
-const clamp = (t) => Math.min(1, Math.max(0, t));
-function rrect(px, py, cx, cy, halfW, halfH, r) {
-  return coverage(roundedRectSdf(px, py, cx, cy, halfW, halfH, r));
-}
+
+// A circular sun with eight separated, rounded rays. No horizon or tile: the
+// radial silhouette reads as sunshine even before its glossy shading is seen.
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
-    const px = x + 0.5;
-    const py = y + 0.5;
-    const nx = px / u;
-    const ny = py / u;
-    const sun = coverage(Math.hypot(px - 50 * u, py - 55 * u) - 37 * u)
-      * coverage(py - 67 * u);
-    if (sun > 0) {
-      // Warm gold at the crown, vivid orange at the horizon. A broad soft
-      // reflection and a fine rim give depth without muddying the silhouette.
-      const height = clamp((ny - 18) / 49);
-      let color = mix([255, 220, 67], [255, 91, 20], height);
-      const light = Math.exp(-(((nx - 37) / 22) ** 2 + ((ny - 29) / 15) ** 2));
-      color = mix(color, [255, 249, 196], light * 0.72);
-      const gloss = clamp((43 - ny + 0.12 * (nx - 50)) / 3);
-      color = mix(color, [255, 249, 221], gloss * 0.15);
-      const radius = Math.hypot(nx - 50, ny - 55);
-      const rim = clamp((radius - 35.9) / 1.1) * clamp((53 - ny) / 20);
-      color = mix(color, [255, 244, 161], rim * 0.7);
-      setPixel(x, y, color, sun);
+    const nx = (x + 0.5) / u - 50;
+    const ny = (y + 0.5) / u - 50;
+    let ray = 0;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const along = nx * Math.cos(angle) + ny * Math.sin(angle);
+      const across = -nx * Math.sin(angle) + ny * Math.cos(angle);
+      const distance = Math.hypot(along - Math.max(36, Math.min(43, along)), across) - 3.1;
+      ray = Math.max(ray, coverage(distance * u));
     }
-    // A warm rounded horizon remains visible against both light and dark
-    // surfaces, unlike the old paper-white bar. The top edge catches light.
-    const bar = rrect(px, py, 50 * u, 71 * u, 44 * u, 4 * u, 4 * u);
-    if (bar > 0) {
-      const vertical = clamp((ny - 67) / 8);
-      let color = mix([255, 193, 59], [232, 73, 19], vertical);
-      color = mix(color, [255, 239, 159], Math.exp(-(((ny - 68) / 0.8) ** 2)) * 0.65);
-      setPixel(x, y, color, bar);
+    if (ray > 0) setPixel(x, y, mix([255, 184, 23], [255, 108, 12], clamp((ny + 46) / 92)), ray);
+    const radius = Math.hypot(nx, ny);
+    const sun = coverage((radius - 28.5) * u);
+    if (sun > 0) {
+      let color = mix([255, 198, 24], [255, 91, 12], clamp((ny + 28.5) / 57));
+      const reflection = Math.exp(-(((nx + 10) / 16) ** 2 + ((ny + 17) / 9) ** 2));
+      color = mix(color, [255, 235, 120], reflection * 0.65);
+      const rim = clamp((radius - 27.3) / 1.2) * clamp((-ny + 5) / 28);
+      color = mix(color, [255, 230, 92], rim * 0.55);
+      setPixel(x, y, color, sun);
     }
   }
 }

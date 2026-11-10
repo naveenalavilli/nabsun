@@ -66,7 +66,7 @@
 
   --radius: 6px;
   --radius-lg: 8px;
-  --top-chrome: 76px;
+  --top-chrome: 88px;
   --find-bar: 40px;
 
   /* Derived from the tokens above, so they follow the theme without
@@ -198,7 +198,7 @@ html, body {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: 38px;
+  height: 40px;
   padding: 6px 0 0 8px;
   -webkit-app-region: drag;
 }
@@ -270,8 +270,8 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-#window-controls { display:flex; -webkit-app-region:no-drag; align-self:flex-start; flex-shrink:0; }
-.win-btn { display:grid; place-items:center; width:46px; height:38px; padding:0; border:0; border-radius:0; background:transparent; color:var(--chrome-text); cursor:default; }
+#window-controls { display:flex; -webkit-app-region:no-drag; align-self:flex-start; margin-top:-6px; flex-shrink:0; }
+.win-btn { display:grid; place-items:center; width:46px; height:40px; padding:0; border:0; border-radius:0; background:transparent; color:var(--chrome-text); cursor:default; }
 .win-btn svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1; pointer-events:none; }
 .win-btn:hover { background:var(--chrome-hover-strong); }
 .win-btn:active { background:var(--chrome-hover); }
@@ -289,7 +289,7 @@ html, body {
 
 #toolbar {
   display: flex; align-items: center; gap: 4px;
-  height: 38px; padding: 0 8px;
+  height: 48px; padding: 0 8px;
   background: var(--chrome);
   border-bottom: 1px solid var(--chrome-border);
 }
@@ -315,7 +315,7 @@ html, body {
 
 #omnibox {
   flex: 1; display: flex; align-items: center; gap: 8px;
-  height: 28px; padding: 0 12px; margin: 0 4px;
+  height: 36px; min-width: 100px; padding: 0 14px; margin: 0 4px;
   border: 1px solid var(--chrome-border); border-radius: 999px;
   background: var(--chrome-raised); color: var(--chrome-text);
   font-size: 12.5px; text-align: left; cursor: text;
@@ -1079,3 +1079,15 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .settings-category .check input:disabled { cursor:not-allowed; opacity:.5; }
 #workspace select:focus-visible, #workspace textarea:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
 @media(forced-colors:active) { .settings-category .check input[type=checkbox] { appearance:auto; } .settings-category .check input::after { display:none; } .settings-category .field select { appearance:auto; background-image:none; } }
+
+/* Consistent desktop toolbar targets and vector glyphs, independent of fonts. */
+#toolbar .icon-btn, #toolbar .ext-action { width:36px; height:36px; }
+#toolbar .icon-btn { color:var(--chrome-text); }
+#toolbar .icon-btn svg { width:20px; height:20px; stroke-width:1.7; }
+#toolbar .icon-btn:focus-visible, #tabstrip .icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+#tabstrip #new-tab { width:34px; height:32px; margin-bottom:3px; }
+#nav-reload .stop-icon, #nav-reload.loading .reload-icon { display:none; }
+#nav-reload.loading .stop-icon { display:block; }
+#bookmark.on svg { fill:currentColor; }
+#ext-actions:empty { display:none; }
+#toolbar .ext-action img { width:20px; height:20px; }

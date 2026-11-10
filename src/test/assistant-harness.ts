@@ -124,6 +124,42 @@ async function main() {
     const browserTab = win.tabs.create('about:blank');
     await until(() => !browserTab.wc.isLoading());
     const pageWidth = await browserTab.wc.executeJavaScript('innerWidth');
+    const originalSize = win.window.getContentSize();
+    for (const width of [900, 1280]) {
+      win.window.setContentSize(width, 800);
+      await delay(80);
+      const toolbar = await win.shell.webContents.executeJavaScript(`(() => {
+        const bar = document.querySelector('#toolbar').getBoundingClientRect();
+        const buttons = [...document.querySelectorAll('#toolbar .icon-btn')].map(button => {
+          const rect = button.getBoundingClientRect();
+          return { width:rect.width, height:rect.height, center:rect.y + rect.height / 2,
+            right:rect.right, icon:!!button.querySelector('svg'), label:button.getAttribute('aria-label') };
+        });
+        return { buttons, center:bar.y + bar.height / 2, width:innerWidth,
+          pageY:document.querySelector('#content-placeholder').getBoundingClientRect().top,
+          redundant:!!document.querySelector('#ask-page') };
+      })()`);
+      assert.equal(toolbar.redundant, false);
+      for (const button of toolbar.buttons) {
+        assert.ok(button.width >= 36 && button.height >= 36 && button.icon && button.label);
+        assert.ok(Math.abs(button.center - toolbar.center) < 1);
+        assert.ok(button.right <= toolbar.width);
+      }
+      assert.equal(toolbar.pageY, win.contentBounds.y, 'native page begins below the toolbar and bookmark bar');
+    }
+    win.window.setContentSize(originalSize[0], originalSize[1]);
+    await win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").click()');
+    await until(() => !win.state.sidebarOpen);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").getAttribute("aria-pressed") === "false"'));
+    await win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").click()');
+    await until(() => win.state.sidebarOpen);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").getAttribute("aria-pressed") === "true"'));
+    assert.equal(await win.shell.webContents.executeJavaScript('!!document.querySelector("#nav-reload svg") && !!document.querySelector("#bookmark svg")'), true, 'state renders preserve vector icons');
+    const chromeArtifacts = path.resolve(__dirname, '../../../.review-artifacts');
+    fs.mkdirSync(chromeArtifacts, { recursive:true });
+    fs.writeFileSync(path.join(chromeArtifacts, 'browser-toolbar.png'), (await win.shell.webContents.capturePage({x:0,y:0,width:win.window.getContentSize()[0],height:130})).toPNG());
+    console.log('PASS desktop toolbar alignment at 900/1280px, native page bounds, vector icons, and assistant toggle');
+
     assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#developer-tools-btn") === null'), true, 'everyday toolbar does not expose developer controls');
     await win.shell.webContents.executeJavaScript('window.nabsun.window.pageDevTools("toggle")');
     await until(() => browserTab.wc.isDevToolsOpened());

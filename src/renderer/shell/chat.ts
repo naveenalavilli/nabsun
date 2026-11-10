@@ -94,7 +94,7 @@ export class ChatView {
     }).catch(() => { /* Live queue events still keep this view current. */ });
   }
 
-  /** Pre-fills the composer, used by "Ask about page" and the omnibox. */
+  /** Pre-fills the composer, used by onboarding and the omnibox. */
   ask(text: string, send = false) {
     this.prompt.value = text;
     this.autoGrow();

@@ -20,7 +20,7 @@ export class OnboardingView {
       </div>
       <div class="welcome-steps">
         <div><span>1</span><p><strong>Open a website</strong><br>Use the address bar to search or enter a website address.</p></div>
-        <div><span>2</span><p><strong>Ask about the page</strong><br>Click Ask about page, type a question, then press Send.</p></div>
+        <div><span>2</span><p><strong>Open the assistant</strong><br>Use the panel button at the right of the address bar, type your request, then press Send.</p></div>
         <div><span>3</span><p><strong>You are in control</strong><br>Review requested actions before approving them. Press Stop to cancel the current task.</p></div>
       </div>
       <p class="hint">The built-in assistant answers on your computer. If you connect an online service, your messages and any included page text are shared with that service. Websites still use the internet as usual.</p>
