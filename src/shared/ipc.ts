@@ -1,5 +1,8 @@
+import type {DatasetSummary,Workflow,RecordedTask,Batch,BatchReport} from './workflows';
 import type { UpdateStatus } from './updates';
+import type {VoiceAvailability,VoiceEvent} from './voice';
 import type {
+  AttachedFile,
   AgentEvent,
   AccountStatus,
   AgentExtension,
@@ -30,6 +33,10 @@ import type {
 
 /** Renderer -> main, request/response. */
 export const CH = {
+  activityList:'activity:list',
+  activityExport:'activity:export',
+  sitePermissionsList:'site-permissions:list',
+  sitePermissionsRevoke:'site-permissions:revoke',
   updateCheck: 'updates:check',
   updateOpen: 'updates:open',
   // shell lifecycle
@@ -84,6 +91,33 @@ export const CH = {
   agentQuestion: 'agent:question', // main -> renderer push
   agentAnswer: 'agent:answer',
   agentAttachPage: 'agent:attach-page',
+  fileAttach:'files:attach',
+  fileList:'files:list',
+  filePreview:'files:preview',
+  fileRemove:'files:remove',
+  voiceAvailability:'voice:availability',
+  voiceStart:'voice:start',
+  voiceStop:'voice:stop',
+  voiceEvent:'voice:event',
+  dataOpen:'data:open',
+  dataContext:'data:context',
+  dataList:'data:list',
+  dataPreview:'data:preview',
+  dataAttach:'data:attach',
+  dataPaste:'data:paste',
+  workflowList:'workflow:list',
+  workflowTrace:'workflow:trace',
+  workflowSave:'workflow:save-trace',
+  workflowUpdate:'workflow:update',
+  workflowImport:'workflow:import',
+  workflowExport:'workflow:export',
+  workflowScope:'workflow:scope',
+  batchList:'batch:list',
+  batchStart:'batch:start',
+  batchControl:'batch:control',
+  batchReport:'batch:report',
+  batchExport:'batch:export',
+  batchChanged:'batch:changed',
 
   // sessions
   sessionList: 'session:list',
@@ -141,8 +175,12 @@ export const CH = {
   // integrations
   mcpStatus: 'mcp:status',
   mcpReload: 'mcp:reload',
+  mcpApprove:'mcp:approve',
+  mcpRevoke:'mcp:revoke',
   pluginStatus: 'plugin:status',
   pluginReload: 'plugin:reload',
+  pluginApprove:'plugin:approve',
+  pluginRevoke:'plugin:revoke',
   pluginOpenFolder: 'plugin:open-folder',
 
   // passwords
@@ -199,6 +237,8 @@ export interface CredentialSaveResult {
 
 /** The surface exposed on `window.nabsun` inside the shell renderer. */
 export interface ShellApi {
+  activity:{list(day?:string):Promise<{days:string[];records:import('./types').ActivityRecord[]}>;export(day:string):Promise<void>};
+  sitePermissions:{list():Promise<{origin:string;capability:string;allowed:boolean}[]>;revoke(origin?:string):Promise<void>};
   readonly platform: string;
   updates: { check(manual?: boolean): Promise<UpdateStatus>; open(): Promise<void> };
   onWindowState(cb: (state: WindowState) => void): () => void;
@@ -234,7 +274,7 @@ export interface ShellApi {
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
     prefillAssistant(prompt: string): void;
-    openWorkspace(name: 'settings' | 'onboarding' | null): void;
+    openWorkspace(name: 'settings' | 'onboarding' | 'workflows' | 'activity' | null): void;
     openAssistantView(name: string): void;
     zoomAssistant(delta: number | null): void;
     detachAssistant(detached: boolean): void;
@@ -262,6 +302,41 @@ export interface ShellApi {
     resolveApproval(id: string, decision: ApprovalDecision): void;
     /** Answers a question from the assistant; null means the user skipped it. */
     answer(id: string, text: string | null): void;
+  };
+
+  workflows:{
+    open(scope:string,workflowId?:string):Promise<void>;
+    context():Promise<string|null>;
+    onScope(cb:(scope:{scope:string;workflowId?:string})=>void):()=>void;
+    onChanged(cb:(batch:Batch)=>void):()=>void;
+    datasets(scope:string):Promise<DatasetSummary[]>;
+    preview(scope:string,id:string):Promise<Record<string,string>[]>;
+    attach(scope:string):Promise<DatasetSummary|null>;
+    paste(scope:string,text:string,name:string):Promise<DatasetSummary>;
+    list():Promise<Workflow[]>;
+    trace(scope:string):Promise<RecordedTask>;
+    saveTrace(scope:string,name:string,successText:string,datasetId?:string,variables?:Record<string,string>):Promise<Workflow>;
+    update(workflow:Workflow):Promise<void>;
+    import():Promise<Workflow|null>;
+    export(id:string):Promise<void>;
+    batches(scope:string):Promise<Batch[]>;
+    start(spec:{scope:string;datasetId:string;workflowId?:string;taskTemplate?:string;successText?:string;stepBudget?:number;tokenBudget?:number;timeBudgetMs?:number;maxConsecutiveFailures?:number}):Promise<Batch>;
+    control(scope:string,id:string,action:'pause'|'resume'|'stop'|'skip'|'complete'|'review-skip'|'retry'):Promise<void>;
+    report(scope:string,id:string):Promise<BatchReport>;
+    exportReport(scope:string,id:string,format:'csv'|'json'):Promise<void>;
+  };
+
+  files:{
+    preview(sessionId:string,id:string):Promise<string|null>;
+    attach(sessionId:string):Promise<AttachedFile[]>;
+    list(sessionId:string):Promise<AttachedFile[]>;
+    remove(sessionId:string,fileId:string):Promise<void>;
+  };
+  voice:{
+    availability():Promise<VoiceAvailability>;
+    start(sessionId:string,requestId:string,language:string):Promise<void>;
+    stop(requestId:string):void;
+    onEvent(callback:(event:VoiceEvent)=>void):()=>void;
   };
 
   sessions: {
@@ -335,8 +410,12 @@ export interface ShellApi {
   integrations: {
     mcpStatus(): Promise<McpStatus[]>;
     mcpReload(): Promise<McpStatus[]>;
+    mcpApprove(name:string,fingerprint:string):Promise<McpStatus[]>;
+    mcpRevoke(name:string):Promise<McpStatus[]>;
     pluginStatus(): Promise<PluginStatus[]>;
     pluginReload(): Promise<PluginStatus[]>;
+    pluginApprove(id:string,fingerprint:string):Promise<PluginStatus[]>;
+    pluginRevoke(id:string):Promise<PluginStatus[]>;
     openPluginFolder(): void;
   };
 

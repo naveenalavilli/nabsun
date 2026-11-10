@@ -22,6 +22,7 @@
  * external agent.
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {version} from '../../package.json';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
@@ -83,7 +84,7 @@ async function main() {
   }
 
   const server = new Server(
-    { name: 'nabsun', version: '0.1.0' },
+    { name: 'nabsun', version },
     { capabilities: { tools: {} } },
   );
 

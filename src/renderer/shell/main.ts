@@ -1,4 +1,6 @@
 import type { DownloadEntry, ExtensionStatus, Settings, TabState, WindowState } from '../../shared/types';
+import { WorkflowsView } from './workflows';
+import {ActivityView} from './activity';
 import { ExtensionsView } from './extensions';
 import { BookmarksView, PasswordsView } from './vault';
 import { ChatView } from './chat';
@@ -136,7 +138,10 @@ function renderToolbar(next: WindowState) {
   const active = next.tabs.find((t) => t.id === next.activeTabId);
   $<HTMLButtonElement>('#nav-back').disabled = !active?.canGoBack;
   $<HTMLButtonElement>('#nav-forward').disabled = !active?.canGoForward;
-  $('#nav-reload').textContent = active?.loading ? '✕' : '⟳';
+  const reload = $('#nav-reload');
+  reload.classList.toggle('loading', !!active?.loading);
+  reload.setAttribute('aria-label', active?.loading ? 'Stop loading' : 'Reload');
+  reload.title = active?.loading ? 'Stop loading' : 'Reload (Ctrl+R)';
 
   const url = active?.url ?? '';
   if (!url || url === 'about:blank' || url.startsWith('nabsun://')) {
@@ -155,7 +160,7 @@ function renderToolbar(next: WindowState) {
     }
   }
 
-  bookmarkBtn.textContent = bookmarkedUrls.has(url) ? '★' : '☆';
+  bookmarkBtn.setAttribute('aria-label', bookmarkedUrls.has(url) ? 'Remove bookmark' : 'Bookmark this page');
   bookmarkBtn.classList.toggle('on', bookmarkedUrls.has(url));
 }
 
@@ -191,12 +196,6 @@ function wireToolbar() {
     else await window.nabsun.data.addBookmark(tab.url, tab.title);
     await refreshBookmarks();
   await bookmarksView.refresh();
-  });
-
-  $('#ask-page').addEventListener('click', () => {
-    window.nabsun.window.toggleSidebar(true);
-    showView('chat');
-    chat.ask('');
   });
 
   $('#sidebar-toggle').addEventListener('click', () => window.nabsun.window.toggleSidebar());
@@ -500,6 +499,8 @@ const chat = new ChatView(() => void renderSessions(), assistantWindow);
 const bookmarksView = new BookmarksView(() => showView('bookmarks'));
 const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
+const workflowsView = assistantWindow ? null : new WorkflowsView($('#workflows-body'));
+const activityView = assistantWindow ? null : new ActivityView($('#activity-body'));
 const settingsView = new SettingsView((next) => {
   settings = next;
   applyTheme(next.theme);
@@ -529,6 +530,9 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  $('#workflows-btn').addEventListener('click', () => {
+    if (chat.currentSessionId) void window.nabsun.workflows.open(chat.currentSessionId).catch(()=>{ $('#attachment-status').textContent='Could not open Data & workflows. Finish the current row or try again.'; });
+  });
   const menu = $<HTMLDetailsElement>('#assistant-menu');
   menu.addEventListener('click', event => {
     const button = (event.target as HTMLElement).closest('button');
@@ -597,6 +601,7 @@ window.nabsun.onWindowState((next) => {
   document.body.classList.toggle('no-bookmarks-bar', !next.bookmarksBarVisible);
   if (!assistantWindow) $('#sidebar').style.width = `${next.sidebarWidth}px`;
   $('#sidebar-toggle').classList.toggle('on', next.sidebarOpen);
+  $('#sidebar-toggle').setAttribute('aria-pressed', String(next.sidebarOpen));
   if (next.findOpen && findbar.hidden) openFind();
   if (!next.findOpen && !findbar.hidden) closeFind();
   renderTabs(next);
@@ -645,11 +650,13 @@ window.nabsun.onCommand((command, arg) => {
       if (assistantWindow) break;
       $('#workspace').hidden = arg === null;
       document.documentElement.classList.toggle('workspace-open', arg !== null);
-      for (const name of ['settings', 'onboarding']) {
+      for (const name of ['settings', 'onboarding', 'workflows', 'activity']) {
         $(`#view-${name}`).classList.toggle('active', name === arg);
       }
       if (arg === 'settings') void settingsView.render();
       if (arg === 'onboarding') onboarding.render();
+      if (arg === 'workflows') void workflowsView?.render();
+      if (arg === 'activity') void activityView?.render();
       $('#workspace-close').focus();
       break;
     case 'prefill-prompt':

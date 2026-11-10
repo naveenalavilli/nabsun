@@ -1,3 +1,5 @@
+import type {DatasetStore} from '../../data/datasets';
+import type { FileStore } from '../../files';
 import type { RiskLevel, ToolSpec } from '../../../shared/types';
 import type { HistoryStore } from '../../history';
 import type { SettingsStore } from '../../store';
@@ -34,6 +36,13 @@ export interface ToolContext {
   ask?(question: string, options: string[]): Promise<string | null>;
   signal: AbortSignal;
   userDataPath: string;
+  files?:FileStore;
+  supportsImages?:boolean;
+  datasets?:DatasetStore;
+  fileScope?:string|null;
+  /** Host-only nested dispatch; extensions cannot replace approvals or budgets. */
+  invokeTool?(name:string,input:Record<string,unknown>):Promise<string>;
+  cancelTask?():void;
   /** Host decision; absent means no permission to disclose saved notes. */
   memoryAllowed?: boolean;
 }

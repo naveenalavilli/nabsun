@@ -228,9 +228,9 @@ function checkCodexArgs() {
     args.find((a) => a.startsWith('mcp_servers.nabsun.args=')) ?? '(absent)',
   );
   check(
-    'codex args: the bridge token reaches the MCP server through its env',
-    args.includes(`mcp_servers.nabsun.env.NABSUN_BRIDGE_TOKEN='${bridge.token}'`),
-    args.find((a) => a.startsWith('mcp_servers.nabsun.env.NABSUN_BRIDGE_TOKEN')) ?? '(absent)',
+    'codex args: credentials are forwarded by environment name and never appear in process arguments',
+    args.some(arg=>arg.startsWith('mcp_servers.nabsun.env_vars=')&&arg.includes('NABSUN_BRIDGE_TOKEN'))&&!args.some(arg=>arg.includes(bridge.token)),
+    args.find((a) => a.startsWith('mcp_servers.nabsun.env_vars')) ?? '(absent)',
   );
 
   const withModel = buildCodexArgs({ ...base, model: 'gpt-5.1' });

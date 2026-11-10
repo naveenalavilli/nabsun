@@ -76,6 +76,7 @@ export async function* streamChatCompletions(
         messages,
         max_completion_tokens: req.maxTokens,
         stream: true,
+        ...(req.jsonSchema?{response_format:{type:'json_schema' as const,json_schema:{name:'grounded_action',strict:true,schema:req.jsonSchema}}}:{}),
         stream_options: { include_usage: true },
         ...(req.tools.length ? { tools: toOpenAITools(req.tools), tool_choice: 'auto' as const } : {}),
       },

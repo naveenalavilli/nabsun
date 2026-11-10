@@ -1,4 +1,5 @@
 import type { Session } from 'electron';
+import type {SitePermissions,SiteCapability} from './sitePermissions';
 
 /**
  * Site capability policy.
@@ -57,9 +58,13 @@ function reportDenial(permission: string, origin: string | undefined): void {
  * an API is exposed at all. With only the first, a denied capability can still
  * report itself as granted.
  */
-export function applyPermissionPolicy(ses: Session): void {
+export function applyPermissionPolicy(ses: Session,sites?:SitePermissions): void {
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const allowed = permissionAllowed(permission);
+    if(!allowed&&sites){
+      const capability:SiteCapability[] = permission==='media'?((details as {mediaTypes?:string[]}).mediaTypes??[]).flatMap(type=>type==='video'?['camera' as const]:type==='audio'?['microphone' as const]:[]):permission==='geolocation'?['location']:permission==='notifications'?['notifications']:permission==='clipboard-read'?['clipboard-read']:[];
+      if(capability.length){void sites.request(wc,details?.requestingUrl??wc?.getURL()??'',capability).then(callback,()=>callback(false));return}
+    }
     if (!allowed) reportDenial(permission, details?.requestingUrl ?? wc?.getURL());
     callback(allowed);
   });
@@ -67,7 +72,18 @@ export function applyPermissionPolicy(ses: Session): void {
   // Deliberately silent. This answers `permissions.query()`, which is a page
   // asking what the answer *would* be rather than asking for anything, and
   // pages poll it on a timer.
-  ses.setPermissionCheckHandler((_wc, permission) => permissionAllowed(permission));
+  ses.setPermissionCheckHandler((_wc, permission,requestingOrigin,details) => {
+    if(permissionAllowed(permission))return true;
+    if(!sites)return false;
+    const origin=requestingOrigin;
+    try{if(!_wc||new URL(_wc.getURL()).origin!==origin)return false}catch{return false}
+    if(permission==='media'){
+      const media=(details as {mediaType?:string}).mediaType;
+      return media==='video'?sites.allowed(origin,'camera'):media==='audio'?sites.allowed(origin,'microphone'):false;
+    }
+    const capability=permission==='geolocation'?'location':permission==='notifications'?'notifications':permission==='clipboard-read'?'clipboard-read':null;
+    return capability?sites.allowed(origin,capability):false;
+  });
 
   // Device pickers (WebUSB, WebHID, Web Serial, Bluetooth) never resolve to a
   // device: there is no UI here for choosing one, and choosing silently is worse.

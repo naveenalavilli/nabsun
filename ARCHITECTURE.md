@@ -35,6 +35,10 @@ acting on a different target.
 
 The normal cycle is snapshot, action, then a fresh snapshot. Structured tools
 cover reading, clicking, typing, selecting, scrolling, and extraction.
+Input tools use serialized CDP mouse and keyboard operations with hit testing,
+cancellation and credential checks. Date/time, multi-select and ambiguous macOS
+dropdown compatibility fallbacks are disclosed. Frame routing supplies isolated child-document refs and
+maps pointer positions through the embedding frame; open shadow roots are included.
 `browser_evaluate` permits page JavaScript and is classified as dangerous.
 
 Password and one-time-code fields are excluded from structured credential
@@ -70,8 +74,10 @@ pending approvals and questions. Cancellation cannot undo a completed action.
 | `dangerous` | Page JavaScript, destructive MCP tools | Ask |
 
 The sidebar and external MCP bridge use the same `ApprovalManager`.
-Per-tool grants and auto-approval settings can bypass prompts; they are not
-task-scoped security grants. MCP annotations affect classification:
+Global per-tool grants are revoked during migration. New grants apply once,
+to a task and origin, or to a tool and origin for 24 hours. Policy is checked
+before approval and again before dispatch; sensitive actions force individual
+approval. MCP annotations affect classification:
 destructive tools are dangerous, read-only tools are safe, and unspecified tools
 are write. Trust the server before enabling it.
 
@@ -90,6 +96,11 @@ Prompts travel over stdin. Launcher resolution supports native binaries, npm
 shims, and Unix symlinks without passing user prompts through a shell.
 Codex turns replay bounded conversation context; CLI tool calls still enter
 Nabsun's approval path.
+Each hosted CLI stream gets an opaque browser capability bound to the real chat
+run, instead of selecting a run using a client-supplied id. Delegated browser
+actions share approval, auditing and per-action transcript persistence. Completion,
+Stop and time limits revoke the capability. Browser action and time limits are
+host-enforced; CLI-internal token accounting remains dependent on reported usage.
 
 Account setup is separate from conversation execution:
 
@@ -110,10 +121,29 @@ External clients spawn `dist/bin/nabsun-mcp.js`, which forwards requests to a
 loopback HTTP bridge using a per-launch bearer token. The standalone MCP bundle
 is unpacked from `app.asar` so it can run as a child process.
 
-Plugins execute CommonJS code in the privileged main process. Configured MCP
-servers are child processes and inherit the host environment plus configured
-overrides. Both are trusted code, not sandboxed extensions.
+Plugins execute CommonJS code in a separate Node permission-restricted process.
+Approved source is staged separately, and page helpers reenter the shared agent
+gate. Exact source pins require renewed review after edits. Configured MCP
+servers remain trusted child processes with an explicit environment allowlist,
+configuration/source fingerprints and process-tree cancellation. Their filesystem
+and network access are not restricted by a complete OS sandbox. Dynamic package
+runners are refused because their downloaded content is not pinned by this path.
 Unpacked Chrome extensions have partial Electron API compatibility.
+
+Chat attachments use opaque, chat-owned ids and integrity-checked copied bytes.
+Text, table and PDF parsing runs in a bounded worker; supported images are
+normalized for previews and vision models. Datasets, versioned workflows and
+batch checkpoints live in separate stores. Replay checks postconditions and
+pauses uncertain rows for review instead of automatically repeating a submission.
+
+`AuditSink` records action intent and result before and after the shared action
+path. The default local sink uses a daily hash chain and durable checkpoint,
+redacts values to fingerprints and blocks further actions after recording failure.
+Its viewer/export is available only to trusted application UI.
+
+Windows chat dictation uses an explicitly approved, time-limited desktop speech
+recognizer child process. Text events update only the owning chat draft. Other
+platforms provide OS dictation guidance; no cloud transcription is used.
 
 Settings, chats, history, bookmarks, and plugins live under the application
 profile. API keys use Electron `safeStorage`; without secure storage they stay
@@ -147,13 +177,18 @@ Use the [contributor guide](CONTRIBUTING.md) for local commands and the
 
 ## Remaining limitations
 
-- Persistent tool grants lack task scope and expiry.
-- Delegated CLI work does not share a unified host-side action/time budget.
-- Page tools have limited iframe and shadow-root coverage.
-- Chat persistence is not a complete audit journal for external agents.
+- Bundled-model task planning has failed diagnostic form attempts; full model
+  evaluation, constrained grounding and measured tier/token improvements remain open.
+- Host limits cover delegated browser tools; CLI-internal unreported tokens and
+  native process capabilities are not strictly constrained by these limits.
+- Closed shadow roots and broader nested-frame cases still need coverage.
+- Journal concurrency/export edge cases and external-client run lifecycles need
+  wider verification; the local hash chain is not a central enterprise audit service.
 - Interrupted actions do not have general postcondition-based reconciliation.
 - Plugins and MCP servers are trusted native code.
 - There is no managed enterprise policy or automatic update channel.
+- Profiles/private mode, slim distribution and cross-platform release certification
+  remain incomplete. See the [verification record](docs/improvement-status.md).
 
 Prompt injection remains a risk even with approval controls. See the
 [security model](SECURITY.md).

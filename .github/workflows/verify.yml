@@ -22,6 +22,44 @@ env:
   CI: 'true'
 
 jobs:
+  verify-action-workflows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node dist/test/audit-harness.js
+      - run: node dist/test/voice-harness.js
+      - name: Dictation panel cancellation
+        run: |
+          if ($IsLinux) {
+            xvfb-run -a node scripts/electron-run.mjs scripts/verify-voice-ui.cjs --no-sandbox
+          } else {
+            node scripts/electron-run.mjs scripts/verify-voice-ui.cjs
+          }
+      - run: node dist/test/integration-trust-harness.js
+      - name: Input, frames, files, approvals, and durable workflows
+        run: |
+          foreach ($harness in @('input', 'frame', 'file', 'delegation', 'approval', 'site-permission', 'network-auth', 'network-config', 'plugin-isolation', 'workflow')) {
+            if ($IsLinux) {
+              xvfb-run -a node scripts/electron-run.mjs "dist/test/$harness-harness.js" --no-sandbox
+            } else {
+              node scripts/electron-run.mjs "dist/test/$harness-harness.js"
+            }
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
   verify-connections:
     strategy:
       fail-fast: false
@@ -290,7 +328,7 @@ jobs:
 
   package:
     runs-on: windows-2022
-    needs: [verify, verify-macos, package-macos, verify-connections]
+    needs: [verify, verify-macos, package-macos, verify-connections, verify-action-workflows]
     timeout-minutes: 60
     # Only this job may write, and only the release step below uses it. The
     # workflow default stays `contents: read`.

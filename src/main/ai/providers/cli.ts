@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 import os from 'node:os';
 import path from 'node:path';
+import {randomUUID} from 'node:crypto';
 import type { ProviderId, TokenUsage } from '../../../shared/types';
 import type { ModelMessage, Provider, StreamEvent, StreamRequest } from '../provider';
 import { stopProcessTree } from './processTree';
@@ -617,7 +618,13 @@ export abstract class CliProvider implements Provider {
     return null;
   }
 
-  async *stream(req: StreamRequest): AsyncGenerator<StreamEvent> {
+  protected forkForStream():CliProvider{return this}
+  protected cleanup(){}
+  async *stream(req:StreamRequest):AsyncGenerator<StreamEvent>{
+    const worker=this.forkForStream();worker.sessions=this.sessions;
+    try{yield* worker.streamTask(req)}finally{worker.cleanup()}
+  }
+  private async *streamTask(req: StreamRequest): AsyncGenerator<StreamEvent> {
     req.signal.throwIfAborted();
     const launcher = this.launcher;
     if (!launcher) {
@@ -627,7 +634,7 @@ export abstract class CliProvider implements Provider {
           : `${this.label} is not installed, or not on PATH. Add it from the Extensions panel.`,
       );
     }
-    const bridge = this.bridge();
+    const bridge = req.browserBridge??this.bridge();
     if (!bridge) throw new Error('The browser tool bridge is not running.');
 
     const body = this.replayHistory
@@ -652,6 +659,8 @@ export abstract class CliProvider implements Provider {
           ...process.env,
           NABSUN_BRIDGE_URL: bridge.url,
           NABSUN_BRIDGE_TOKEN: bridge.token,
+          ELECTRON_RUN_AS_NODE:'1',
+          ELECTRON_NO_ATTACH_CONSOLE:'1',
           // Some CLIs colourise even when piped, which corrupts JSONL parsing.
           NO_COLOR: '1',
           FORCE_COLOR: '0',
@@ -799,6 +808,9 @@ interface ClaudeStreamLine {
 }
 
 export class ClaudeCodeProvider extends CliProvider {
+  private configFile?:string;
+  protected override forkForStream(){return new ClaudeCodeProvider(this.bridge,this.overridePath)}
+  protected override cleanup(){if(this.configFile){try{fs.unlinkSync(this.configFile)}catch{/* A revoked token grants no later access. */}this.configFile=undefined}}
   readonly id: ProviderId = 'claude-cli';
   readonly label = 'Claude Code (CLI)';
   protected readonly binName = 'claude';
@@ -810,7 +822,7 @@ export class ClaudeCodeProvider extends CliProvider {
 
     // Written to a temp file rather than passed inline: the token should not
     // appear in the process command line, where other users could read it.
-    const configPath = path.join(os.tmpdir(), `nabsun-mcp-${process.pid}.json`);
+    const configPath = this.configFile=path.join(os.tmpdir(), `nabsun-mcp-${process.pid}-${randomUUID()}.json`);
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -827,8 +839,9 @@ export class ClaudeCodeProvider extends CliProvider {
           },
         },
       }),
-      'utf8',
+      {encoding:'utf8',mode:0o600,flag:'wx'},
     );
+    fs.chmodSync(configPath,0o600);
 
     const args = [
       // No positional prompt: it arrives on stdin.
@@ -950,11 +963,9 @@ export function buildCodexArgs(opts: CodexArgOptions): string[] {
     `mcp_servers.nabsun.command=${tomlString(opts.mcpCommand)}`,
     '-c',
     `mcp_servers.nabsun.args=[${tomlString(opts.bridge.serverScript)}]`,
-    // A dotted key per variable: an inline table would need its own escaping.
-    ...Object.entries(env).flatMap(([key, value]) => [
-      '-c',
-      `mcp_servers.nabsun.env.${key}=${tomlString(value)}`,
-    ]),
+    // Forward names, not secret values: process arguments are visible to
+    // other local processes. Codex reads these from its inherited environment.
+    '-c',`mcp_servers.nabsun.env_vars=[${Object.keys(env).map(tomlString).join(',')}]`,
   ];
 
   const model = opts.model.trim();
@@ -1038,6 +1049,7 @@ export function parseCodexLine(line: string): CodexLine {
 }
 
 export class CodexProvider extends CliProvider {
+  protected override forkForStream(){return new CodexProvider(this.bridge,this.overridePath)}
   readonly id: ProviderId = 'codex-cli';
   readonly label = 'Codex (CLI)';
   protected readonly binName = 'codex';

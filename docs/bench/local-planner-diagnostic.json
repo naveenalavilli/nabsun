@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "backend": "local",
+  "attempts": 3,
+  "metadata": {
+    "version": "1.0.0",
+    "startedAt": "2026-11-10T05:49:18.673Z",
+    "platform": "win32",
+    "arch": "x64",
+    "electron": "44.10.2",
+    "node": "24.22.2",
+    "threads": 4,
+    "contextSize": 8192,
+    "cpu": "12th Gen Intel(R) Core(TM) i7-1255U",
+    "logicalCpus": 12,
+    "totalMemoryBytes": 68388864000
+  },
+  "reports": [
+    {
+      "task": "plain-1",
+      "backend": "local",
+      "attempt": 1,
+      "success": false,
+      "steps": 4,
+      "inputTokens": 7070,
+      "outputTokens": 275,
+      "wallTimeMs": 71245,
+      "tiers": [
+        "local",
+        "local",
+        "local",
+        "local"
+      ],
+      "actual": {
+        "value": ""
+      },
+      "error": "Malformed ref \"[ref=4bb56dfe-45e1-4bb7-bdb5-de8d256bf8d1]\". A ref is an opaque handle from the latest snapshot, like \"k3f9a1b2-12\" \u2014 copy one verbatim, or take a fresh snapshot."
+    },
+    {
+      "task": "plain-1",
+      "backend": "local",
+      "attempt": 2,
+      "success": false,
+      "steps": 18,
+      "inputTokens": 15490,
+      "outputTokens": 1205,
+      "wallTimeMs": 180014,
+      "tiers": [
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local",
+        "local"
+      ],
+      "actual": {},
+      "error": "Malformed ref \"[ref=a1b2-7]\". A ref is an opaque handle from the latest snapshot, like \"k3f9a1b2-12\" \u2014 copy one verbatim, or take a fresh snapshot."
+    }
+  ],
+  "diagnosticOnly": true,
+  "complete": false,
+  "expectedAttempts": 111,
+  "completedAttempts": 2,
+  "interruptionReason": "Stopped after two plain-1 attempts to tighten fixture network isolation; this is not a complete model baseline."
+}

@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import {version} from '../../../package.json';
+import {McpTransport} from './mcpTransport';
+import {inspectMcp} from './mcpIntegrity';
+import {ContentPins} from './contentPins';
 import type { McpServerConfig, McpStatus, RiskLevel } from '../../shared/types';
 import { defineTool, type Tool } from '../ai/tools/types';
 
@@ -21,12 +24,17 @@ export class McpManager {
   private disabled = new Map<string, string>();
   private connecting = new Set<Client>();
   private generation = 0;
+  private pins:ContentPins;
+  private inspected=new Map<string,{command:string;fingerprint:string}>();
+  constructor(profile:string,private enabled:()=>boolean=()=>true){this.pins=new ContentPins(profile,'mcp-trust.json')}
+  async approve(name:string,hash:string,config:McpServerConfig){const source=await inspectMcp(config);if(source.fingerprint!==hash)throw Error('MCP source changed. Reload and review it again.');this.pins.approve(name,hash)}
+  revoke(name:string){this.pins.revoke(name)}
 
   async reload(servers: Record<string, McpServerConfig>): Promise<void> {
     const generation = ++this.generation;
     await this.closeConnections();
     if (generation !== this.generation) return;
-    this.disabled.clear();
+    this.disabled.clear();this.inspected.clear();
 
     const entries = Object.entries(servers).filter(([, cfg]) => cfg.enabled !== false);
     // Servers are independent; one that fails to start must not block the rest.
@@ -35,18 +43,16 @@ export class McpManager {
 
   private async connect(name: string, cfg: McpServerConfig, generation: number): Promise<void> {
     let client: Client | undefined;
-    let transport: StdioClientTransport | undefined;
+    let transport: McpTransport | undefined;
     try {
-      transport = new StdioClientTransport({
-        command: cfg.command,
-        args: cfg.args ?? [],
-        env: { ...(process.env as Record<string, string>), ...(cfg.env ?? {}) },
-        stderr: 'pipe',
-      });
-      // Consume diagnostics so a chatty server cannot fill its stderr pipe.
-      transport.stderr?.on('data', () => {});
+      const source=await inspectMcp(cfg);
+      if(generation!==this.generation)return;
+      this.inspected.set(name,source);
+      if(!this.enabled())throw Error('External MCP servers are disabled in Settings.');
+      if(!this.pins.matches(name,source.fingerprint))throw Error('Review and approve this MCP executable and configuration before connecting.');
+      transport=new McpTransport(source.command,cfg.args??[],source.env);
       client = new Client(
-        { name: 'nabsun', version: '0.1.0' },
+        { name: 'nabsun', version },
         { capabilities: {} },
       );
       this.connecting.add(client);
@@ -54,7 +60,10 @@ export class McpManager {
 
       const listed = await client.listTools();
       if (generation !== this.generation) throw new Error('MCP configuration changed during startup');
-      const tools = listed.tools.map((t) => this.wrap(name, client!, t));
+      if(listed.tools.length>200||JSON.stringify(listed.tools).length>1024*1024)throw Error('MCP tool catalogue exceeds its limit.');
+      const tools = listed.tools.map((t) => this.wrap(name, client!, cfg, source.fingerprint, t));
+      if(new Set(tools.map(tool=>tool.name)).size!==tools.length)throw Error('MCP tool names collide after normalization.');
+      client.onclose=()=>{if(this.connections.get(name)?.client===client){this.connections.delete(name);this.disabled.set(name,'Server disconnected. Review its status and reconnect.')}};
       this.connections.set(name, { name, client, tools });
       console.log(`[mcp] ${name}: ${tools.length} tool(s)`);
     } catch (err) {
@@ -72,6 +81,8 @@ export class McpManager {
   private wrap(
     server: string,
     client: Client,
+    config:McpServerConfig,
+    fingerprint:string,
     tool: { name: string; description?: string; inputSchema?: unknown; annotations?: Record<string, unknown> },
   ): Tool {
     const ann = tool.annotations ?? {};
@@ -100,8 +111,15 @@ export class McpManager {
       },
       async (input, ctx) => {
         ctx.signal.throwIfAborted();
-        const res = await client.callTool({ name: tool.name, arguments: input }, undefined, { signal: ctx.signal });
-        return renderMcpResult(res);
+        if(!this.enabled()||this.connections.get(server)?.client!==client)throw Error('MCP server is no longer enabled or connected.');
+        const source=await inspectMcp(config,ctx.signal);ctx.signal.throwIfAborted();
+        if(source.fingerprint!==fingerprint||!this.pins.matches(server,source.fingerprint)){
+          this.inspected.set(server,source);
+          await client.close();this.disabled.set(server,'MCP source changed. Review and approve it again.');throw Error('MCP source changed; this tool was not run.');
+        }
+        if(!this.enabled()||this.connections.get(server)?.client!==client)throw Error('MCP configuration changed before the action.');
+        const cancel=()=>{void client.close().catch(()=>{})};ctx.signal.addEventListener('abort',cancel,{once:true});
+        try{const res=await client.callTool({name:tool.name,arguments:input},undefined,{signal:ctx.signal});return renderMcpResult(res)}finally{ctx.signal.removeEventListener('abort',cancel)}
       },
     );
   }
@@ -115,7 +133,10 @@ export class McpManager {
       const conn = this.connections.get(name);
       return {
         name,
-        enabled: cfg.enabled !== false,
+        enabled: this.enabled() && cfg.enabled !== false,
+        fingerprint:this.inspected.get(name)?.fingerprint,
+        resolvedCommand:this.inspected.get(name)?.command,
+        approved:!!this.inspected.get(name) && this.pins.matches(name,this.inspected.get(name)!.fingerprint),
         connected: Boolean(conn),
         error: this.disabled.get(name),
         toolNames: conn?.tools.map((t) => t.name) ?? [],

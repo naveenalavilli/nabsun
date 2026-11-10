@@ -1,0 +1,2137 @@
+{
+  "schemaVersion": 1,
+  "backend": "scripted",
+  "attempts": 3,
+  "reports": [
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1200,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1135,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1131,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1113,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1142,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1102,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1099,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1133,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1124,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1700,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1701,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1667,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1667,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1670,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1680,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1677,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1704,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1674,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1141,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1125,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1102,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1105,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1145,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1166,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1166,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1117,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1151,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1087,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1116,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1102,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1124,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1155,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1181,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1209,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1122,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1123,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1106,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1139,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1081,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1248,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1104,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1093,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1098,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1120,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1102,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1672,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1689,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1655,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1696,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1698,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1748,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1744,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1724,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1688,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1119,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1102,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1157,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1108,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1131,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1152,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1088,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1123,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1168,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1204,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1214,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1184,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1201,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1291,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1163,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1235,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1156,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1167,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 641,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 629,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 638,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 640,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 660,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 623,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 669,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 635,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 617,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 874,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 651,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 667,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 668,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 683,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 680,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 669,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 730,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 680,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3",
+        "name": "fixture.txt"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 187,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 216,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 196,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 183,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 194,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 211,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 199,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 216,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 148,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1721,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1752,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1790,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1747,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1753,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1723,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1744,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1673,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1702,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1133,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": true
+      },
+      "error": ""
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1176,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": true
+      },
+      "error": ""
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1210,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": true
+      },
+      "error": ""
+    }
+  ]
+}

@@ -20,11 +20,15 @@ export interface ModelMessage {
 }
 
 export interface StreamRequest {
+  /** Host-issued, task-scoped browser access. Never part of model messages. */
+  browserBridge?:{url:string;token:string;serverScript:string};
   model: string;
   system: string;
   messages: ModelMessage[];
   tools: ToolSpec[];
   maxTokens: number;
+  /** Optional constrained output for narrow grounding/repair requests. */
+  jsonSchema?:Record<string,unknown>;
   /** Ask the backend to expose reasoning when it supports doing so. */
   thinking: boolean;
   signal: AbortSignal;

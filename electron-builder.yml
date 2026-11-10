@@ -10,6 +10,7 @@ directories:
 # everything the app imports is already inside dist/.
 files:
   - dist/**/*
+  - '!dist/test/**/*'
   - package.json
   # Licences travel with the build, not only with the repository. Neither of
   # these was in the packaged app, which left the redistributed weights without
@@ -40,7 +41,10 @@ asar: true
 # A child process cannot be spawned from inside an asar archive, and the MCP
 # server is spawned by the agent CLIs, so it ships unpacked.
 asarUnpack:
+  - dist/main/plugin-worker.js
   - dist/bin/**
+  - dist/main/file-parser.js
+  - dist/pdf/**
 
 # Electron ships its own copies of these; dropping them saves ~40 MB.
 removePackageScripts: true
@@ -83,6 +87,9 @@ mac:
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSCameraUsageDescription: Nabsun lets websites use your camera only after you allow access.
+    NSMicrophoneUsageDescription: Nabsun lets websites use your microphone only after you allow access.
   gatekeeperAssess: false
 
 dmg:

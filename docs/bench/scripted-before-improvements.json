@@ -1,0 +1,1993 @@
+{
+  "schemaVersion": 1,
+  "backend": "scripted",
+  "attempts": 3,
+  "reports": [
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1032,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1019,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1036,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1004,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1019,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1002,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 984,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1014,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "plain-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1005,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1523,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1536,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1538,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1536,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1532,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1546,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1532,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1533,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "wizard-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1545,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1032,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1019,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1001,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1034,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1033,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1016,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1023,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1021,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "controlled-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1016,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 999,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1003,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1016,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-01"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 981,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1001,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1018,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-02"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1002,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1016,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "date-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1014,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "2027-02-03"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1015,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 999,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 983,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 996,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1002,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1002,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1003,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 983,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "autocomplete-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 995,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1519,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1533,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1543,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1546,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1549,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1539,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1545,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1553,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "modal-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1544,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1014,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1003,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1017,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 1"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 990,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1019,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1025,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 2"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1053,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1091,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "table-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": true,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1010,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Entry 3"
+      },
+      "error": ""
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 23,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 27,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 24,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 29,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 36,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 25,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 29,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 23,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "frame-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 26,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 22,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 22,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 21,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 29,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 22,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 25,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 20,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 28,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "shadow-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 28,
+      "tiers": [
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Confirm shadow"
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 577,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 567,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 565,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 570,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 567,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 589,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 580,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 567,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "upload-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 563,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_upload\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 50,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 38,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 57,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 49,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 38,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 65,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 39,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 42,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "drag-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 52,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Unknown tool \"browser_drag\". It may belong to a plugin or MCP server that is not loaded."
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 562,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 544,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-1",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 575,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 563,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 556,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-2",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 560,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 571,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 549,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "signin-3",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 545,
+      "tiers": [
+        "scripted",
+        "scripted"
+      ],
+      "actual": {},
+      "error": "Missing target in outline: Customer name"
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 1,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1019,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": false
+      },
+      "error": ""
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 2,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 999,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": false
+      },
+      "error": ""
+    },
+    {
+      "task": "trusted-input",
+      "backend": "scripted",
+      "attempt": 3,
+      "success": false,
+      "steps": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "wallTimeMs": 1759,
+      "tiers": [
+        "scripted",
+        "scripted",
+        "scripted"
+      ],
+      "actual": {
+        "value": "Trusted input",
+        "trusted": false
+      },
+      "error": ""
+    }
+  ]
+}

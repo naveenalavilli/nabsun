@@ -52,6 +52,13 @@ export class SettingsView {
   private saveError = '';
   private paintGeneration = 0;
   private approvalSave: Promise<void> = Promise.resolve();
+  private integrationSave:Promise<void>=Promise.resolve();
+  private setIntegrationControl(key:'plugins'|'mcp'|'extensions',value:boolean){
+    this.integrationSave=this.integrationSave.then(async()=>{
+      const current=this.settings;if(!current)return;
+      try{this.settings=await window.nabsun.settings.set({integrationControls:{plugins:true,mcp:true,extensions:true,...current.integrationControls,[key]:value}});this.onChanged(this.settings)}catch{this.settings=await window.nabsun.settings.get().catch(()=>this.settings);this.saveError='The change could not be fully applied. Check integration status and try again.';this.paint()}
+    });
+  }
 
   private setAutoApprove(key: keyof Settings['autoApprove'], value: boolean) {
     // Serialize edits so even rapid toggles merge with the preceding save.
@@ -538,27 +545,32 @@ export class SettingsView {
       checkbox(
         'Autopilot — run page actions without asking',
         s.autoApprove.write,
-        'Clicking, typing, navigating, opening and closing tabs. The assistant is still told to pause before anything irreversible.',
+        'Applies to one site in each task. Changing sites asks again. Uploads and page JavaScript always ask.',
         (v) => this.setAutoApprove('write', v),
-      ),
-      checkbox(
-        'Run high-risk actions without asking',
-        s.autoApprove.dangerous,
-        'Includes executing arbitrary JavaScript in a page. Leave this off unless you know you want it.',
-        (v) => this.setAutoApprove('dangerous', v),
       ),
     );
 
     set.append(this.soulField(s));
+    const activity=el('button',{className:'ghost',textContent:'Review assistant activity'});
+    activity.addEventListener('click',()=>window.nabsun.window.openWorkspace('activity'));
+    const retention=el('select');for(const days of [7,30,90,365])retention.append(el('option',{value:String(days),textContent:days+' days'}));retention.value=String(s.auditRetentionDays??30);
+    retention.addEventListener('change',()=>void this.patch({auditRetentionDays:Number(retention.value)}));
+    set.append(field('Activity journal',activity,'Actions are recorded locally. Typed values are hashed. If recording fails, further actions stop.'),field('Keep activity for',retention,'Older days are removed before the next action after the retention period. Export anything you need to keep.'));
 
-    if (s.alwaysAllowTools.length) {
+    if (s.approvalMigrationNotice) {
+      const notice=el('p',{className:'muted',textContent:'For your safety, old global always-allow permissions were removed. You can now allow an action once, for this task on this site, or on this site for 24 hours.'});
+      const dismiss=el('button',{className:'ghost',textContent:'Got it'});
+      dismiss.addEventListener('click',()=>void this.patch({approvalMigrationNotice:false}));
+      set.append(notice,dismiss);
+    }
+    if (s.siteToolGrants?.length) {
       const reset = el('button', {
         className: 'ghost',
-        textContent: `Forget ${s.alwaysAllowTools.length} always-allowed tool(s)`,
+        textContent: `Revoke all ${s.siteToolGrants.length} site permissions`,
       });
-      reset.addEventListener('click', () => void this.patch({ alwaysAllowTools: [] }));
+      reset.addEventListener('click', () => void this.patch({ siteToolGrants: [] }));
       set.append(
-        field('Always-allowed tools', reset, s.alwaysAllowTools.join(', ')),
+        field('Site action permissions', reset, s.siteToolGrants.map(grant=>`${grant.tool} on ${grant.origin} until ${new Date(grant.expiresAt).toLocaleString()}`).join('; ')),
       );
     }
 
@@ -566,6 +578,37 @@ export class SettingsView {
   }
 
   /* ------------------------------------------------------------- browsing */
+
+  private sitePermissionsField(){
+    const body=el('div');
+    const refresh=async()=>{
+      body.replaceChildren();
+      const decisions=await window.nabsun.sitePermissions.list();
+      if(!decisions.length)body.append(el('p',{className:'hint',textContent:'No remembered choices. Websites ask before using your camera, microphone, location, notifications, or clipboard.'}));
+      for(const origin of [...new Set(decisions.map(item=>item.origin))]){
+        const row=el('div',{className:'settings-field'});
+        row.append(el('p',{textContent:origin}),el('p',{className:'hint',textContent:decisions.filter(item=>item.origin===origin).map(item=>`${item.capability}: ${item.allowed?'allowed':'blocked'}`).join('; ')}));
+        const reset=el('button',{className:'ghost',textContent:'Reset permissions'});
+        reset.addEventListener('click',()=>{void window.nabsun.sitePermissions.revoke(origin).then(refresh).catch(()=>{body.append(el('p',{textContent:'Could not reset permissions. Try again.'}))})});
+        row.append(reset);body.append(row);
+      }
+    };
+    void refresh().catch(()=>body.append(el('p',{className:'hint',textContent:'Could not read site permissions.'})));
+    return field('Website permissions',body,'Only you can answer permission prompts. The assistant cannot approve them.');
+  }
+
+  private networkField(s:Settings){
+    const config=s.browserNetwork??{mode:'system',pacUrl:'',proxy:'',integratedDomains:''};
+    const details=el('details'),summary=el('summary',{textContent:'Network and work sign-in'}),body=el('div');details.append(summary,body);
+    body.append(el('p',{className:'hint',textContent:'Most people can keep system settings. Your workplace may provide a proxy or sign-in domain. These settings apply to browser tabs.'}));
+    const mode=el('select');for(const [value,label] of [['system','Use system settings'],['direct','Connect directly'],['pac','Use a PAC configuration URL'],['manual','Use a proxy server']])mode.append(el('option',{value,textContent:label}));mode.value=config.mode;
+    const pac=el('input',{type:'url',value:config.pacUrl,placeholder:'https://work.example/proxy.pac'}),proxy=el('input',{type:'text',value:config.proxy,placeholder:'proxy.work.example:8080'}),domains=el('input',{type:'text',value:config.integratedDomains,placeholder:'portal.work.example, *.trusted.work.example'});
+    const update=()=>{pac.disabled=mode.value!=='pac';proxy.disabled=mode.value!=='manual'};mode.addEventListener('change',update);update();
+    body.append(field('Connection',mode),field('PAC URL',pac),field('Proxy host and port',proxy),field('Integrated Windows sign-in domains',domains,'Only listed domains may use your Windows sign-in automatically. Leave empty to ask for credentials. A global wildcard is not allowed.'));
+    const apply=el('button',{className:'ghost',textContent:'Apply network settings'}),status=el('p',{className:'hint'});
+    apply.addEventListener('click',()=>{apply.disabled=true;void window.nabsun.settings.set({browserNetwork:{mode:mode.value as 'system'|'direct'|'pac'|'manual',pacUrl:pac.value,proxy:proxy.value,integratedDomains:domains.value}}).then(next=>{this.settings=next;this.onChanged(next);status.textContent='Network settings saved.'},()=>{status.textContent='Could not apply these settings. Check the URL, host:port, and domain list.'}).finally(()=>apply.disabled=false)});
+    body.append(apply,status);return details;
+  }
 
   private browsingSection(s: Settings): HTMLElement {
     const set = el('fieldset');
@@ -597,6 +640,7 @@ export class SettingsView {
         'Offers to save credentials typed into sign-in forms, and fills them back in on the same site. Stored encrypted with the OS keychain.',
         (v) => void this.patch({ savePasswords: v }),
       ),
+      this.sitePermissionsField(),
       checkbox(
         'Show the bookmarks bar',
         s.bookmarksBarVisible,
@@ -609,6 +653,7 @@ export class SettingsView {
     );
 
     set.append(this.clearDataBlock());
+    set.append(this.networkField(s));
     return set;
   }
 
@@ -678,6 +723,8 @@ export class SettingsView {
     const s = this.settings!;
     const set = el('fieldset');
     set.append(el('legend', { textContent: 'Integrations' }));
+    const controls=s.integrationControls??{plugins:true,mcp:true,extensions:true};
+    set.append(checkbox('Enable approved plugins',controls.plugins,'Disabling stops plugin hosts and blocks their tools.',value=>this.setIntegrationControl('plugins',value)),checkbox('Enable approved external MCP servers',controls.mcp,'Disabling closes their processes and blocks their tools.',value=>this.setIntegrationControl('mcp',value)),checkbox('Enable unpacked browser extensions',controls.extensions,'Disabling unloads extensions. Reload websites to remove scripts they already injected.',value=>this.setIntegrationControl('extensions',value)));
 
     const plugins = await window.nabsun.integrations.pluginStatus();
     const pluginList = el('div');
@@ -694,6 +741,8 @@ export class SettingsView {
         }),
       ]);
       pluginList.append(line);
+      if(!p.approved&&p.fingerprint){const approve=el('button',{className:'ghost',textContent:'Review and approve'});approve.addEventListener('click',()=>{approve.disabled=true;void window.nabsun.integrations.pluginApprove(p.id,p.fingerprint!).then(()=>this.render()).catch(()=>{approve.disabled=false;approve.textContent='Could not approve. Reload and review again.'})});line.append(approve)}
+      if(p.approved){const revoke=el('button',{className:'ghost',textContent:'Revoke approval'});revoke.addEventListener('click',()=>{revoke.disabled=true;void window.nabsun.integrations.pluginRevoke(p.id).then(()=>this.render()).catch(()=>{revoke.disabled=false;revoke.textContent='Could not revoke. Try again.'})});line.append(revoke)}
     }
     const pluginButtons = el('div', { className: 'inline' });
     const reloadPlugins = el('button', { className: 'ghost', textContent: 'Reload plugins' });
@@ -709,23 +758,23 @@ export class SettingsView {
       field(
         'Plugins',
         el('div', {}, [pluginList, pluginButtons]),
-        'Each plugin is a folder with plugin.json and a CommonJS module exporting activate(api). Plugins run with full privileges — install only ones you trust.',
+        'Plugins need approval for their exact source. They run in a separate host with restricted filesystem access and can use the network and their own storage. Browser helpers use the shared approval gate. Changed source must be reviewed again.',
       ),
     );
 
     const mcpStatus = await window.nabsun.integrations.mcpStatus();
     const mcpList = el('div');
     for (const m of mcpStatus) {
-      mcpList.append(
-        el('div', { className: 'status-line' }, [
+      const line=el('div', { className: 'status-line' }, [
           el('span', { className: `dot ${m.connected ? 'on' : 'off'}` }),
           el('span', { textContent: m.name }),
           el('span', {
             className: 'muted',
             textContent: m.connected ? `${m.toolNames.length} tool(s)` : (m.error ?? 'not connected'),
           }),
-        ]),
-      );
+        ]);mcpList.append(line);
+      if(!m.approved&&m.fingerprint){const approve=el('button',{className:'ghost',textContent:'Review and approve'});approve.addEventListener('click',()=>{approve.disabled=true;void window.nabsun.integrations.mcpApprove(m.name,m.fingerprint!).then(()=>this.render()).catch(()=>{approve.disabled=false;approve.textContent='Could not approve. Reload and review again.'})});line.append(approve)}
+      if(m.approved){const revoke=el('button',{className:'ghost',textContent:'Revoke approval'});revoke.addEventListener('click',()=>{revoke.disabled=true;void window.nabsun.integrations.mcpRevoke(m.name).then(()=>this.render()).catch(()=>{revoke.disabled=false;revoke.textContent='Could not revoke. Try again.'})});line.append(revoke)}
     }
 
     const mcpJson = el('textarea', { value: JSON.stringify(s.mcpServers, null, 2) });
@@ -747,7 +796,7 @@ export class SettingsView {
       field(
         'MCP servers',
         el('div', {}, [mcpList, mcpJson, el('div', { className: 'inline' }, [saveMcp]), mcpError]),
-        'Example: {"filesystem":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","C:\\\\work"],"enabled":true}}',
+        'Choose a locally installed server: {"tools":{"command":"node","args":["/absolute/path/to/server.js"],"enabled":true}}. Approve its source after saving. Dynamic package runners such as npx are not loaded.',
       ),
     );
 

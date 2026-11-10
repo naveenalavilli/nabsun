@@ -16,6 +16,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { ToolSpec } from '../shared/types';
 import { BrowserBridgeServer } from '../main/bridge/server';
 import { McpManager } from '../main/integrations/mcp';
+import {inspectMcp} from '../main/integrations/mcpIntegrity';
+import type {McpServerConfig} from '../shared/types';
 import type { ToolContext } from '../main/ai/tools/types';
 
 let failures = 0;
@@ -76,6 +78,31 @@ async function main() {
   });
   check('bridge rejects a wrong token', badToken.status === 401);
 
+  const taskController = new AbortController();
+  const delegated: string[] = [];
+  const taskAccess = bridge.issue({
+    signal: taskController.signal,
+    listTools: () => [TOOLS[0]!],
+    callTool: async (name) => { delegated.push(name); return 'task-owned result'; },
+  });
+  const taskHeaders = { authorization: `Bearer ${taskAccess.token}`, 'x-nabsun-client': 'forged-other-session' };
+  const taskTools = await fetch(`${bridge.url}/tools`, { headers: taskHeaders });
+  const taskCatalog = await taskTools.json() as { tools: ToolSpec[] };
+  check('delegated token exposes only its task catalog', taskCatalog.tools.length === 1 && taskCatalog.tools[0]?.name === 'browser_snapshot');
+  const taskCall = await fetch(`${bridge.url}/call`, {
+    method: 'POST', headers: taskHeaders, body: JSON.stringify({ name: 'browser_snapshot' }),
+  });
+  check('client identity cannot redirect a delegated call into another session', (await taskCall.json() as { content: string }).content === 'task-owned result' && delegated.length === 1 && calls.length === 0);
+  const forbiddenTaskCall = await fetch(`${bridge.url}/call`, {
+    method: 'POST', headers: taskHeaders, body: JSON.stringify({ name: 'browser_click', arguments: { ref: 1 } }),
+  });
+  check('delegated task cannot call a tool outside its catalog', (await forbiddenTaskCall.json() as { isError?: boolean }).isError === true && delegated.length === 1);
+  taskController.abort();
+  check('Stop revokes delegated credentials', (await fetch(`${bridge.url}/tools`, { headers: taskHeaders })).status === 401);
+  const expiring = bridge.issue({ signal: new AbortController().signal, listTools: () => [], callTool: async () => '' }, 1000);
+  await new Promise(resolve => setTimeout(resolve, 1050));
+  check('delegated credentials expire without further task activity', (await fetch(`${bridge.url}/tools`, { headers: { authorization: `Bearer ${expiring.token}` } })).status === 401);
+
   for (const body of ['{', 'null', '{"name":17}', '{"name":"browser_click","arguments":[]}', '{"name":"browser_click","arguments":null}']) {
     const response = await fetch(`${bridge.url}/call`, {
       method: 'POST', headers: { authorization: `Bearer ${bridge.token}` }, body,
@@ -113,7 +140,10 @@ async function main() {
   });
 
   const client = new Client({ name: 'harness', version: '1.0.0' }, { capabilities: {} });
-  const manager = new McpManager();
+  const manager = new McpManager(fs.mkdtempSync(path.join(os.tmpdir(),'nabsun-mcp-trust-')));
+  const approveConfigs=async(servers:Record<string,McpServerConfig>)=>{for(const [name,config] of Object.entries(servers)){const source=await inspectMcp(config);await manager.approve(name,source.fingerprint,config)}};
+  const approvedReload=async(servers:Record<string,McpServerConfig>)=>{await approveConfigs(servers);await manager.reload(servers)};
+
 
   try {
     await client.connect(transport);
@@ -166,7 +196,7 @@ async function main() {
       denied.isError === true && /declined/i.test(denied.content[0]?.text ?? ''),
       JSON.stringify(denied),
     );
-    await manager.reload({ review: { command: process.execPath, args: [serverScript], enabled: true,
+    await approvedReload({ review: { command: process.execPath, args: [serverScript], enabled: true,
       env: { NABSUN_BRIDGE_URL: bridge.url, NABSUN_BRIDGE_TOKEN: bridge.token } } });
     const tool = manager.tools.find((tool) => tool.name.endsWith('_browser_click'));
     if (!tool) throw new Error('MCP host did not discover the fixture tool');
@@ -197,7 +227,7 @@ async function main() {
       });
       setInterval(()=>{},1000);
     `;
-    await manager.reload({ broken: { command: process.execPath, args: ['-e', brokenServer], enabled: true,
+    await approvedReload({ broken: { command: process.execPath, args: ['-e', brokenServer], enabled: true,
       env: { NABSUN_TEST_PID_FILE: pidFile } } });
     const pid = Number(fs.readFileSync(pidFile, 'utf8'));
     let alive = true;
@@ -225,13 +255,14 @@ async function main() {
         NABSUN_TEST_READY_FILE: path.join(fixtureDir, name + '.ready'),
         NABSUN_TEST_TOOL: name, NABSUN_TEST_DELAY: String(delay) },
     } });
+    await approveConfigs(config('older',5000));
     const older = manager.reload(config('older', 5000));
     const deadline = Date.now() + 5000;
     while (!fs.existsSync(path.join(fixtureDir, 'older.ready')) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     if (!fs.existsSync(path.join(fixtureDir, 'older.ready'))) throw new Error('slow MCP fixture did not start');
-    await manager.reload(config('newer', 0));
+    await approvedReload(config('newer', 0));
     await older;
     check('a newer MCP configuration wins over an overlapping slow startup',
       manager.tools.length === 1 && manager.tools[0].name === 'mcp_review_newer');

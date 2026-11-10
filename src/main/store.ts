@@ -103,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // plus a few turns without asking a low-spec machine for too much RAM.
   localModel: { serverPath: '', modelPath: '', contextSize: 8192, threads: 0 },
   homepage: 'nabsun://home',
+  browserNetwork:{mode:'system',pacUrl:'',proxy:'',integratedDomains:''},
   searchEngine: 'duckduckgo',
   // Light by default: a browser is mostly other people's pages, and most of the
   // web is white — a dark shell around a white page is a glare sandwich.
@@ -115,6 +116,11 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarOpen: true,
   autoApprove: { safe: true, write: false, dangerous: false },
   alwaysAllowTools: [],
+  approvalVersion:1,
+  approvalMigrationNotice:false,
+  auditRetentionDays:30,
+  siteToolGrants:[],
+  integrationControls:{plugins:true,mcp:true,extensions:true},
   maxAgentSteps: 40,
   inputTokenBudget: 24_000,
   memoryEnabled: true,
@@ -141,6 +147,7 @@ export class SettingsStore {
     try {
       const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
       if (saved.onboardingCompleted === undefined) this.store.set({ onboardingCompleted: true });
+      if (saved.approvalVersion !== 1) this.store.set({approvalVersion:1,alwaysAllowTools:[],siteToolGrants:[],approvalMigrationNotice:Boolean(saved.alwaysAllowTools?.length)});
     } catch { /* A new profile starts with the welcome screen. */ }
   }
 
@@ -156,6 +163,7 @@ export class SettingsStore {
       cliPaths: { ...DEFAULT_SETTINGS.cliPaths, ...s.cliPaths },
       autoApprove: { ...DEFAULT_SETTINGS.autoApprove, ...s.autoApprove },
       alwaysAllowTools: s.alwaysAllowTools ?? [],
+      integrationControls:{plugins:s.integrationControls?.plugins===true,mcp:s.integrationControls?.mcp===true,extensions:s.integrationControls?.extensions===true},
       mcpServers: { ...DEFAULT_SETTINGS.mcpServers, ...s.mcpServers },
       chromeExtensions: s.chromeExtensions ?? [],
     };

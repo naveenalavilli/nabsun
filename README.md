@@ -3,7 +3,7 @@
 **A browser with an AI assistant built in.** Read pages, compare tabs, and complete
 browser tasks using a bundled local model, a cloud provider, Codex, or Claude Code.
 
-[Website](https://nabsun.com) · [Downloads](https://github.com/naveenalavilli/nabsun/releases/latest) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Website](https://nabsun.com) · [Downloads](https://github.com/naveenalavilli/nabsun/releases/latest) · [Release notes](RELEASE_NOTES.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 [![Watch the Nabsun demo on YouTube](https://i.ytimg.com/vi/mCyKPYy7OHw/hqdefault.jpg)](https://www.youtube.com/watch?v=mCyKPYy7OHw)
 
@@ -115,7 +115,15 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
 - Tabs, bookmarks, history, downloads, session restore, and encrypted saved passwords.
 - Page reading, research, form filling, and browser actions in your existing tabs.
 - Approval prompts for clicks, typing, navigation, and page code by default.
-  **Always allow this tool** and **Autopilot** change those permissions.
+  Approvals can apply once, to the task on that site, or to that tool/site for
+  24 hours. Old global grants are revoked with a migration notice.
+- Chat image and file attachments, with image previews and vision-model support.
+  Documents and data support text, CSV, TSV, XLSX and text-based PDF reading.
+- Windows microphone dictation into the chat draft, using installed speech
+  languages. Review the words before sending. macOS/Linux provide OS dictation guidance.
+- A full data workspace for datasets, saved workflows, batch replay and per-row
+  reports. Uncertain rows pause for review before another attempt.
+- A local activity journal with integrity checks and export.
 - Optional personal context in `soul.md`, shared only with local models by default.
 - Plugins, MCP servers, and unpacked Chrome extensions. Chrome API support is partial;
   there is no Chrome Web Store installation flow.
@@ -123,7 +131,15 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
 To let an external agent use Nabsun, copy the MCP configuration from
 **Settings → Integrations → Connect an external agent**. Browser tools use the
 same approval settings as the sidebar. Only install plugins and MCP servers you trust.
+New or changed integrations require source review. MCP servers must be installed
+locally and configured through their executable or entry script; dynamic package
+runners such as `npx` are no longer accepted. Plugins, MCP and unpacked extensions
+can be disabled independently in Settings.
 See [Security](SECURITY.md) for permissions, credential handling, and limitations.
+
+The 1.0.0 development branch is still being verified. The
+[implementation and evidence record](docs/improvement-status.md) lists unfinished
+release gates. Scripted browser-tool success is not a model-quality guarantee.
 
 ## Develop
 

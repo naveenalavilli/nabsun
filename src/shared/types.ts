@@ -87,6 +87,7 @@ export interface TokenUsage {
 
 export interface ChatSession {
   id: string;
+  kind?: 'batch-row';
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -146,9 +147,16 @@ export interface ApprovalRequest {
   title: string;
   detail: string;
   input: unknown;
+  origin?: string;
+  forceOnce?: boolean;
 }
 
-export type ApprovalDecision = 'allow' | 'allow_always' | 'deny';
+export interface ActivityRecord {
+  sequence:number;time:string;previous:string;hash:string;
+  event:{actionId:string;phase:'intent'|'result';tool:string;task:string;origin?:string;status?:string;approver?:string;target?:unknown;input?:unknown};
+}
+
+export type ApprovalDecision = 'allow' | 'allow_always' | 'allow_site' | 'deny';
 
 /**
  * A question the assistant is waiting on an answer to.
@@ -230,6 +238,7 @@ export interface Settings {
     threads: number;
   };
   homepage: string;
+  browserNetwork?:{mode:'system'|'direct'|'pac'|'manual';pacUrl:string;proxy:string;integratedDomains:string};
   searchEngine: 'google' | 'duckduckgo' | 'bing';
   theme: 'dark' | 'light' | 'system';
   appearance: 'classic' | 'playful' | 'blossom' | 'ocean';
@@ -241,6 +250,11 @@ export interface Settings {
   autoApprove: Record<RiskLevel, boolean>;
   /** Tools the user chose "always allow" for, regardless of their risk level. */
   alwaysAllowTools: string[];
+  approvalVersion?: number;
+  approvalMigrationNotice?: boolean;
+  auditRetentionDays?:number;
+  siteToolGrants?: {tool:string;origin:string;expiresAt:number}[];
+  integrationControls?:{plugins:boolean;mcp:boolean;extensions:boolean};
   maxAgentSteps: number;
   /** Request input target, independent of the model's maximum context. */
   inputTokenBudget: number;
@@ -412,6 +426,8 @@ export interface PluginManifest {
 }
 
 export interface PluginStatus {
+  fingerprint?:string;
+  approved?:boolean;
   id: string;
   name: string;
   version: string;
@@ -481,6 +497,9 @@ export interface AccountStatus {
 }
 
 export interface McpStatus {
+  fingerprint?:string;
+  approved?:boolean;
+  resolvedCommand?:string;
   name: string;
   enabled: boolean;
   connected: boolean;
@@ -492,6 +511,8 @@ export interface McpStatus {
 
 /** One interactive element in a page snapshot, addressed by `ref` in tool calls. */
 export interface PageElement {
+  /** Origin of the frame that issued this element reference. */
+  origin?:string;
   /** Opaque, document-qualified handle. Pass it back verbatim; never parse it. */
   ref: string;
   tag: string;
@@ -518,3 +539,6 @@ export interface PageSnapshot {
 
 
 
+
+/** User-selected file capability; filesystem paths never reach the model. */
+export interface AttachedFile { id:string; name:string; size:number }

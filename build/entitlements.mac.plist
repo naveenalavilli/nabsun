@@ -22,6 +22,12 @@
     <key>com.apple.security.network.server</key>
     <true/>
 
+    <!-- Websites still pass the per-origin permission gate and macOS consent. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
+    <true/>
+
     <!-- Downloads, and reading files the user picks for config import. -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>

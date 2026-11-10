@@ -50,10 +50,28 @@ const webBundle = (entry, outfile) => ({
 });
 
 const configs = [
+  nodeBundle('src/main/fileParser.ts', `${out}/main/file-parser.js`),
+  nodeBundle('src/main/integrations/pluginWorker.ts', `${out}/main/plugin-worker.js`),
   nodeBundle('src/main/index.ts', `${out}/main/index.js`),
   nodeBundle('src/preload/shell.ts', `${out}/preload/shell.js`),
   nodeBundle('src/preload/overlay.ts', `${out}/preload/overlay.js`),
   nodeBundle('src/preload/page.ts', `${out}/preload/page.js`),
+  nodeBundle('src/test/bench/runner.ts', `${out}/test/bench-runner.js`),
+  webBundle('scripts/fixtures/bench/react-entry.js', `${out}/test/bench/react-fixture.js`),
+  nodeBundle('src/test/frame-harness.ts', `${out}/test/frame-harness.js`),
+  nodeBundle('src/test/file-harness.ts', `${out}/test/file-harness.js`),
+  nodeBundle('src/test/voice-harness.ts', `${out}/test/voice-harness.js`),
+  nodeBundle('src/test/delegation-harness.ts', `${out}/test/delegation-harness.js`),
+  nodeBundle('src/test/workflow-harness.ts', `${out}/test/workflow-harness.js`),
+  nodeBundle('src/test/batch-crash-worker.ts', `${out}/test/batch-crash-worker.js`),
+  nodeBundle('src/test/approval-harness.ts', `${out}/test/approval-harness.js`),
+  nodeBundle('src/test/audit-harness.ts', `${out}/test/audit-harness.js`),
+  nodeBundle('src/test/site-permission-harness.ts', `${out}/test/site-permission-harness.js`),
+  nodeBundle('src/test/network-auth-harness.ts', `${out}/test/network-auth-harness.js`),
+  nodeBundle('src/test/network-config-harness.ts', `${out}/test/network-config-harness.js`),
+  nodeBundle('src/test/plugin-isolation-harness.ts', `${out}/test/plugin-isolation-harness.js`),
+  nodeBundle('src/test/integration-trust-harness.ts', `${out}/test/integration-trust-harness.js`),
+  nodeBundle('src/test/input-harness.ts', `${out}/test/input-harness.js`),
   nodeBundle('src/test/agent-harness.ts', `${out}/test/agent-harness.js`),
   nodeBundle('src/test/bridge-harness.ts', `${out}/test/bridge-harness.js`),
   nodeBundle('src/test/cli-harness.ts', `${out}/test/cli-harness.js`),
@@ -84,6 +102,12 @@ const configs = [
 
 /** Static assets are copied rather than bundled. */
 function copyStatic() {
+  // PDF parsing is confined to a bounded worker. Keep its ESM worker and
+  // resources local so no CDN or dynamic code download is used.
+  const pdfOut=path.join(out,'pdf');fs.mkdirSync(pdfOut,{recursive:true});
+  for(const file of ['pdf.mjs','pdf.worker.mjs'])fs.copyFileSync(path.join(root,'node_modules/pdfjs-dist/legacy/build',file),path.join(pdfOut,file));
+  for(const directory of ['standard_fonts','cmaps'])fs.cpSync(path.join(root,'node_modules/pdfjs-dist',directory),path.join(pdfOut,directory),{recursive:true});
+  fs.copyFileSync(path.join(root,'node_modules/pdfjs-dist/LICENSE'),path.join(pdfOut,'LICENSE'));
   const jobs = [
     ['src/renderer/shell/index.html', 'renderer/shell/index.html'],
     ['src/renderer/shell/styles.css', 'renderer/shell/styles.css'],

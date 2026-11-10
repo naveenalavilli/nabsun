@@ -1,0 +1,55 @@
+name: task-benchmark
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '30 2 * * *'
+permissions:
+  contents: read
+jobs:
+  scripted:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run build
+      - run: npm run verify:bench
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scripted-benchmark-${{ matrix.os }}
+          path: bench-results/
+          if-no-files-found: error
+  local-nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run fetch:model
+      - run: npm run build
+      - run: npm run bench -- --provider=local
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-model-task-benchmark
+          path: bench-results/
+          if-no-files-found: error

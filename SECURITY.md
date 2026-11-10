@@ -23,10 +23,14 @@ Responses are best-effort; there is no bug bounty.
 | API keys | OS-backed encryption when available; otherwise session memory only |
 | Passwords | Secure storage required; saving needs consent; autofill matches the full origin |
 | External agent bridge | Loopback binding and a fresh bearer token for each launch |
+| Hosted CLI task bridge | Temporary credentials bound to the chat run; revoked on Stop or completion |
+| Activity journal | Durable intent/result records, hashed values, integrity checks and fail-closed recording |
 
 Certificate errors are refused. Sensitive site capabilities such as camera,
-microphone, location, and clipboard reading are denied by default. Websites need
-a separate confirmation before opening another application.
+microphone, location, and clipboard reading require a user-only, per-origin
+decision. Site choices can be reset in Settings. Cross-origin frames cannot
+borrow the top site's device grant. Websites need a separate confirmation before
+opening another application.
 
 ## Approvals and prompt injection
 
@@ -34,13 +38,18 @@ Page content can contain malicious instructions aimed at the model. System
 instructions discourage following them, but do not reliably prevent prompt injection.
 
 By default, read tools run automatically; write and dangerous tools ask first.
-**Always allow this tool** persists a grant. **Autopilot** enables automatic write
-actions. These settings also affect external agents, so review them before
-letting an assistant work in sensitive sessions.
+Old global **Always allow this tool** grants are revoked during migration.
+Approvals can allow an action once, for the current task on a site, or for that
+tool and site for 24 hours. Settings can revoke saved site grants. Uploads,
+arbitrary page JavaScript and detected cross-origin submissions require an
+individual approval. Legacy automatic-write mode is restricted to the first
+site in a run; it does not permit arbitrary cross-origin writes.
 
 Targets are captured before approval and revalidated before dispatch. Stop cancels
-pending work, but cannot reverse an action that already completed. Persistent
-grants are not scoped to a particular task, origin, or integration version.
+pending work, but cannot reverse an action that already completed. Hosted CLI
+tasks have a 100-browser-action and five-minute default limit. CLI-internal
+activity outside Nabsun's tools is not an OS sandbox, and unreported internal
+token use cannot be strictly limited by Nabsun.
 
 ## Credentials and private content
 
@@ -67,10 +76,22 @@ uses Google Analytics.
 
 ## Trusted integrations
 
-Plugins run with full Node privileges in the main process. They can read files,
-access stored data, and use the network. MCP servers are local child processes
-and inherit environment variables; their risk annotations influence auto-approval.
-Only enable code and servers you trust.
+Plugins run in a separate Node process with filesystem permission restrictions,
+their own storage, bounded messages and explicit browser helper calls through the
+shared approval gate. Source changes require renewed native approval. This is not
+a complete OS sandbox: network access remains available. Only approve code you trust.
+
+MCP servers remain trusted native child processes with filesystem and network
+access. They receive an OS/login/path environment allowlist plus explicitly
+configured variables, rather than all parent secrets. Approval pins the executable,
+local entry files and configuration; this does not attest every transitive
+dependency. Source changes require review. Dynamic package runners such as `npx`
+are refused: install the server locally and configure its executable or entry
+script. MCP risk annotations influence approval classification.
+
+Plugins, MCP servers and unpacked extensions have independent enable switches.
+Disabling an extension requires reloading open websites to remove code already
+injected into those documents.
 
 Unpacked Chrome extensions run in the browser session and can access sites
 according to their permissions. There is no Chrome Web Store review or installation
@@ -98,8 +119,10 @@ short-lived caching for repeated checks. No account, browsing history, or local
 settings are sent. GitHub receives the request's IP address. Notifications link
 to Nabsun's official release page; the app does not download or execute updates.
 
-There is no central action audit log, enterprise policy enforcement, plugin
-sandbox, separate password-vault unlock, or automatic updater. Windows packages
+The local activity journal is not a central enterprise audit service, and the
+shared policy hook does not implement enterprise policy administration. There
+is no complete OS integration sandbox, separate password-vault unlock, or
+automatic updater. Windows packages
 are unsigned; macOS builds use ad-hoc signing without notarization.
 Tracker blocking is a small built-in list rather than a full filtering engine.
 

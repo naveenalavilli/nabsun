@@ -22,6 +22,7 @@ const list = document.getElementById('list') as HTMLElement;
 let rows: Row[] = [];
 let selected = 0;
 let mode: 'omnibox' | 'palette' = 'omnibox';
+let savedWorkflows:{id:string;name:string}[]=[];
 /** Guards against a slow suggestion response overwriting a newer query. */
 let queryToken = 0;
 let composing = false;
@@ -37,6 +38,7 @@ const COMMANDS: { title: string; subtitle: string; command: string; hint?: strin
   { title: 'Downloads', subtitle: 'Progress, pause, open, reveal in folder', command: 'open-downloads', hint: 'Ctrl+J' },
   { title: 'Saved passwords', subtitle: 'Show, copy or delete a saved credential', command: 'open-passwords' },
   { title: 'Settings', subtitle: 'Provider, models, permissions, plugins', command: 'open-settings', hint: 'Ctrl+,' },
+  { title: 'Data & workflows', subtitle: 'Tables, saved tasks, and row-by-row runs', command: 'open-workflows' },
   { title: 'Developer tools', subtitle: 'Inspect the current page', command: 'devtools', hint: 'F12' },
 ];
 
@@ -59,8 +61,9 @@ window.overlay.onOpen(({ kind, payload, theme, appearance }) => {
   rows = [];
   backdrop.classList.toggle('palette', kind === 'palette');
   const { query: rawQuery = '', anchor } = (payload ?? {}) as {
-    query?: string; anchor?: { x: number; y: number; width: number; height: number; viewportWidth: number };
+    query?: string; workflows?:{id:string;name:string}[]; anchor?: { x: number; y: number; width: number; height: number; viewportWidth: number };
   };
+  savedWorkflows=Array.isArray((payload as {workflows?:unknown})?.workflows)?(payload as {workflows:{id:string;name:string}[]}).workflows:[];
   const query = rawQuery.startsWith('nabsun://') ? '' : rawQuery;
   if (anchor) {
     backdrop.style.setProperty('--address-left', `${anchor.x}px`);
@@ -136,6 +139,7 @@ async function refresh() {
       hint: c.hint,
       run: () => window.overlay.run(c.command),
     }));
+    rows.push(...savedWorkflows.filter(workflow=>!q||workflow.name.toLowerCase().includes(q)).map(workflow=>({icon:'>',title:'Run workflow: '+workflow.name,subtitle:'Choose a table and review the run',run:()=>window.overlay.run('run-workflow',workflow.id)})));
     paint();
     return;
   }

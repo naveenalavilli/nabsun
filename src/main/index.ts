@@ -1,3 +1,9 @@
+import {DatasetStore} from './data/datasets';
+import {DataWorkspace} from './data/workspace';
+import {datasetTools} from './ai/tools/datasets';
+import {FileStore,bindOwnedDownloads} from './files';
+import {fileTools} from './ai/tools/files';
+import { BLOCKED_HOSTS } from './blockedHosts';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Menu, app, ipcMain, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
@@ -30,6 +36,9 @@ import { handleCommand, registerIpc, type IpcDeps } from './ipc';
 import { PasswordStore } from './passwords';
 import { FORMER_SCHEME, migrateProfile, rewriteInternalUrl } from './rebrand';
 import { applyPermissionPolicy } from './security';
+import {SitePermissions} from './sitePermissions';
+import {NetworkAuth} from './networkAuth';
+import {applyBrowserNetwork,defaultNetwork} from './browserNetwork';
 import { DEFAULT_SETTINGS, SecretStore, SettingsStore } from './store';
 import { SoulStore, soulPath } from './soul';
 
@@ -85,6 +94,7 @@ async function boot() {
   const userDataPath = app.getPath('userData');
 
   const settings = new SettingsStore();
+  const sitePermissions=new SitePermissions();
   // A homepage saved as `smart://home` still resolves, but the address bar
   // would go on showing the old product name. Canonicalise it once.
   const savedHome = settings.get().homepage;
@@ -96,14 +106,14 @@ async function boot() {
   const sessions = new SessionStore(userDataPath);
   const approvals = new ApprovalManager(settings);
   const questions = new QuestionManager();
-  const mcp = new McpManager();
-  const plugins = new PluginManager(path.join(userDataPath, 'plugins'));
+  const mcp = new McpManager(userDataPath,()=>settings.get().integrationControls?.mcp!==false);
+  const plugins = new PluginManager(path.join(userDataPath, 'plugins'),()=>settings.get().integrationControls?.plugins!==false);
   // Write the starter soul.md once, so the path Settings shows is real and
   // the file is there to edit. Never overwrites an existing one.
   new SoulStore(userDataPath).ensure();
   const downloads = new DownloadManager();
   const passwords = new PasswordStore();
-  const extensions = new ChromeExtensionManager(() => settings.get().chromeExtensions);
+  const extensions = new ChromeExtensionManager(() => settings.get().chromeExtensions.map(entry=>settings.get().integrationControls?.extensions===false?{...entry,enabled:false}:entry));
   const accounts = new CliAccountManager(
     (id) => (id === 'claude-cli' || id === 'codex-cli' ? settings.get().cliPaths[id] : ''),
     (event) => {
@@ -127,14 +137,14 @@ async function boot() {
   ) => Promise<string> = async () => {
     throw new Error('The browser is still starting up.');
   };
-  const bridge = new BrowserBridgeServer({
+  const bridge:BrowserBridgeServer = new BrowserBridgeServer({
     listTools: () => agent.toolSpecs(),
     // The client id is carried through, not dropped: it is what keeps each
     // connected agent's tab its own between calls.
     callTool: (name, args, clientId) => bridgeCall(name, args, clientId),
   });
 
-  configureSession(settings);
+  await configureSession(settings,sitePermissions);
 
   // Bundled alongside the main process. In a packaged build it ships unpacked,
   // because a child process cannot be spawned from inside an asar archive.
@@ -225,7 +235,11 @@ async function boot() {
 
   // The built-in tool set is fixed; plugin and MCP tools are re-read on every
   // turn so reloading an integration takes effect without a restart.
+  const files=new FileStore(userDataPath);
+  const datasets=new DatasetStore(userDataPath,files);
   const builtins: Tool[] = [
+    ...fileTools(),
+    ...datasetTools(),
     ...browserTools(),
     ...tabTools(),
     ...webTools(),
@@ -233,7 +247,9 @@ async function boot() {
     ...memoryTools(),
   ];
 
-  const agent = new Agent({
+  const agent:Agent = new Agent({
+    issueTaskBridge:access=>{const capability=bridge.issue(access);return {info:{url:bridge.url,token:capability.token,serverScript:mcpServerScript},revoke:capability.revoke}},
+    files,datasets,
     providers: providers as Map<string, Provider>,
     settings,
     sessions,
@@ -245,6 +261,10 @@ async function boot() {
     getTools: () => [...builtins, ...plugins.tools, ...mcp.tools],
     emit: (event) => win.send(CH.agentEvent, event),
   });
+
+  const dataWorkspace=new DataWorkspace(userDataPath,files,agent,win.tabs,sessions,settings,providers as Map<string,Provider>,batch=>win.send(CH.batchChanged,batch),datasets);
+
+  bindOwnedDownloads(downloads,files,id=>agent.downloadScope(id),scope=>!!sessions.load(scope));
 
   bridgeCall = (name, args, clientId) => agent.runToolForExternalAgent(name, args, clientId);
   await bridge.start().catch((err: unknown) => {
@@ -264,12 +284,13 @@ async function boot() {
   });
 
   const reloadIntegrations = async () => {
-    plugins.reload();
+    await plugins.reload();
     await mcp.reload(settings.get().mcpServers);
   };
 
   const deps: IpcDeps = {
     win,
+    sitePermissions,
     settings,
     secrets,
     history,
@@ -281,6 +302,7 @@ async function boot() {
     plugins,
     providers,
     downloads,
+    dataWorkspace,
     extensions,
     accounts,
     passwords,
@@ -452,6 +474,7 @@ async function boot() {
     passwords.flush();
     bridge.stop();
     void mcp.shutdown();
+    plugins.shutdown();
   });
 }
 
@@ -477,25 +500,12 @@ function favourites(history: HistoryStore): { url: string; title: string }[] {
 }
 
 /** A small, honest tracker blocklist plus a conservative permission policy. */
-const BLOCKED_HOSTS = [
-  'doubleclick.net',
-  'googlesyndication.com',
-  'googletagservices.com',
-  'google-analytics.com',
-  'googletagmanager.com',
-  'adservice.google.com',
-  'scorecardresearch.com',
-  'adnxs.com',
-  'criteo.com',
-  'taboola.com',
-  'outbrain.com',
-  'quantserve.com',
-  'moatads.com',
-];
 
 
-function configureSession(settings: SettingsStore) {
+
+async function configureSession(settings: SettingsStore,sites:SitePermissions) {
   const ses = session.fromPartition('persist:nabsun');
+  try{await applyBrowserNetwork(ses,settings.get().browserNetwork??defaultNetwork)}catch{await applyBrowserNetwork(ses,defaultNetwork);console.warn('[network] Invalid saved proxy settings; using the system network settings.')}
 
   ses.webRequest.onBeforeRequest((details, callback) => {
     if (!settings.get().blockAds) return callback({});
@@ -508,7 +518,7 @@ function configureSession(settings: SettingsStore) {
     }
   });
 
-  applyPermissionPolicy(ses);
+  applyPermissionPolicy(ses,sites);
 
   // A bad certificate is not something to click through casually: refuse it and
   // let did-fail-load render the explanation page.
@@ -518,12 +528,7 @@ function configureSession(settings: SettingsStore) {
     callback(false);
   });
 
-  // Sites behind HTTP basic auth would otherwise hang on a prompt we never
-  // show. Cancel cleanly so the page reports an error instead.
-  app.on('login', (event, _wc, _details, _authInfo, callback) => {
-    event.preventDefault();
-    callback();
-  });
+  new NetworkAuth(ses).install();
 
   // Use Electron/Chromium's native user agent and client hints. In particular,
   // do not claim Windows on macOS/Linux or rewrite only low-entropy hints.
@@ -729,7 +734,7 @@ function buildMenu(deps: IpcDeps) {
         {
           label: 'Command Palette',
           accelerator: 'CmdOrCtrl+Shift+P',
-          click: () => deps.win.showOverlay('palette', {}),
+          click: () => deps.win.showOverlay('palette', {workflows:deps.dataWorkspace?.workflows.list().map(({id,name})=>({id,name}))??[]}),
         },
         { type: 'separator' },
         { label: 'Toggle Assistant', accelerator: 'CmdOrCtrl+Shift+A', click: run('toggle-sidebar') },

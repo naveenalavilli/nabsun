@@ -7,6 +7,7 @@ export interface BridgeDeps {
   /** Runs a tool through the same approval gate the in-app agent uses. */
   callTool: (name: string, args: Record<string, unknown>, clientId: string) => Promise<string>;
 }
+export interface TaskBridgeAccess {signal:AbortSignal;listTools:()=>ToolSpec[];callTool:(name:string,args:Record<string,unknown>)=>Promise<string>}
 
 /**
  * A loopback control plane for the browser's tools.
@@ -26,8 +27,21 @@ export class BrowserBridgeServer {
   readonly token = randomBytes(24).toString('hex');
   private server: Server | null = null;
   private boundPort = 0;
+  private capabilities=new Map<string,{access:TaskBridgeAccess;expiresAt:number;revoke:()=>void}>();
 
   constructor(private readonly deps: BridgeDeps) {}
+  /** Host-only capability; callers cannot acquire scope by choosing a client id. */
+  issue(access:TaskBridgeAccess,ttlMs=300000){
+    if(!this.running||access.signal.aborted)throw Error('The browser task bridge is not available.');
+    if(!Number.isFinite(ttlMs))throw Error('Invalid task authorization lifetime.');
+    if(this.capabilities.size>=100)throw Error('Too many delegated browser tasks.');
+    const token=randomBytes(32).toString('hex');
+    const lifetime=Math.min(1800000,Math.max(1000,ttlMs));
+    const revoke=()=>{clearTimeout(timer);this.capabilities.delete(token);access.signal.removeEventListener('abort',revoke)};
+    const timer=setTimeout(revoke,lifetime);timer.unref();
+    this.capabilities.set(token,{access,expiresAt:Date.now()+lifetime,revoke});
+    access.signal.addEventListener('abort',revoke,{once:true});return {token,revoke};
+  }
 
   get port(): number {
     return this.boundPort;
@@ -56,7 +70,11 @@ export class BrowserBridgeServer {
       };
 
       const auth = req.headers.authorization ?? '';
-      if (auth !== `Bearer ${this.token}`) {
+      const global=auth===`Bearer ${this.token}`,token=auth.startsWith('Bearer ')?auth.slice(7):'';
+      const capability=global?undefined:this.capabilities.get(token);
+      const valid=()=>global||!!capability&&this.capabilities.get(token)===capability&&!capability.access.signal.aborted&&capability.expiresAt>Date.now();
+      if (!valid()) {
+        capability?.revoke();
         send(401, { error: 'unauthorized' });
         return;
       }
@@ -64,7 +82,7 @@ export class BrowserBridgeServer {
       if (req.method === 'GET' && req.url === '/tools') {
         try {
           send(200, {
-            tools: this.deps.listTools().map((t) => ({
+            tools: (capability?capability.access.listTools():this.deps.listTools()).map((t) => ({
               name: t.name,
               description: t.description,
               inputSchema: t.inputSchema,
@@ -95,6 +113,7 @@ export class BrowserBridgeServer {
         });
         req.on('end', () => {
           if (oversized) return;
+          if(!valid()){send(401,{error:'task authorization expired'});return}
           let parsed: { name: string; arguments?: Record<string, unknown> };
           try {
             // Decode once: a TCP chunk can end in the middle of a UTF-8 character.
@@ -112,10 +131,11 @@ export class BrowserBridgeServer {
           }
           void (async () => {
             try {
+              if(capability&&!capability.access.listTools().some(tool=>tool.name===parsed.name))throw Error('This tool is not available to the delegated task.');
               // Identifies the connected agent, so its tab selection survives
               // between calls without leaking into another client's run.
               const clientId = String(req.headers['x-nabsun-client'] ?? '').slice(0, 64) || 'anonymous';
-              const result = await this.deps.callTool(parsed.name, parsed.arguments ?? {}, clientId);
+              const result = capability?await capability.access.callTool(parsed.name,parsed.arguments??{}):await this.deps.callTool(parsed.name, parsed.arguments ?? {}, clientId);
               send(200, { content: result });
             } catch (err) {
               send(200, {
@@ -143,6 +163,7 @@ export class BrowserBridgeServer {
   }
 
   stop() {
+    for(const capability of [...this.capabilities.values()])capability.revoke();
     this.server?.close();
     this.server = null;
     this.boundPort = 0;

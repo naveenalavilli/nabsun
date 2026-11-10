@@ -7,6 +7,7 @@
 
 | Job | Purpose |
 | --- | --- |
+| `verify-action-workflows` | Trusted input, frames, attachments, delegation, replay/recovery, approvals, audit and integration isolation on Windows, macOS and Linux |
 | `verify-connections` | CLI installation, authentication interface, cleanup, and UI checks on Windows, macOS, and Linux |
 | `verify` | Windows build, type checking, regression checks, and local inference |
 | `verify-macos` | macOS verification, local inference, and packaged application checks |
@@ -20,6 +21,11 @@ Local inference must run with the bundled model; missing resources fail the CI s
 Model weights are cached and verified after restoration. Native engines use
 pinned downloads. Packaging checks the shipped engine, weights, and licenses.
 Linux connection checks do not imply Linux release support.
+
+The separate [task-benchmark workflow](workflows/benchmark.yml) requires all 111
+scripted attempts to pass on Windows and macOS for pull requests. Its scheduled
+local-model run records actual planner performance; scripted success does not
+establish model accuracy. Packaging also waits for the action-workflow matrix.
 
 ## Download artifacts
 
@@ -40,6 +46,12 @@ After successful packaging, a push to `main` whose package version has no
 existing tag creates that tag and a **draft GitHub release** with the artifacts.
 A maintainer must publish the draft. Pull requests, ordinary tag-triggered runs,
 and manual workflow runs do not take this release path.
+
+[RELEASE_NOTES.md](../RELEASE_NOTES.md) is the maintained change history. The
+workflow's generated commit list is supporting metadata; before publishing a
+draft, use the matching maintained entry for its user-facing changes and keep
+the download/platform instructions. Update the entry's publication status and
+America/Chicago date only after the release is published.
 
 `scripts/release.mjs` prepares a version-bump branch and pull request. Inspect
 its `--dry-run` output before using it; local installer generation alone does

@@ -1,3 +1,6 @@
+import {FileStore} from '../main/files';
+import {DatasetStore} from '../main/data/datasets';
+import {DataWorkspace} from '../main/data/workspace';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,6 +23,8 @@ import { PluginManager } from '../main/integrations/plugins';
 import { ChromeExtensionManager } from '../main/integrations/extensions';
 import { CliAccountManager } from '../main/integrations/cliAccounts';
 import { CH } from '../shared/ipc';
+import {VoiceManager} from '../main/voice';
+import type {VoiceEvent} from '../shared/voice';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-assistant-test-'));
@@ -75,10 +80,19 @@ async function main() {
   const providers = new Map([['anthropic' as const, provider]]);
   const approvals = new ApprovalManager(settings);
   const questions = new QuestionManager();
-  const agent = new Agent({ providers, settings, sessions, tabs: win.tabs, history, approvals, questions,
+  const files=new FileStore(tmp),datasets=new DatasetStore(tmp,files);
+  const agent = new Agent({ files,datasets,providers, settings, sessions, tabs: win.tabs, history, approvals, questions,
     getTools: () => [], userDataPath: tmp, emit: event => win.send(CH.agentEvent, event) });
-  const mcp = new McpManager();
-  registerIpc({ win, settings, sessions, history, providers, approvals, questions, agent, mcp,
+  const mcp = new McpManager(tmp);
+  const dataWorkspace=new DataWorkspace(tmp,files,agent,win.tabs,sessions,settings,providers,batch=>win.send(CH.batchChanged,batch),datasets);
+  let voiceEmit:((event:Pick<VoiceEvent,'type'|'text'>)=>void)|undefined,voiceStops=0;
+  class FixtureVoice extends VoiceManager {
+    override start(...args:Parameters<VoiceManager['start']>){args[5]=async()=>true;return super.start(...args)}
+  }
+  const fixtureVoice=new FixtureVoice({availability:async()=>({available:true,languages:[{code:'en-US',name:'English'},{code:'te-IN',name:'Telugu'}],help:'Local test recognizer'}),listen:(_language,emit)=>{voiceEmit=emit;setImmediate(()=>emit({type:'listening'}));return()=>{voiceStops++}}});
+  registerIpc({
+    voice:fixtureVoice,
+    dataWorkspace, win, settings, sessions, history, providers, approvals, questions, agent, mcp,
     secrets: new SecretStore(), downloads: new DownloadManager(), passwords: new PasswordStore(),
     plugins: new PluginManager(path.join(tmp, 'plugins')),
     extensions: new ChromeExtensionManager(() => []),
@@ -124,12 +138,74 @@ async function main() {
     const browserTab = win.tabs.create('about:blank');
     await until(() => !browserTab.wc.isLoading());
     const pageWidth = await browserTab.wc.executeJavaScript('innerWidth');
+    const originalSize = win.window.getContentSize();
+    for (const width of [900, 1280]) {
+      win.window.setContentSize(width, 800);
+      await delay(80);
+      const toolbar = await win.shell.webContents.executeJavaScript(`(() => {
+        const bar = document.querySelector('#toolbar').getBoundingClientRect();
+        const buttons = [...document.querySelectorAll('#toolbar .icon-btn')].map(button => {
+          const rect = button.getBoundingClientRect();
+          return { width:rect.width, height:rect.height, center:rect.y + rect.height / 2,
+            right:rect.right, icon:!!button.querySelector('svg'), label:button.getAttribute('aria-label') };
+        });
+        return { buttons, center:bar.y + bar.height / 2, width:innerWidth,
+          pageY:document.querySelector('#content-placeholder').getBoundingClientRect().top,
+          redundant:!!document.querySelector('#ask-page') };
+      })()`);
+      assert.equal(toolbar.redundant, false);
+      for (const button of toolbar.buttons) {
+        assert.ok(button.width >= 36 && button.height >= 36 && button.icon && button.label);
+        assert.ok(Math.abs(button.center - toolbar.center) < 1);
+        assert.ok(button.right <= toolbar.width);
+      }
+      assert.equal(toolbar.pageY, win.contentBounds.y, 'native page begins below the toolbar and bookmark bar');
+    }
+    win.window.setContentSize(originalSize[0], originalSize[1]);
+    await win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").click()');
+    await until(() => !win.state.sidebarOpen);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").getAttribute("aria-pressed") === "false"'));
+    await win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").click()');
+    await until(() => win.state.sidebarOpen);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#sidebar-toggle").getAttribute("aria-pressed") === "true"'));
+    assert.equal(await win.shell.webContents.executeJavaScript('!!document.querySelector("#nav-reload svg") && !!document.querySelector("#bookmark svg")'), true, 'state renders preserve vector icons');
+    const chromeArtifacts = path.resolve(__dirname, '../../../.review-artifacts');
+    fs.mkdirSync(chromeArtifacts, { recursive:true });
+    fs.writeFileSync(path.join(chromeArtifacts, 'browser-toolbar.png'), (await win.shell.webContents.capturePage({x:0,y:0,width:win.window.getContentSize()[0],height:130})).toPNG());
+    console.log('PASS desktop toolbar alignment at 900/1280px, native page bounds, vector icons, and assistant toggle');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#workflows-btn").click()');
+    await until(()=>win.shell.webContents.executeJavaScript('document.querySelector("#view-workflows").classList.contains("active") && !!document.querySelector("#data-paste")'));
+    const literal='<img src=x onerror="window.__dataXss=true">';
+    await win.shell.webContents.executeJavaScript(`document.querySelector('#data-table-text').value=${JSON.stringify('Name\n'+literal)};document.querySelector('#data-paste').dispatchEvent(new Event('submit',{cancelable:true}))`);
+    await until(()=>win.shell.webContents.executeJavaScript('document.querySelector("#data-preview").textContent.includes("onerror")'));
+    assert.equal(await win.shell.webContents.executeJavaScript('!!window.__dataXss || !!document.querySelector("#data-preview img")'),false,'table cells are rendered as text');
+    for(const width of [900,1280])for(const theme of ['light','dark']){
+      win.window.setContentSize(width,800);
+      await win.shell.webContents.executeJavaScript(`document.documentElement.dataset.theme='${theme}'`);
+      await delay(40);
+      assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#workflows-body").scrollWidth <= document.querySelector("#workflows-body").clientWidth'),true);
+    }
+    const dataArtifacts=path.resolve(__dirname,'../../../.review-artifacts');fs.mkdirSync(dataArtifacts,{recursive:true});
+    fs.writeFileSync(path.join(dataArtifacts,'data-workspace.png'),(await win.shell.webContents.capturePage()).toPNG());
+    await win.shell.webContents.executeJavaScript('document.querySelector("#workspace-close").click()');
+    await until(()=>browserTab.view.getVisible());win.window.setContentSize(originalSize[0],originalSize[1]);
+    console.log('PASS full data workspace, chat-scoped pasted table, inert HTML-looking cells, responsive themes, and return to browser');
+    await win.shell.webContents.executeJavaScript(`window.nabsun.tabs.navigate(${JSON.stringify(browserTab.id)},'nabsun://activity')`);
+    await until(async()=>await win.shell.webContents.executeJavaScript('document.querySelector("#view-activity").classList.contains("active") && document.querySelector("#activity-body").textContent.includes("Journal integrity verified")'));
+    assert.equal(browserTab.view.getVisible(),false);
+    assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#activity-body").scrollWidth<=document.querySelector("#activity-body").clientWidth'),true);
+    await win.shell.webContents.executeJavaScript('document.querySelector("#workspace-close").click()');await until(()=>browserTab.view.getVisible());
+    console.log('PASS user-entered activity address opens a verified full workspace and returns to the existing browser tab');
+
+
     assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#developer-tools-btn") === null'), true, 'everyday toolbar does not expose developer controls');
     await win.shell.webContents.executeJavaScript('window.nabsun.window.pageDevTools("toggle")');
     await until(() => browserTab.wc.isDevToolsOpened());
     assert.equal(win.shell.webContents.isDevToolsOpened(), false, 'developer shortcut targets the page, not browser UI');
     await until(async () => await browserTab.wc.executeJavaScript('innerWidth') < pageWidth);
     await until(() => Boolean(browserTab.wc.devToolsWebContents?.getURL().startsWith('devtools://')));
+    win.tabs.pageDevTools('detach');
+    await until(async()=>browserTab.wc.isDevToolsOpened()&&await browserTab.wc.executeJavaScript('innerWidth')>=pageWidth);
     win.tabs.pageDevTools('toggle');
     await until(() => !browserTab.wc.isDevToolsOpened());
     browserTab.wc.sendInputEvent({ type: 'keyDown', keyCode: 'F12' });
@@ -224,6 +300,13 @@ async function main() {
     win.window.setContentSize(1680, 950);
     await delay(150);
     fs.writeFileSync(path.join(artifacts, 'settings-welcome.png'), (await settingsUI().capturePage()).toPNG());
+    for (const step of [1, 2]) {
+      await settingsUI().executeJavaScript(`document.querySelector('[data-guide-step="${step}"]').click()`);
+      await delay(80);
+      fs.writeFileSync(path.join(artifacts, `getting-started-${step}.png`), (await settingsUI().capturePage()).toPNG());
+    }
+    await settingsUI().executeJavaScript('document.querySelector("#guide-tab-0").click()');
+
     await settingsUI().executeJavaScript('document.querySelector("[data-action=local]").click()');
     await until(() => browserTab.view.getVisible());
     await until(() => win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value === "What can you help me do in this browser?"'));
@@ -234,6 +317,27 @@ async function main() {
     assert.equal(win.assistant.view.getVisible(), true, 'return restores attached assistant');
     assert.equal(win.tabs.activeTabId, browserTab.id, 'settings preserves the active tab');
     console.log('PASS full settings workspace, category search, visual setup, and return preserve browser state');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value="Existing draft";document.querySelector("#voice-toggle").click()');
+    await until(()=>!!voiceEmit);
+    voiceEmit!({type:'text',text:'నమస్కారం'});
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value === "Existing draft నమస్కారం"'));
+    assert.equal(provider.requests.length,0,'dictation never sends automatically');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#voice-toggle").click()');
+    await until(()=>voiceStops===1);
+    voiceEmit!({type:'text',text:'late words'});
+    await delay(50);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'),'Existing draft నమస్కారం');
+    fs.writeFileSync(path.join(artifacts,'assistant-voice.png'),(await win.assistant.webContents.capturePage()).toPNG());
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#voice-language").value="te-IN";document.querySelector("#voice-toggle").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#voice-status").textContent.startsWith("Listening")'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#view-chat").classList.remove("active")');
+    await until(()=>voiceStops===2);
+    voiceEmit!({type:'text',text:'hidden chat output'});
+    await delay(40);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'),'Existing draft నమస్కారం');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#view-chat").classList.add("active")');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value=""');
+    console.log('PASS microphone control appends multilingual words to the draft without sending; Stop ignores late recognizer output');
     win.openWorkspace('settings');
     win.toggleSidebar(true);
     await until(() => settingsUI().executeJavaScript('document.querySelector("#workspace").hidden'));
@@ -284,6 +388,21 @@ async function main() {
     win.toggleSidebar(true);
     await until(() => win.assistant.isVisible());
     console.log('PASS first-use examples require Send and browse-only setup leaves the assistant closed');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".starter-tour").click()');
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#view-onboarding").classList.contains("active")'));
+    const draft = await win.shell.webContents.executeJavaScript(`(() => {
+      document.querySelector('#guide-tab-1').click();
+      document.querySelector('[data-guide-example="2"]').click();
+      const prompt = document.querySelector('#guide-prompt').textContent;
+      document.querySelector('[data-action=example]').click();
+      return prompt;
+    })()`);
+    await until(() => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value === ${JSON.stringify(draft)}`));
+    assert.equal(settings.get().provider, 'anthropic');
+    assert.equal(provider.requests.length, 0, 'guide examples never send a task automatically');
+    assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#workspace").hidden'), true);
+    console.log('PASS task guide opens the chosen draft with the current assistant without running it');
+
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Preserved draft"; document.querySelector("#assistant-zoom-in").click()');
     await until(() => settings.get().assistantZoom === 1.1);
@@ -383,6 +502,20 @@ async function main() {
     assert.equal(JSON.stringify(sessions.load(runningId)).includes('SHOULD NOT APPEAR'), false);
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#stop").hidden'), true);
     console.log('PASS Stop cancels the running chat after switching sessions and drops late output');
+
+    provider.finish=null;
+    await submitPrompt('Delete this running chat');
+    await until(()=>provider.finish!==null);
+    const deletedId=sessions.list()[0].id;
+    assert.equal(agent.isRunning(deletedId),true);
+    await win.assistant.webContents.executeJavaScript(`window.nabsun.sessions.remove(${JSON.stringify(deletedId)})`);
+    await until(()=>!agent.isRunning(deletedId));
+    assert.equal(sessions.load(deletedId),null);
+    assert.throws(()=>sessions.upsert(deletedId,{id:'late-result',role:'assistant',createdAt:Date.now(),blocks:[{type:'text',text:'late text'}]}),/deleted/);
+    assert.throws(()=>sessions.appendBestEffort(deletedId,{id:'late-user',role:'user',createdAt:Date.now(),blocks:[{type:'text',text:'queued text'}]}),/deleted/);
+    assert.equal(sessions.load(deletedId),null,'late history writes cannot resurrect a deleted chat');
+    assert.equal(fs.existsSync(path.join(tmp,'sessions',deletedId+'.json')),false);
+    console.log('PASS deleting an active chat cancels its work and late writes cannot recreate its history');
 
     win.toggleSidebar(false);
     win.send(CH.overlayCommand, { command: 'open-downloads' });

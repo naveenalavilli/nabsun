@@ -1,7 +1,7 @@
 {
   "name": "nabsun",
   "productName": "Nabsun",
-  "version": "0.1.13",
+  "version": "1.0.0",
   "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
   "main": "dist/main/index.js",
   "author": "Naveen Alavilli",
@@ -14,7 +14,7 @@
     "start": "npm run build && node scripts/electron-run.mjs",
     "setup": "node node_modules/electron/install.js",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:updates && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:local",
+    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:updates && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:delegation && npm run verify:local && npm run verify:bench && npm run verify:input && npm run verify:frames && npm run verify:files && npm run verify:voice && npm run verify:workflows && npm run verify:approvals && npm run verify:audit && npm run verify:permissions && npm run verify:network && npm run verify:integrations",
     "verify:review": "node scripts/electron-run.mjs dist/test/review-harness.js && node scripts/electron-run.mjs scripts/verify-permissions-ui.cjs && npm run verify:assistant",
     "verify:assistant": "node scripts/electron-run.mjs dist/test/assistant-harness.js",
     "verify:updates": "node scripts/electron-run.mjs scripts/verify-updates.cjs",
@@ -39,18 +39,38 @@
     "verify:omnibox": "node scripts/electron-run.mjs scripts/verify-omnibox-ui.cjs",
     "verify:appearance": "node scripts/electron-run.mjs scripts/verify-appearance-ui.cjs",
     "verify:connections": "node dist/test/connection-harness.js && node scripts/electron-run.mjs scripts/verify-connections-ui.cjs && npm run verify:onboarding",
-    "verify:connections:native": "node dist/test/native-install-harness.js --install"
+    "verify:connections:native": "node dist/test/native-install-harness.js --install",
+    "bench": "node scripts/electron-run.mjs dist/test/bench-runner.js",
+    "verify:bench": "npm run bench -- --provider=scripted",
+    "verify:input": "node scripts/electron-run.mjs dist/test/input-harness.js",
+    "verify:frames": "node scripts/electron-run.mjs dist/test/frame-harness.js",
+    "verify:files": "node scripts/electron-run.mjs dist/test/file-harness.js",
+    "verify:workflows": "node scripts/electron-run.mjs dist/test/workflow-harness.js",
+    "verify:approvals": "node scripts/electron-run.mjs dist/test/approval-harness.js",
+    "verify:audit": "node dist/test/audit-harness.js",
+    "verify:permissions": "node scripts/electron-run.mjs dist/test/site-permission-harness.js",
+    "verify:network": "node scripts/electron-run.mjs dist/test/network-auth-harness.js && node scripts/electron-run.mjs dist/test/network-config-harness.js",
+    "verify:integrations": "node dist/test/integration-trust-harness.js && node scripts/electron-run.mjs dist/test/plugin-isolation-harness.js",
+    "verify:voice": "node dist/test/voice-harness.js && node scripts/electron-run.mjs scripts/verify-voice-ui.cjs",
+    "verify:delegation": "node scripts/electron-run.mjs dist/test/delegation-harness.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
-    "openai": "^6.10.0"
+    "openai": "^6.10.0",
+    "pdfjs-dist": "6.5.438",
+    "read-excel-file": "9.3.14"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "electron": "^44.2.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.12",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "minimatch@>=7 <11.0.1": "11.0.1"
   }
 }
