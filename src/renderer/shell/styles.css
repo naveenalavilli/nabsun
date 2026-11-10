@@ -511,15 +511,9 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
 
 /* First-run guide stays in the sidebar, clear of the native page surface. */
 .welcome { overflow-y: auto; padding: 24px; }
-.welcome-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-size: 26px; font-weight: 800; }
 .welcome-eyebrow { margin: 22px 0 10px; font-size: 10px; letter-spacing: .16em; font-weight: 700; color: var(--accent-text); }
 .welcome h1 { margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: -.04em; }
 .welcome-intro { color: var(--text-dim); line-height: 1.6; margin: 14px 0 20px; }
-.welcome-steps { border-block: 1px solid var(--border); padding: 12px 0; margin-bottom: 20px; }
-.welcome-steps > div { display: flex; gap: 12px; align-items: baseline; }
-.welcome-steps > div > span { color: var(--accent-text); font-size: 11px; font-weight: 800; }
-.welcome-steps p { line-height: 1.5; color: var(--text-dim); margin: 8px 0; }
-.welcome-steps strong { color: var(--text); }
 .welcome-choice { display: block; width: 100%; padding: 14px; text-align: left; white-space: normal; margin-bottom: 10px; border-radius: 10px; }
 .welcome-choice strong, .welcome-choice span { display: block; }
 .welcome-choice span { margin-top: 5px; font-size: 11px; font-weight: 400; line-height: 1.5; }
@@ -992,36 +986,15 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .settings-card .settings-card-link { margin-top:auto; padding-top:8px; color:var(--accent-text)!important; }
 .setup-banner { display:block; width:100%; text-align:left; margin-bottom:24px; padding:18px 22px; border:1px solid var(--accent); border-radius:12px; background:var(--accent-tint); color:var(--accent-text); white-space:normal; font-weight:700; }
 #workspace .welcome { width:100%; max-width:1060px; margin:0 auto; padding:32px 48px 48px; }
-.welcome-heading { display:flex; align-items:center; gap:12px; color:var(--text-dim); font-size:12px; }
 #workspace .welcome h1 { font-size:clamp(30px,4vw,46px); }
 #workspace .welcome-intro { max-width:600px; font-size:15px; }
 .welcome-illustration { display:grid; grid-template-columns:1.2fr 1fr; gap:0; border:1px solid var(--border); border-radius:16px; overflow:hidden; margin:24px 0; background:var(--bg-raised); }
-.tour-browser { border-right:1px solid var(--border); }
-.tour-chrome { display:flex; align-items:center; gap:5px; padding:12px; background:var(--panel); color:var(--text-dim); font-size:10px; }
-.tour-chrome i { width:6px; height:6px; background:var(--text-faint); border-radius:50%; }
-.tour-chrome span { margin-left:12px; }
-.tour-page { padding:22px; }
 .tour-tag { display:block; font-size:9px; font-weight:800; letter-spacing:.12em; color:var(--accent-text); margin-bottom:14px; }
-.tour-page strong { display:block; font-size:17px; margin-bottom:16px; }
-.tour-line { height:5px; background:var(--border); border-radius:4px; margin:8px 0; }
-.tour-line.short { width:70%; }
-.tour-picture { padding:10px; margin:16px 0; background:var(--accent-tint); color:var(--accent-text); border-radius:8px; }
-.tour-picture svg { display:block; width:100%; height:65px; }
-.tour-assistant { padding:24px; display:flex; flex-direction:column; justify-content:center; gap:14px; }
-.tour-question { padding:14px; border-radius:10px; background:var(--panel); font-size:12px; }
-.tour-answer { font-size:13px; color:var(--text-dim); line-height:1.7; }
-.tour-approval { display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--border); border-radius:10px; font-size:11px; line-height:1.6; }
-.tour-check { font-size:20px; color:var(--accent-text); }
-#workspace .welcome-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; }
-.welcome-path-heading { font-size:18px; margin:24px 0 16px; }
-.welcome-paths { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.welcome-paths .welcome-choice { height:100%; margin:0; }
 @media(max-width:800px) { .settings-layout { grid-template-columns:190px minmax(0,1fr); } .settings-cards { grid-template-columns:1fr; } .settings-content { padding:24px; } #workspace .welcome { padding:24px; } }
-@media(max-width:540px) { .settings-layout { display:flex; flex-direction:column; overflow:auto; } .settings-rail { flex-shrink:0; border-right:0; } .settings-content { overflow:visible; } .workspace-top { padding:12px; } .workspace-brand span { display:none; } .welcome-illustration,.welcome-paths,#workspace .welcome-steps { grid-template-columns:1fr; } .tour-browser { border-right:0; border-bottom:1px solid var(--border); } }
+@media(max-width:540px) { .settings-layout { display:flex; flex-direction:column; overflow:auto; } .settings-rail { flex-shrink:0; border-right:0; } .settings-content { overflow:visible; } .workspace-top { padding:12px; } .workspace-brand span { display:none; }  }
 @media(prefers-reduced-motion:reduce) { .settings-card:hover { transform:none; } }
 
 .welcome-illustration { flex-shrink:0; }
-@media(max-width:540px) { .welcome-illustration,.welcome-paths { grid-template-columns:1fr; } .tour-browser { border-right:0; } }
 
 #workspace-close { padding:10px 16px; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg-input); color:var(--text); font:inherit; font-size:12px; cursor:pointer; }
 #workspace-close:hover { border-color:var(--accent); }
@@ -1038,9 +1011,6 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .welcome-choice:not(.primary):hover { border-color:var(--accent); background:var(--bg-raised); }
 .welcome-choice strong { font-size:14px; }
 .welcome-skip { padding:9px 12px; border:1px solid var(--border-strong); border-radius:8px; background:transparent; color:var(--text-dim); font:inherit; cursor:pointer; }
-.welcome-start { max-width:620px; padding:22px; margin:24px 0 16px; background:var(--bg-input); border:1px solid var(--border); border-radius:14px; }
-.welcome-recommended { margin:0 0 12px; font-size:12px; font-weight:650; color:var(--accent-text); }
-.welcome-start .welcome-skip { margin-top:4px; }
 .welcome-optional { max-width:620px; padding:16px 20px; border:1px solid var(--border); border-radius:10px; }
 .welcome-optional summary,.settings-advanced summary { font-size:12px; font-weight:650; cursor:pointer; color:var(--text-dim); }
 .welcome-optional p { font-size:12px; line-height:1.7; color:var(--text-dim); }
@@ -1048,11 +1018,9 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .settings-advanced[open] summary { margin-bottom:20px; }
 @media(max-height:750px) {
   #workspace .welcome { padding:20px 24px; }
-  #workspace .welcome-heading { display:none; }
   #workspace .welcome-eyebrow { margin:0 0 8px; }
   #workspace .welcome h1 { font-size:28px; }
   #workspace .welcome-intro { margin:10px 0 14px; font-size:12px; line-height:1.5; }
-  .welcome-start { margin:14px 0; padding:16px; }
 }
 
 /* One control language throughout Settings and setup, including native form semantics. */
@@ -1091,3 +1059,71 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 #bookmark.on svg { fill:currentColor; }
 #ext-actions:empty { display:none; }
 #toolbar .ext-action img { width:20px; height:20px; }
+
+/* Getting started is a short, task-oriented guide with one section at a time. */
+.guide-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.guide-heading .welcome-eyebrow { margin:0; }
+.guide-duration { color:var(--text-dim); font-size:12px; }
+.guide-start { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:20px 0 12px; }
+.guide-start > button, .guide-panel > button { min-height:40px; padding:10px 16px; border-radius:9px; font:inherit; cursor:pointer; white-space:normal; }
+.guide-start .welcome-skip { margin:0; }
+.guide-start p { width:100%; margin:0; color:var(--text-dim); font-size:12px; }
+.welcome .welcome-optional { max-width:none; padding:12px 16px; background:var(--bg-input); }
+.guide-tabs { display:flex; gap:6px; margin:24px 0 0; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.guide-tabs button { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; min-width:0; padding:10px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--text-dim); font:inherit; cursor:pointer; }
+.guide-tabs button[aria-selected=true] { background:var(--accent-tint); border-color:var(--accent); color:var(--text); font-weight:650; }
+.guide-tabs button span { display:grid; place-items:center; width:23px; height:23px; flex-shrink:0; border-radius:50%; background:var(--panel); font-size:11px; }
+.guide-panel { padding:22px 0 4px; outline-offset:-2px; }
+.guide-panel[hidden] { display:none; }
+.guide-panel h2 { margin:0 0 8px; font-size:22px; line-height:1.25; letter-spacing:-.025em; }
+.guide-panel-heading > p { margin:0; color:var(--text-dim); max-width:700px; line-height:1.6; }
+.guide-map { grid-template-columns:1.2fr 1fr; margin:20px 0; background:var(--bg-input); }
+.guide-browserbar { grid-column:1/-1; display:flex; gap:12px; align-items:center; padding:12px; background:var(--chrome); color:var(--chrome-text); }
+.guide-address { flex:1; min-width:0; padding:7px 12px; background:var(--chrome-raised); border:1px solid var(--chrome-border); border-radius:20px; font-size:11px; }
+.guide-panel-button { width:32px; height:32px; display:grid; place-items:center; border:1px solid var(--accent); border-radius:7px; background:var(--chrome-hover-strong); }
+.guide-panel-button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7; }
+.guide-page, .guide-assistant { padding:24px; display:flex; flex-direction:column; gap:14px; }
+.guide-page { border-right:1px solid var(--border); }
+.guide-page .tour-tag { margin:0; }
+.guide-page strong { font-size:17px; }
+.guide-field { height:27px; border:1px solid var(--border); border-radius:6px; background:var(--bg-raised); }
+.guide-field.short { width:65%; }
+.guide-map-caption { font-size:11px; line-height:1.6; color:var(--text-dim); }
+.guide-bubble { padding:13px; border-radius:10px; background:var(--accent-tint); font-size:13px; }
+.guide-message { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:11px; color:var(--text-dim); }
+.guide-message b { padding:5px 10px; border-radius:5px; background:var(--accent); color:var(--on-accent); }
+.guide-tip-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.guide-tip-grid h3, .guide-control-grid h3 { font-size:14px; margin:0 0 6px; }
+.guide-tip-grid p, .guide-control-grid p { font-size:12px; color:var(--text-dim); line-height:1.65; margin:0; }
+.guide-examples { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 16px; }
+.guide-examples button { padding:8px 12px; border:1px solid var(--border-strong); border-radius:20px; background:var(--bg-input); color:var(--text); font:inherit; font-size:12px; cursor:pointer; }
+.guide-examples button[aria-pressed=true] { background:var(--accent-tint); border-color:var(--accent); }
+.guide-task { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:18px; }
+.guide-task > div { padding:22px; background:var(--bg-input); min-width:0; }
+.guide-task > div + div { border-left:1px solid var(--border); background:var(--bg-raised); }
+.guide-task blockquote { font-size:15px; line-height:1.6; margin:0; }
+.guide-task ol { padding-left:20px; margin:0; }
+.guide-task li { padding:0 0 12px 4px; line-height:1.5; font-size:13px; }
+.guide-task li::marker { color:var(--accent-text); font-weight:700; }
+.guide-review { padding-top:12px; margin:0; border-top:1px solid var(--border); color:var(--accent-text); font-size:12px; line-height:1.5; }
+.guide-control-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0; }
+.guide-control-grid article { padding:18px; border:1px solid var(--border); border-radius:12px; background:var(--bg-input); }
+.guide-control-symbol { display:grid; place-items:center; width:34px; height:34px; margin-bottom:14px; background:var(--accent-tint); color:var(--accent-text); border-radius:9px; font-size:18px; }
+.guide-permission-note { padding:16px 18px; background:var(--accent-tint); border:1px solid var(--border); border-radius:10px; font-size:13px; }
+.guide-permission-note p { margin:6px 0 0; font-size:12px; line-height:1.6; color:var(--text-dim); }
+.guide-navigation { display:flex; align-items:center; gap:12px; border-top:1px solid var(--border); margin-top:22px; padding-top:16px; }
+.guide-navigation button { min-height:38px; padding:8px 12px; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg-input); color:var(--text); font:inherit; cursor:pointer; }
+.guide-progress { flex:1; color:var(--text-dim); font-size:12px; }
+.guide-return { margin-top:22px; }
+.welcome button:focus-visible, .guide-tabs button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media(max-width:600px) {
+  .guide-duration { display:none; }
+  .guide-tabs button { flex-direction:column; font-size:11px; padding:8px 4px; }
+  .guide-map, .guide-tip-grid, .guide-task, .guide-control-grid { grid-template-columns:1fr; }
+  .guide-page { border-right:0; border-bottom:1px solid var(--border); }
+  .guide-task > div + div { border-left:0; border-top:1px solid var(--border); }
+  .guide-page, .guide-assistant, .guide-task > div { padding:16px; }
+  .guide-navigation { flex-wrap:wrap; }
+}
+
+.guide-progressed .guide-start, .guide-progressed .welcome-optional, .guide-progressed > .welcome-intro { display:none; }

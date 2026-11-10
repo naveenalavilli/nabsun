@@ -260,6 +260,13 @@ async function main() {
     win.window.setContentSize(1680, 950);
     await delay(150);
     fs.writeFileSync(path.join(artifacts, 'settings-welcome.png'), (await settingsUI().capturePage()).toPNG());
+    for (const step of [1, 2]) {
+      await settingsUI().executeJavaScript(`document.querySelector('[data-guide-step="${step}"]').click()`);
+      await delay(80);
+      fs.writeFileSync(path.join(artifacts, `getting-started-${step}.png`), (await settingsUI().capturePage()).toPNG());
+    }
+    await settingsUI().executeJavaScript('document.querySelector("#guide-tab-0").click()');
+
     await settingsUI().executeJavaScript('document.querySelector("[data-action=local]").click()');
     await until(() => browserTab.view.getVisible());
     await until(() => win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value === "What can you help me do in this browser?"'));
@@ -320,6 +327,21 @@ async function main() {
     win.toggleSidebar(true);
     await until(() => win.assistant.isVisible());
     console.log('PASS first-use examples require Send and browse-only setup leaves the assistant closed');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".starter-tour").click()');
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#view-onboarding").classList.contains("active")'));
+    const draft = await win.shell.webContents.executeJavaScript(`(() => {
+      document.querySelector('#guide-tab-1').click();
+      document.querySelector('[data-guide-example="2"]').click();
+      const prompt = document.querySelector('#guide-prompt').textContent;
+      document.querySelector('[data-action=example]').click();
+      return prompt;
+    })()`);
+    await until(() => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value === ${JSON.stringify(draft)}`));
+    assert.equal(settings.get().provider, 'anthropic');
+    assert.equal(provider.requests.length, 0, 'guide examples never send a task automatically');
+    assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#workspace").hidden'), true);
+    console.log('PASS task guide opens the chosen draft with the current assistant without running it');
+
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Preserved draft"; document.querySelector("#assistant-zoom-in").click()');
     await until(() => settings.get().assistantZoom === 1.1);
