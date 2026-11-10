@@ -177,12 +177,31 @@ async function main() {
       true,
     );
     await run('browser_select', { ref: ref('Color'), values: ['Green'] });
+    const selectionEvents = await tab.wc.executeJavaScript(
+      'window.events.filter(event=>event.name==="Color"&&["input","change"].includes(event.type))',
+    );
+    assert.ok(
+      selectionEvents.length > 0 &&
+        selectionEvents.every((event: { trusted: boolean }) => event.trusted),
+      'select value changes must come from trusted keyboard events',
+    );
     assert.equal(
       await tab.wc.executeJavaScript('document.querySelector("select").value'),
       'green',
     );
     console.log(
       'PASS trusted checkbox changes are idempotent and native select keeps the requested value',
+    );
+    await tab.wc.executeJavaScript(
+      `document.querySelector('[aria-label="Password"]').focus();document.querySelector('select').addEventListener('focus',()=>document.querySelector('[aria-label="Password"]').focus(),{once:true})`,
+    );
+    await assert.rejects(
+      run('browser_select', { ref: ref('Color'), values: ['Blue'] }),
+      /Focus moved/,
+    );
+    assert.equal(
+      await tab.wc.executeJavaScript('document.querySelector("select").value'),
+      'green',
     );
     settings.set({
       autoApprove: { safe: true, write: false, dangerous: false },

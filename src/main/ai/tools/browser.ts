@@ -230,15 +230,20 @@ export function browserTools(): Tool[] {
           const index=options.findIndex(option=>option.value.toLowerCase()===values[0].toLowerCase()||option.label.toLowerCase()===values[0].toLowerCase());
           if(index<0)throw Error('No enabled option matches the requested value.');
           if(index>500)throw Error('Select has too many options for a bounded keyboard action.');
+          // Focus the hit-tested control without opening an OS-owned menu.
+          // Cocoa popup menus do not receive renderer CDP key events.
           const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
-          await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y));
-          await send('Input.dispatchMouseEvent',mouse('mouseReleased',point.x,point.y));
-          for(const key of ['Escape','Home',...Array<string>(index).fill('ArrowDown')]){
-            await send('Input.dispatchKeyEvent',{type:'keyDown',key,windowsVirtualKeyCode:key==='Escape'?27:key==='Home'?36:40});
+          await send('Input.dispatchMouseEvent',mouse('mouseMoved',point.x,point.y,'none'));
+          await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
+          await ctx.tabs.callBridge(tab,`window.__nabsunAgent.selectionTarget(${ref},true)`,ctx.signal);
+          for(const key of ['Home',...Array<string>(index).fill('ArrowDown')]){
+            const focus=await ctx.tabs.callBridge<{focused:boolean}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);
+            if(!focus.focused)throw Error('Focus moved away from the approved select. Input stopped.');
+            await send('Input.dispatchKeyEvent',{type:'keyDown',key,windowsVirtualKeyCode:key==='Home'?36:40});
             await send('Input.dispatchKeyEvent',{type:'keyUp',key});
           }
           const result=await ctx.tabs.callBridge<{value:string}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);
-          if(result.value!==options[index].value)throw Error('Trusted selection did not match. Inspect the page before retrying.');
+          if(result.value!==options[index].value)throw Error(`Trusted selection did not match (wanted ${JSON.stringify(options[index].value.slice(0,200))}, got ${JSON.stringify(result.value.slice(0,200))}). Inspect the page before retrying.`);
           return 'Selected the requested option with trusted keyboard input';
         });
         ctx.status(message);
