@@ -573,11 +573,11 @@ function uploadTarget(ref:unknown){
   if(!(el instanceof HTMLInputElement)||el.type!=='file')throw new Error('Target is not a file upload input.');
   return prepareInput(ref);
 }
-function selectionTarget(ref:unknown,focus=false) {
+function selectionTarget(ref:unknown,focus=false,resetTypeAhead=false) {
   const el=resolveActionable(ref);
   if(!(el instanceof HTMLSelectElement))throw new Error('Target is not a select element.');
   if(withinCredentialField(el))throw new Error('The assistant does not enter credentials.');
-  if(focus)el.focus({preventScroll:true});
+  if(focus){if(resetTypeAhead)el.blur();el.focus({preventScroll:true})}
   let active=document.activeElement;while(active?.shadowRoot?.activeElement)active=active.shadowRoot.activeElement;
   return {focused:active===el,multiple:el.multiple,options:Array.from(el.options).map(option=>({value:option.value,label:clean(option.text),disabled:option.disabled||!!option.closest('optgroup[disabled]')})),value:el.value};
 }

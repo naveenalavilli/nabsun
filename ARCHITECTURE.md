@@ -36,8 +36,8 @@ acting on a different target.
 The normal cycle is snapshot, action, then a fresh snapshot. Structured tools
 cover reading, clicking, typing, selecting, scrolling, and extraction.
 Input tools use serialized CDP mouse and keyboard operations with hit testing,
-cancellation and credential checks. Date/time and multi-select compatibility
-fallbacks are disclosed. Frame routing supplies isolated child-document refs and
+cancellation and credential checks. Date/time, multi-select and ambiguous macOS
+dropdown compatibility fallbacks are disclosed. Frame routing supplies isolated child-document refs and
 maps pointer positions through the embedding frame; open shadow roots are included.
 `browser_evaluate` permits page JavaScript and is classified as dangerous.
 

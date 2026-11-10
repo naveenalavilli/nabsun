@@ -230,16 +230,31 @@ export function browserTools(): Tool[] {
           const index=options.findIndex(option=>option.value.toLowerCase()===values[0].toLowerCase()||option.label.toLowerCase()===values[0].toLowerCase());
           if(index<0)throw Error('No enabled option matches the requested value.');
           if(index>500)throw Error('Select has too many options for a bounded keyboard action.');
+          if(meta.value===options[index].value)return 'The requested option is already selected';
+          let prefix='';
+          if(process.platform==='darwin'){
+            // Cocoa owns arrow-key popup navigation; printable type-ahead stays
+            // in Blink and generates trusted selection events (DevTools #3033).
+            for(const character of options[index].label){
+              if(/\s/.test(character)||prefix.length>=200)break;
+              prefix+=character;
+              if(options.filter(option=>option.label.toLowerCase().startsWith(prefix.toLowerCase())).length===1)break;
+            }
+            if(!prefix||options.filter(option=>option.label.toLowerCase().startsWith(prefix.toLowerCase())).length!==1){
+              const result=await ctx.tabs.callBridge<string>(tab,`window.__nabsunAgent.select(${ref},${JSON.stringify([options[index].value])})`,ctx.signal);
+              return `${result} (DOM compatibility fallback for ambiguous native macOS type-ahead; events are not trusted)`;
+            }
+          }
           // Focus the hit-tested control without opening an OS-owned menu.
           // Cocoa popup menus do not receive renderer CDP key events.
           const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
           await send('Input.dispatchMouseEvent',mouse('mouseMoved',point.x,point.y,'none'));
           await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
-          await ctx.tabs.callBridge(tab,`window.__nabsunAgent.selectionTarget(${ref},true)`,ctx.signal);
-          for(const key of ['Home',...Array<string>(index).fill('ArrowDown')]){
+          await ctx.tabs.callBridge(tab,`window.__nabsunAgent.selectionTarget(${ref},true,${process.platform==='darwin'})`,ctx.signal);
+          for(const key of process.platform==='darwin'?[...prefix]:['Home',...Array<string>(index).fill('ArrowDown')]){
             const focus=await ctx.tabs.callBridge<{focused:boolean}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);
             if(!focus.focused)throw Error('Focus moved away from the approved select. Input stopped.');
-            await send('Input.dispatchKeyEvent',{type:'keyDown',key,windowsVirtualKeyCode:key==='Home'?36:40});
+            await send('Input.dispatchKeyEvent',process.platform==='darwin'?{type:'keyDown',key,text:key,unmodifiedText:key}:{type:'keyDown',key,windowsVirtualKeyCode:key==='Home'?36:40});
             await send('Input.dispatchKeyEvent',{type:'keyUp',key});
           }
           const result=await ctx.tabs.callBridge<{value:string}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);

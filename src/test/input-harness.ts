@@ -189,6 +189,25 @@ async function main() {
       await tab.wc.executeJavaScript('document.querySelector("select").value'),
       'green',
     );
+    await run('browser_select', { ref: ref('Color'), values: ['Blue'] });
+    assert.equal(
+      await tab.wc.executeJavaScript('document.querySelector("select").value'),
+      'blue',
+    );
+    await tab.wc.executeJavaScript(
+      'document.querySelector("select").add(new Option("New York","ny"));document.querySelector("select").add(new Option("New Jersey","nj"))',
+    );
+    const multiword = await run('browser_select', {
+      ref: ref('Color'),
+      values: ['New Jersey'],
+    });
+    assert.equal(
+      await tab.wc.executeJavaScript('document.querySelector("select").value'),
+      'nj',
+    );
+    if (process.platform === 'darwin')
+      assert.match(multiword, /DOM compatibility fallback/);
+    await run('browser_select', { ref: ref('Color'), values: ['Green'] });
     console.log(
       'PASS trusted checkbox changes are idempotent and native select keeps the requested value',
     );
