@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
+import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { ToolContext } from '../ai/tools/types';
 import { PolicyDeniedError } from '../ai/policy';
@@ -46,6 +47,12 @@ export class PluginHost {
   ) {}
   start(): Promise<HostedTool[]> {
     if (this.child) throw Error('Plugin host already started.');
+    // Node checks canonical paths. macOS commonly exposes temporary folders
+    // through /var -> /private/var; grant only the resolved source/storage.
+    this.root = fs.realpathSync(this.root);
+    this.entry = fs.realpathSync(this.entry);
+    this.storage = fs.realpathSync(this.storage);
+    this.worker = fs.realpathSync(this.worker);
     const env: Record<string, string> = {
       ELECTRON_RUN_AS_NODE: '1',
       TEMP: this.storage,

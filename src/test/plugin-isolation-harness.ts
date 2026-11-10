@@ -48,10 +48,22 @@ async function main() {
  };`,
   );
   process.env.NABSUN_PRIVATE_FIXTURE = 'fixture-only';
-  const host = new PluginHost(
+  const sourceAlias = path.join(profile, 'source-link'),
+    storageAlias = path.join(profile, 'storage-link');
+  fs.symlinkSync(
     root,
-    entry,
+    sourceAlias,
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+  fs.symlinkSync(
     storage,
+    storageAlias,
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+  const host = new PluginHost(
+    sourceAlias,
+    path.join(sourceAlias, 'index.cjs'),
+    storageAlias,
     'fixture',
     '1.0.0',
     path.join(__dirname, '../main/plugin-worker.js'),
