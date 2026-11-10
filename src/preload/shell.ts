@@ -74,6 +74,8 @@ const api: ShellApi = {
     cancelQueued: (sessionId, id) => ipcRenderer.invoke(CH.agentCancelQueued, sessionId, id),
     tools: () => ipcRenderer.invoke(CH.agentTools),
     resolveApproval: (id, decision) => ipcRenderer.send(CH.agentApprovalResolve, id, decision),
+    sessionGrants: sessionId => ipcRenderer.invoke(CH.agentSessionGrants, sessionId),
+    revokeSessionTool: (sessionId,toolName,source) => ipcRenderer.invoke(CH.agentRevokeSessionTool, sessionId,toolName,source),
     answer: (id, text) => ipcRenderer.send(CH.agentAnswer, id, text),
   },
 

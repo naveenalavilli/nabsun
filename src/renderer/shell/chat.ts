@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   AgentQuestion,
   ApprovalRequest,
+  ApprovalDecision,
   ChatMessage,
   ChatSession,
   ContentBlock,
@@ -52,6 +53,8 @@ export class ChatView {
    * it again after the user navigates away and back — and has to refuse to show
    * another chat's question in this one.
    */
+  private sessionGrantRefresh=0;
+  private pendingApprovals = new Map<string, ApprovalRequest>();
   private pendingQuestions = new Map<string, AgentQuestion>();
 
   constructor(private readonly onSessionChanged: () => void, enabled = true) {
@@ -95,6 +98,10 @@ export class ChatView {
     for (const pending of this.pendingQuestions.values()) {
       if (pending.sessionId === session.id) this.renderQuestion(pending);
     }
+    for (const pending of this.pendingApprovals.values()) {
+      if (pending.sessionId === session.id) this.renderApproval(pending);
+    }
+    void this.refreshSessionGrants();
     this.scrollToEnd();
     this.renderQueue();
     void this.refreshFiles().catch(()=>{ $('#attachment-status').textContent='Could not load attachments. Reopen this chat to try again.'; });
@@ -279,6 +286,12 @@ export class ChatView {
       this.setBusy(true);
     }
     if (event.type === 'turn_end' || event.type === 'aborted' || event.type === 'error') {
+      for (const [id,request] of this.pendingApprovals) {
+        if(request.sessionId===event.sessionId){
+          this.pendingApprovals.delete(id);
+          this.transcript.querySelector(`[data-approval-id="${CSS.escape(id)}"]`)?.remove();
+        }
+      }
       if (event.sessionId === this.runningSessionId) {
         this.runningSessionId = null;
         this.setBusy(false);
@@ -499,9 +512,58 @@ export class ChatView {
     this.scrollToEnd();
   }
 
+  private async refreshSessionGrants() {
+    const generation = ++this.sessionGrantRefresh;
+    const sessionId = this.sessionId;
+    const root = $('#session-tool-grants');
+    root.replaceChildren();
+    root.hidden = true;
+    if (!sessionId) return;
+    try {
+      const grants = await window.nabsun.agent.sessionGrants(sessionId);
+      if (this.sessionId !== sessionId || generation !== this.sessionGrantRefresh) return;
+      root.hidden = !grants.length;
+      if (!grants.length) return;
+      const title = document.createElement('p');
+      title.className = 'hint';
+      title.textContent = 'Auto-allowed in this chat until Nabsun closes. Uncheck to ask again.';
+      root.append(title);
+      for (const grant of grants) {
+        const label = document.createElement('label');
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.checked = true;
+        const name = grant.toolName === 'browser_evaluate'
+          ? 'Run JavaScript in the page'
+          : grant.toolName.replace(/^browser_/, '').replace(/_/g, ' ');
+        const source = grant.source && grant.source !== 'browser' ? ' (' + grant.source + ')' : '';
+        label.append(toggle, document.createTextNode(name + source));
+        toggle.addEventListener('change', () => {
+          toggle.disabled = true;
+          void window.nabsun.agent.revokeSessionTool(sessionId, grant.toolName, grant.source)
+            .then(() => this.refreshSessionGrants())
+            .catch(() => {
+              toggle.disabled = false;
+              toggle.checked = true;
+              title.textContent = 'Could not turn off this permission. Try again.';
+            });
+        });
+        root.append(label);
+      }
+    } catch {
+      if (this.sessionId === sessionId && generation === this.sessionGrantRefresh) {
+        root.hidden = false;
+        root.textContent = 'Could not load chat permissions. Reopen this chat to try again.';
+      }
+    }
+  }
+
   private renderApproval(req: ApprovalRequest) {
+    this.pendingApprovals.set(req.id,req);
+    if(req.sessionId&&req.sessionId!==this.sessionId)return;
     const box = document.createElement('div');
     box.className = 'approval';
+    box.dataset.approvalId=req.id;
 
     const title = document.createElement('h4');
     title.textContent = req.title;
@@ -512,7 +574,7 @@ export class ChatView {
 
     const tool = document.createElement('div');
     tool.className = 'muted';
-    tool.textContent = req.toolName;
+    tool.textContent = req.toolName+(req.source&&req.source!=='browser'?' ('+req.source+')':'');
 
     const detail = document.createElement('pre');
     detail.textContent = req.detail;
@@ -520,7 +582,12 @@ export class ChatView {
     const actions = document.createElement('div');
     actions.className = 'actions';
 
-    const decide = (decision: 'allow' | 'allow_always' | 'allow_site' | 'deny') => {
+    const remember=document.createElement('input');remember.type='checkbox';
+    const sessionChoice=document.createElement('label');sessionChoice.className='session-approval-choice';
+    sessionChoice.append(remember,document.createTextNode('Auto-allow this tool for this chat session'));
+    const sessionHelp=document.createElement('p');sessionHelp.className='hint';sessionHelp.textContent='Allows this tool on any website in this chat, including follow-up prompts. Resets when Nabsun closes. Turn it off below the conversation.';
+    const decide = (decision: ApprovalDecision) => {
+      this.pendingApprovals.delete(req.id);
       window.nabsun.agent.resolveApproval(req.id, decision);
       box.remove();
       const note = document.createElement('div');
@@ -528,11 +595,12 @@ export class ChatView {
       note.textContent =
         decision === 'deny' ? `Declined ${req.toolName}` : `Approved ${req.toolName}`;
       this.transcript.appendChild(note);
+      if(decision==='allow_session')void this.refreshSessionGrants();
       this.scrollToEnd();
     };
 
     actions.append(
-      button('Allow', 'primary', () => decide('allow')),
+      button('Allow', 'primary', () => decide(req.allowSession&&remember.checked?'allow_session':'allow')),
       button('Deny', 'ghost', () => decide('deny')),
     );
     if(!req.forceOnce&&req.origin)actions.append(
@@ -540,7 +608,9 @@ export class ChatView {
       button('Allow on this site for 24 hours','ghost',()=>decide('allow_site')),
     );
 
-    box.append(title, tool, detail, actions);
+    box.append(title, tool, detail);
+    if(req.allowSession)box.append(sessionChoice,sessionHelp);
+    box.append(actions);
     this.transcript.appendChild(box);
     this.scrollToEnd();
   }

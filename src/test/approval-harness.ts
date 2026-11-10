@@ -168,6 +168,45 @@ async function main() {
   console.log(
     'PASS cross-origin submission and Enter require individual approval; disabled integrations are denied through the shared PolicyProvider',
   );
+
+  settings.save({autoApprove:{safe:true,write:false,dangerous:false},integrationControls:{plugins:true,mcp:true,extensions:true}});
+  const sessionRequest=(sessionId:string,tool=evaluate,signal=new AbortController().signal,origin='https://one.example')=>approvals.request(tool,{},signal,{sessionId,origin});
+  decision='allow_session';
+  assert.equal(await sessionRequest('chat-a'),true);
+  const sessionPrompts=prompts;
+  let mode='';
+  assert.equal(await approvals.request(evaluate,{},new AbortController().signal,{sessionId:'chat-a',origin:'https://other.example',onDecision:value=>{mode=value}}),true);
+  assert.equal(prompts,sessionPrompts,'same tool persists across turns and sites within this chat');
+  assert.equal(mode,'session','journal can identify session auto-approval');
+  assert.deepEqual(approvals.grantsForSession('chat-a'),[{toolName:'browser_evaluate',source:evaluate.source}]);
+  decision='deny';
+  assert.equal(await sessionRequest('chat-b'),false,'another chat must ask');
+  assert.equal(await sessionRequest('chat-a',click),false,'another tool must ask');
+  const pluginEvaluate={...evaluate,source:'plugin:fixture'};
+  assert.equal(await sessionRequest('chat-a',pluginEvaluate),false,'another source cannot inherit a grant');
+  assert.equal(await request(new AbortController().signal,'https://one.example',evaluate),false,'unbound external calls cannot inherit chat grants');
+  approvals.revokeSessionTool('chat-a',evaluate.name,evaluate.source);
+  assert.equal(await sessionRequest('chat-a'),false,'unchecking restores prompting');
+  decision='allow_session';await sessionRequest('chat-a');
+  approvals.clearSession('chat-a');decision='deny';
+  assert.equal(await sessionRequest('chat-a'),false,'deleting a chat removes its grant');
+  const stopped=new AbortController();approvals.setEmitter(req=>{stopped.abort();approvals.resolve(req.id,'allow_session')});
+  assert.equal(await sessionRequest('cancelled-chat',evaluate,stopped.signal),false);
+  assert.deepEqual(approvals.grantsForSession('cancelled-chat'),[],'Stop during approval cannot create a grant');
+  approvals.setEmitter(req=>{prompts++;approvals.resolve(req.id,decision)});
+  decision='allow_session';await sessionRequest('chat-a');
+  assert.deepEqual(new ApprovalManager(settings).grantsForSession('chat-a'),[],'restart cannot restore memory-only grants');
+  approvals.denyAll();assert.deepEqual(approvals.grantsForSession('chat-a'),[]);
+  const forced=new ApprovalManager(settings,{evaluate:()=>({allowed:true,requirePrompt:true})});
+  forced.setEmitter(req=>{assert.equal(req.allowSession,false);forced.resolve(req.id,'allow_session')});
+  assert.equal(await forced.request(evaluate,{},new AbortController().signal,{sessionId:'chat-a'}),false,'policy-required prompts cannot be waived');
+  let blocked=false;
+  const guarded=new ApprovalManager(settings,{evaluate:()=>blocked?{allowed:false,reason:'fixture policy'}:{allowed:true}});
+  guarded.setEmitter(req=>guarded.resolve(req.id,'allow_session'));
+  assert.equal(await guarded.request(evaluate,{},new AbortController().signal,{sessionId:'chat-a'}),true);
+  blocked=true;
+  await assert.rejects(guarded.request(evaluate,{},new AbortController().signal,{sessionId:'chat-a'}),/fixture policy/);
+  console.log('PASS opt-in tool/source chat grants, cross-turn reuse, revocation, deletion, restart, Stop and enforced host policy');
   approvals.denyAll();
   settings.flush();
 }

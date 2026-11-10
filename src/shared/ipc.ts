@@ -9,6 +9,7 @@ import type {
   AgentQuestion,
   ApprovalDecision,
   ApprovalRequest,
+  SessionToolGrant,
   Bookmark,
   BridgeInfo,
   ChatSession,
@@ -88,6 +89,8 @@ export const CH = {
   agentTools: 'agent:tools',
   agentApprovalRequest: 'agent:approval-request', // main -> renderer push
   agentApprovalResolve: 'agent:approval-resolve',
+  agentSessionGrants: 'agent:session-grants',
+  agentRevokeSessionTool: 'agent:revoke-session-tool',
   agentQuestion: 'agent:question', // main -> renderer push
   agentAnswer: 'agent:answer',
   agentAttachPage: 'agent:attach-page',
@@ -300,6 +303,8 @@ export interface ShellApi {
     cancelQueued(sessionId: string, id: string): Promise<boolean>;
     tools(): Promise<ToolSpec[]>;
     resolveApproval(id: string, decision: ApprovalDecision): void;
+    sessionGrants(sessionId:string):Promise<SessionToolGrant[]>;
+    revokeSessionTool(sessionId:string,toolName:string,source?:string):Promise<void>;
     /** Answers a question from the assistant; null means the user skipped it. */
     answer(id: string, text: string | null): void;
   };

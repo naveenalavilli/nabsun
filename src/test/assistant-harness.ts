@@ -11,6 +11,7 @@ import { SettingsStore, SecretStore } from '../main/store';
 import { HistoryStore } from '../main/history';
 import { SessionStore } from '../main/ai/sessions';
 import { Agent } from '../main/ai/agent';
+import { defineTool } from '../main/ai/tools/types';
 import { ApprovalManager } from '../main/ai/approvals';
 import { QuestionManager } from '../main/ai/questions';
 import type { Provider, StreamEvent, StreamRequest } from '../main/ai/provider';
@@ -450,6 +451,35 @@ async function main() {
     await until(() => settings.get().assistantZoom === 1);
     win.assistant.setSize(560, 820);
     console.log('PASS hide/reopen preserves draft; independent zoom persists, clamps and resets');
+
+
+    const permissionSession=fs.readdirSync(path.join(tmp,'sessions')).find(name=>name.endsWith('.json'))!.slice(0,-5);
+    const evaluate=defineTool({name:'browser_evaluate',description:'permission fixture',risk:'dangerous',properties:{}},async()=> 'ok');
+    approvals.setEmitter(req=>win.send(CH.agentApprovalRequest,req));
+    const requestPermission=()=>approvals.request(evaluate,{script:'document.title'},new AbortController().signal,{sessionId:permissionSession,origin:'https://fixture.example'});
+    let permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").checked'),false,'session auto-allow is opt-in');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".approval .primary").click()');
+    assert.equal(await permission,true);
+    assert.equal(approvals.grantsForSession(permissionSession).length,0,'Allow alone grants only this call');
+    permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").click();document.querySelector(".approval .primary").click()');
+    assert.equal(await permission,true);
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector("#session-tool-grants input:checked")'));
+    await delay(150);
+    fs.writeFileSync(path.join(artifacts,'assistant-session-permissions.png'),(await win.assistant.webContents.capturePage()).toPNG());
+    assert.equal(await requestPermission(),true,'next call needs no approval card');
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelectorAll(".approval").length'),0);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#session-tool-grants input").click()');
+    await until(()=>approvals.grantsForSession(permissionSession).length===0);
+    permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").click();[...document.querySelectorAll(".approval button")].find(button=>button.textContent==="Deny").click()');
+    assert.equal(await permission,false);
+    assert.equal(approvals.grantsForSession(permissionSession).length,0,'Deny never creates a session grant');
+    console.log('PASS session permission checkbox defaults off, Allow once, repeat tool approval suppression, visible revocation and Deny');
 
     const submitPrompt = (text: string) => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value = ${JSON.stringify(text)}; document.querySelector('#attach-page').checked = false; document.querySelector('#send').click()`);
     await submitPrompt('First queued test');

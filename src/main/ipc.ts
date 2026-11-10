@@ -239,6 +239,11 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.agentApprovalResolve, (_e, id: string, decision: ApprovalDecision) => {
     approvals.resolve(id, decision);
   });
+  ipcMain.handle(CH.agentSessionGrants, (_event,sessionId:string) => sessions.load(sessionId)?approvals.grantsForSession(sessionId):[]);
+  ipcMain.handle(CH.agentRevokeSessionTool, (_event,sessionId:string,toolName:string,source?:string) => {
+    if(typeof sessionId!=='string'||typeof toolName!=='string'||(source!==undefined&&typeof source!=='string'))throw Error('Invalid permission.');
+    approvals.revokeSessionTool(sessionId,toolName,source);
+  });
   ipcMain.on(CH.agentAnswer, (_e, id: string, text: string | null) => {
     questions.answer(id, typeof text === 'string' ? text : null);
   });
@@ -302,6 +307,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CH.sessionNew, (_e) => {const created=sessions.create();if(deps.dataWorkspace&&_e.sender===win.assistant.webContents)deps.dataWorkspace.scope=created.id;return created});
   ipcMain.handle(CH.sessionDelete, (_e, id: string) => {
     voice.stopSession(id);
+    approvals.clearSession(id);
     promptQueue.clear(id);
     agent.cancelScope(id);
     sessions.remove(id);
@@ -598,7 +604,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CH.pluginApprove,async(_event,id:string,fingerprint:string)=>{
     const plugin=plugins.status().find(plugin=>plugin.id===id);
     if(!plugin||plugin.fingerprint!==fingerprint||!fingerprint)throw Error('Plugin changed. Reload and review it again.');
-    const answer=await dialog.showMessageBox({type:'question',title:'Approve plugin source',message:`Allow ${plugin.name} ${plugin.version}?`,detail:`Source: ${plugin.path}\nSHA-256: ${fingerprint}\n\nThe plugin can use the network and its own storage. Profile files and child processes are restricted. Browser actions use your approval settings; page JavaScript asks separately. Only approve code you trust. Approving reloads plugins and stops any active plugin tasks.`,buttons:['Cancel','Approve this source'],defaultId:0,cancelId:0,noLink:true});
+    const answer=await dialog.showMessageBox({type:'question',title:'Approve plugin source',message:`Allow ${plugin.name} ${plugin.version}?`,detail:`Source: ${plugin.path}\nSHA-256: ${fingerprint}\n\nThe plugin can use the network and its own storage. Profile files and child processes are restricted. Browser actions use your approval settings; page JavaScript asks unless explicitly auto-allowed for the current chat. Only approve code you trust. Approving reloads plugins and stops any active plugin tasks.`,buttons:['Cancel','Approve this source'],defaultId:0,cancelId:0,noLink:true});
     if(answer.response===1)await plugins.approve(id,fingerprint);return plugins.status();
   });
   ipcMain.handle(CH.pluginRevoke,async(_event,id:string)=>{await plugins.revoke(id);return plugins.status()});

@@ -198,7 +198,7 @@ export class Agent {
       const metadata=await this.approvalMetadata(run,input,binding);
       base.origin=metadata.origin??undefined;
       target=metadata.target;
-      const approved=await this.deps.approvals.request(tool,input,run.controller.signal,{...metadata,onDecision:mode=>{approver=mode}});
+      const approved=await this.deps.approvals.request(tool,input,run.controller.signal,{...metadata,sessionId:run.kind==='external'?undefined:this.fileOwner(run)??undefined,onDecision:mode=>{approver=mode}});
       if(!approved){status=run.controller.signal.aborted?'cancelled':'denied';return {approved:false}}
       const raw=await this.dispatch(tool,input,run,binding);status='ok';return {approved:true,raw};
     }catch(error){if(run.controller.signal.aborted)status='cancelled';else if(error instanceof PolicyDeniedError)status='denied';throw error}

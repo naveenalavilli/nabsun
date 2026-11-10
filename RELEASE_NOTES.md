@@ -23,6 +23,11 @@ as complete or announce a public release.
 
 ### New
 
+- Optionally auto-allow a tool for the current chat using the checkbox in its
+  permission request, including page JavaScript. The choice covers follow-up
+  prompts and websites in that chat, can be turned off below the conversation,
+  and resets when Nabsun closes. Other chats and tools still ask independently.
+
 - Attach images and files to a chat. Supported readers include text, CSV, TSV,
   XLSX and text-based PDF. Images have previews and can be read by compatible
   vision models. Attachments belong to their conversation.
@@ -64,7 +69,8 @@ as complete or announce a public release.
 
 - Old global "always allow" grants are revoked with a migration notice. New
   approvals can apply once, to the current task on a site, or to a tool/site for
-  24 hours; saved site grants can be revoked in Settings.
+  24 hours; saved site grants can be revoked in Settings. Opt-in chat-session
+  grants can be turned off beneath the conversation and are never saved to disk.
 - New or changed plugins and MCP configurations require review. MCP servers must
   use an installed executable or entry script; dynamic runners such as `npx`
   are no longer accepted. MCP servers remain trusted native code.

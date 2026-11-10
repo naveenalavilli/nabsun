@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { ApprovalDecision, ApprovalRequest } from '../../shared/types';
+import type { ApprovalDecision, ApprovalRequest, SessionToolGrant } from '../../shared/types';
 import type { SettingsStore } from '../store';
 import type { Tool } from './tools/types';
 import {defaultPolicy,integrationPolicy,PolicyDeniedError,type PolicyProvider} from './policy';
 
 type Emit = (req: ApprovalRequest) => void;
-export type ApprovalMode='read-only'|'autopilot'|'task'|'site'|'user'|'denied';
-interface ApprovalMetadata {origin?:string;fileName?:string;target?:{role:string;name:string;value?:string;credential?:boolean};crossOriginSubmit?:boolean;onDecision?:(mode:ApprovalMode)=>void}
+export type ApprovalMode='read-only'|'autopilot'|'task'|'site'|'session'|'user'|'denied';
+interface ApprovalMetadata {sessionId?:string;origin?:string;fileName?:string;target?:{role:string;name:string;value?:string;credential?:boolean};crossOriginSubmit?:boolean;onDecision?:(mode:ApprovalMode)=>void}
 
 interface Pending {
   resolve: (decision: ApprovalDecision) => void;
@@ -14,12 +14,28 @@ interface Pending {
 
 /**
  * The permission gate between the model and anything that changes state.
- * A tool runs only if its risk level is auto-approved, the user has previously
- * chosen "always allow" for it, or they approve this specific call.
+ * Permissions are checked before every action. Explicit session grants live
+ * only in memory and cannot bypass host policy or another chat/source boundary.
  */
 export class ApprovalManager {
   private pending = new Map<string, Pending>();
   private emit: Emit = () => {};
+  private sessionGrants = new Map<string, Map<string, SessionToolGrant>>();
+
+  private sessionKey(toolName: string, source?: string) {
+    return JSON.stringify([toolName, source ?? null]);
+  }
+  grantsForSession(sessionId: string): SessionToolGrant[] {
+    return [...(this.sessionGrants.get(sessionId)?.values() ?? [])].map(grant => ({ ...grant }));
+  }
+  revokeSessionTool(sessionId: string, toolName: string, source?: string) {
+    const grants = this.sessionGrants.get(sessionId);
+    grants?.delete(this.sessionKey(toolName, source));
+    if (!grants?.size) this.sessionGrants.delete(sessionId);
+  }
+  clearSession(sessionId: string) {
+    this.sessionGrants.delete(sessionId);
+  }
   private taskGrants = new WeakMap<AbortSignal, Set<string>>();
   private autopilotOrigin = new WeakMap<AbortSignal, string>();
 
@@ -45,6 +61,11 @@ export class ApprovalManager {
     let origin:string|undefined;
     try {const url=new URL(metadata.origin??'');if(['http:','https:'].includes(url.protocol))origin=url.origin}catch{/* Originless actions require individual approval. */}
     const policy=this.checkPolicy(tool,input,origin);
+    const sessionId = metadata.sessionId;
+    const sessionKey = this.sessionKey(tool.name, tool.source);
+    const allowSession = !!sessionId && !policy.requirePrompt;
+    if (allowSession && sessionId && this.sessionGrants.get(sessionId)?.has(sessionKey))
+      return allow('session');
     const mustPrompt=policy.requirePrompt||metadata.crossOriginSubmit||['browser_upload','browser_evaluate'].includes(tool.name)||tool.name==='browser_press_key'&&(/^(?:enter|return)$/i.test(String(input.key))||/[\r\n]/.test(String(input.key)));
     const key=origin?tool.name+'|'+origin:undefined;
     if(!mustPrompt&&key&&this.taskGrants.get(signal)?.has(key))return allow('task');
@@ -65,6 +86,9 @@ export class ApprovalManager {
       input,
       origin,
       forceOnce:mustPrompt||!origin,
+      sessionId,
+      allowSession,
+      source:tool.source,
     };
 
     const decision = await new Promise<ApprovalDecision>((resolve) => {
@@ -84,6 +108,17 @@ export class ApprovalManager {
     });
 
     if (signal.aborted) return false;
+    if (decision === 'allow_session' && allowSession && sessionId) {
+      const current = this.checkPolicy(tool, input, origin);
+      if (current.requirePrompt) {
+        metadata.onDecision?.('denied');
+        return false;
+      }
+      const grants = this.sessionGrants.get(sessionId) ?? new Map<string, SessionToolGrant>();
+      grants.set(sessionKey, { toolName: tool.name, source: tool.source });
+      this.sessionGrants.set(sessionId, grants);
+      return allow('user');
+    }
     if (decision === 'allow_always' && !mustPrompt && key) {
       const grants=this.taskGrants.get(signal)??new Set<string>();grants.add(key);this.taskGrants.set(signal,grants);
       return allow('user');
@@ -108,6 +143,7 @@ export class ApprovalManager {
   denyAll() {
     for (const [, entry] of this.pending) entry.resolve('deny');
     this.pending.clear();
+    this.sessionGrants.clear();
   }
 }
 

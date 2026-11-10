@@ -40,9 +40,15 @@ instructions discourage following them, but do not reliably prevent prompt injec
 By default, read tools run automatically; write and dangerous tools ask first.
 Old global **Always allow this tool** grants are revoked during migration.
 Approvals can allow an action once, for the current task on a site, or for that
-tool and site for 24 hours. Settings can revoke saved site grants. Uploads,
-arbitrary page JavaScript and detected cross-origin submissions require an
-individual approval. Legacy automatic-write mode is restricted to the first
+tool and site for 24 hours. Settings can revoke saved site grants. A separate,
+unchecked **Auto-allow this tool for this chat session** checkbox grants that
+tool (and integration source) permission across sites and follow-up prompts in
+the current chat. This includes uploads, arbitrary page JavaScript and detected
+cross-origin submissions; without this explicit session choice they require
+individual approval. Active session grants appear below the conversation and
+can be unchecked to ask again. They are memory-only, disappear on chat deletion
+or app shutdown, and never bypass host policy, credential guards or Stop. Stop
+cancels the current task; session choices remain for later prompts in that chat. Legacy automatic-write mode is restricted to the first
 site in a run; it does not permit arbitrary cross-origin writes.
 
 Targets are captured before approval and revalidated before dispatch. Stop cancels

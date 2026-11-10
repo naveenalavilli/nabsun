@@ -149,6 +149,9 @@ export interface ApprovalRequest {
   input: unknown;
   origin?: string;
   forceOnce?: boolean;
+  sessionId?: string;
+  allowSession?: boolean;
+  source?: string;
 }
 
 export interface ActivityRecord {
@@ -156,7 +159,9 @@ export interface ActivityRecord {
   event:{actionId:string;phase:'intent'|'result';tool:string;task:string;origin?:string;status?:string;approver?:string;target?:unknown;input?:unknown};
 }
 
-export type ApprovalDecision = 'allow' | 'allow_always' | 'allow_site' | 'deny';
+export interface SessionToolGrant { toolName: string; source?: string }
+
+export type ApprovalDecision = 'allow' | 'allow_always' | 'allow_site' | 'allow_session' | 'deny';
 
 /**
  * A question the assistant is waiting on an answer to.

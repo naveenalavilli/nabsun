@@ -545,7 +545,7 @@ export class SettingsView {
       checkbox(
         'Autopilot — run page actions without asking',
         s.autoApprove.write,
-        'Applies to one site in each task. Changing sites asks again. Uploads and page JavaScript always ask.',
+        'Applies to one site in each task. Changing sites asks again. Uploads and page JavaScript ask unless you explicitly auto-allow that tool for the current chat.',
         (v) => this.setAutoApprove('write', v),
       ),
     );
