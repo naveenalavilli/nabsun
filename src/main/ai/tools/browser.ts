@@ -1,3 +1,4 @@
+import { withTrustedInput, mouse } from '../../trustedInput';
 import type { PageSnapshot } from '../../../shared/types';
 import { resolveNavigationInput } from '../../history';
 import { delay, type Tab } from '../../tabs';
@@ -34,6 +35,54 @@ function renderSnapshot(snap: PageSnapshot): string {
 async function settle(ctx: ToolContext, tab: Tab, ms = 600) {
   await delay(ms);
   await ctx.tabs.waitForSettled(tab, 8_000);
+}
+
+interface InputTarget { x:number; y:number; role:string; name:string; type:string; multiline?:boolean; value?:string }
+async function trustedClick(ctx:ToolContext, tab:Tab, ref:string, button='left', clickCount=1):Promise<string> {
+  if(!['left','right','middle'].includes(button)||![1,2].includes(clickCount))throw Error('Unsupported mouse button or click count.');
+  return withTrustedInput(tab.wc,ctx.signal,async send=>{
+    let point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)})`,ctx.signal);
+    if(point.type==='file')throw Error('Only you can choose files. Attach a file to this chat, then use browser_upload with its file id.');
+    await send('Input.dispatchMouseEvent',mouse('mouseMoved',point.x,point.y,'none'));
+    for(let count=1;count<=clickCount;count++){
+      assertLive(ctx,'this click');
+      point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)})`,ctx.signal);
+      await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y,button,count));
+      await send('Input.dispatchMouseEvent',mouse('mouseReleased',point.x,point.y,button,count));
+    }
+    return `Clicked ${point.role} ${JSON.stringify(point.name)} with trusted ${button} input${clickCount===2?' (double-click)':''}`;
+  });
+}
+async function trustedType(ctx:ToolContext,tab:Tab,ref:string,text:string,submit:boolean):Promise<string> {
+  if(text.length>32768)throw Error('Text entry is limited to 32768 characters per call.');
+  return withTrustedInput(tab.wc,ctx.signal,async send=>{
+    const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(ref)},'text')`,ctx.signal);
+    if(!point.multiline && /[\n\r\t]/.test(text))throw Error('This single-line field cannot accept the requested value with line breaks or tabs. Nothing was typed or submitted.');
+    const focused=()=>ctx.tabs.callBridge<{value:string}>(tab,`window.__nabsunAgent.focusedInput(${JSON.stringify(ref)})`,ctx.signal);
+    await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y));
+    await send('Input.dispatchMouseEvent',mouse('mouseReleased',point.x,point.y));
+    await focused();
+    const key=async(key:string,extra:Record<string,unknown>={})=>{await focused();await send('Input.dispatchKeyEvent',{type:'keyDown',key,...extra});await send('Input.dispatchKeyEvent',{type:'keyUp',key})};
+    await key('a',{code:'KeyA',modifiers:process.platform==='darwin'?4:2,commands:['selectAll']});
+    await key('Backspace',{windowsVirtualKeyCode:8});
+    for(const character of text) {
+      if(/[\n\r\t]/.test(character)){await focused();await send('Input.insertText',{text:character})}
+      else await key(character,{text:character,unmodifiedText:character});
+    }
+    const result=await focused();
+    let fallback=false;
+    if(result.value!==text) {
+      if(!['date','time','month','week','datetime-local'].includes(point.type))throw Error('Trusted typing did not produce the requested value. The page may have changed or rejected input. No submission was sent; inspect the page before retrying.');
+      // Chromium's segmented date/time controls reject ordinary text on some
+      // locales. Preserve the legacy path only for these native widgets.
+      await ctx.tabs.callBridge(tab,`window.__nabsunAgent.fill(${JSON.stringify(ref)},${JSON.stringify(text)},false)`,ctx.signal);
+      const verified=await focused();
+      if(verified.value!==text)throw Error('The native date/time control rejected the requested value. Nothing was submitted.');
+      fallback=true;
+    }
+    if(submit)await key('Enter',{windowsVirtualKeyCode:13});
+    return `Filled ${JSON.stringify(point.name)} (${text.length} characters) with ${fallback?'DOM compatibility fallback after native date/time input was rejected (input events are not trusted)':'trusted input'}${submit?' and pressed Enter':''}`;
+  });
 }
 
 export function browserTools(): Tool[] {
@@ -100,6 +149,8 @@ export function browserTools(): Tool[] {
         properties: {
           ref: { type: 'string', description: 'The opaque ref handle from the latest snapshot, copied verbatim.' },
           tabId: { type: 'string' },
+          button: { type:'string', enum:['left','right','middle'], description:'Mouse button; default left.' },
+          clickCount: { type:'number', enum:[1,2], description:'One click or double-click; default 1.' },
           expectNavigation: {
             type: 'boolean',
             description: 'Set when the click is expected to load a new page, to wait longer.',
@@ -112,7 +163,7 @@ export function browserTools(): Tool[] {
         const ref = JSON.stringify(str(input.ref));
         await ctx.tabs.callBridge(tab, `window.__nabsunAgent.highlight([${ref}])`, ctx.signal);
         assertLive(ctx, 'this click');
-        const message = await ctx.tabs.callBridge<string>(tab, `window.__nabsunAgent.click(${ref})`, ctx.signal);
+        const message = await trustedClick(ctx, tab, str(input.ref), str(input.button,'left'), num(input.clickCount,1));
         ctx.status(message);
         await settle(ctx, tab, bool(input.expectNavigation) ? 1200 : 500);
         const snap = await ctx.tabs.callBridge<PageSnapshot>(tab, 'window.__nabsunAgent.snapshot({})', ctx.signal);
@@ -141,11 +192,7 @@ export function browserTools(): Tool[] {
         const submit = bool(input.submit);
         await ctx.tabs.callBridge(tab, `window.__nabsunAgent.highlight([${ref}])`, ctx.signal);
         assertLive(ctx, submit ? 'typing and submitting' : 'this text entry');
-        const message = await ctx.tabs.callBridge<string>(
-          tab,
-          `window.__nabsunAgent.fill(${ref}, ${JSON.stringify(text)}, ${submit})`,
-      ctx.signal,
-        );
+        const message = await trustedType(ctx, tab, str(input.ref), text, submit);
         ctx.status(message);
         await settle(ctx, tab, submit ? 1200 : 400);
         const snap = await ctx.tabs.callBridge<PageSnapshot>(tab, 'window.__nabsunAgent.snapshot({})', ctx.signal);
@@ -169,11 +216,29 @@ export function browserTools(): Tool[] {
         const tab = target(ctx, input);
         const values = Array.isArray(input.values) ? input.values.map((v) => str(v)) : [str(input.values)];
         assertLive(ctx, 'this selection');
-        const message = await ctx.tabs.callBridge<string>(
-          tab,
-          `window.__nabsunAgent.select(${JSON.stringify(str(input.ref))}, ${JSON.stringify(values)})`,
-      ctx.signal,
-        );
+        const ref=JSON.stringify(str(input.ref));
+        const message = await withTrustedInput(tab.wc,ctx.signal,async send=>{
+          const meta=await ctx.tabs.callBridge<{multiple:boolean;options:{value:string;label:string;disabled:boolean}[];value:string}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);
+          // Retain multi-select support; disclose the compatibility path explicitly.
+          if(meta.multiple||values.length!==1){
+            const result=await ctx.tabs.callBridge<string>(tab,`window.__nabsunAgent.select(${ref}, ${JSON.stringify(values)})`,ctx.signal);
+            return `${result} (DOM compatibility fallback for multi-select; events are not trusted)`;
+          }
+          const options=meta.options.filter(option=>!option.disabled);
+          const index=options.findIndex(option=>option.value.toLowerCase()===values[0].toLowerCase()||option.label.toLowerCase()===values[0].toLowerCase());
+          if(index<0)throw Error('No enabled option matches the requested value.');
+          if(index>500)throw Error('Select has too many options for a bounded keyboard action.');
+          const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
+          await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y));
+          await send('Input.dispatchMouseEvent',mouse('mouseReleased',point.x,point.y));
+          for(const key of ['Escape','Home',...Array<string>(index).fill('ArrowDown')]){
+            await send('Input.dispatchKeyEvent',{type:'keyDown',key,windowsVirtualKeyCode:key==='Escape'?27:key==='Home'?36:40});
+            await send('Input.dispatchKeyEvent',{type:'keyUp',key});
+          }
+          const result=await ctx.tabs.callBridge<{value:string}>(tab,`window.__nabsunAgent.selectionTarget(${ref})`,ctx.signal);
+          if(result.value!==options[index].value)throw Error('Trusted selection did not match. Inspect the page before retrying.');
+          return 'Selected the requested option with trusted keyboard input';
+        });
         ctx.status(message);
         await settle(ctx, tab, 400);
         return message;
@@ -195,11 +260,17 @@ export function browserTools(): Tool[] {
       async (input, ctx) => {
         const tab = target(ctx, input);
         assertLive(ctx, 'this change');
-        const message = await ctx.tabs.callBridge<string>(
-          tab,
-          `window.__nabsunAgent.setChecked(${JSON.stringify(str(input.ref))}, ${bool(input.checked)})`,
-      ctx.signal,
-        );
+        const ref=JSON.stringify(str(input.ref)),wanted=bool(input.checked);
+        const message=await withTrustedInput(tab.wc,ctx.signal,async send=>{
+          const before=await ctx.tabs.callBridge<boolean>(tab,`window.__nabsunAgent.checkedTarget(${ref})`,ctx.signal);
+          if(before===wanted)return 'Already in the requested checked state';
+          const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${ref})`,ctx.signal);
+          await send('Input.dispatchMouseEvent',mouse('mousePressed',point.x,point.y));
+          await send('Input.dispatchMouseEvent',mouse('mouseReleased',point.x,point.y));
+          const after=await ctx.tabs.callBridge<boolean>(tab,`window.__nabsunAgent.checkedTarget(${ref})`,ctx.signal);
+          if(after!==wanted)throw Error('The control did not enter the requested state. Inspect the page before retrying.');
+          return 'Updated checked state with trusted input';
+        });
         ctx.status(message);
         await settle(ctx, tab, 400);
         return message;
@@ -210,22 +281,41 @@ export function browserTools(): Tool[] {
       {
         name: 'browser_hover',
         description: 'Hover an element, to reveal menus or tooltips that appear on mouseover.',
-        risk: 'safe',
+        risk: 'write',
         properties: { ref: { type: 'string' }, tabId: { type: 'string' } },
         required: ['ref'],
       },
       async (input, ctx) => {
         const tab = target(ctx, input);
-        const message = await ctx.tabs.callBridge<string>(
-          tab,
-          `window.__nabsunAgent.hover(${JSON.stringify(str(input.ref))})`,
-      ctx.signal,
-        );
+        const message = await withTrustedInput(tab.wc,ctx.signal,async send=>{
+          const point=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(str(input.ref))})`,ctx.signal);
+          await send('Input.dispatchMouseEvent',mouse('mouseMoved',point.x,point.y,'none'));
+          return `Hovered ${JSON.stringify(point.name)} with trusted input`;
+        });
         await delay(400);
         const snap = await ctx.tabs.callBridge<PageSnapshot>(tab, 'window.__nabsunAgent.snapshot({})', ctx.signal);
         return `${message}\n\n${renderSnapshot(snap)}`;
       },
     ),
+
+    defineTool({
+      name:'browser_drag', description:'Drag from one current element ref to another with trusted pointer input. Take a new snapshot afterwards.',risk:'write',
+      properties:{ref:{type:'string'},toRef:{type:'string'},tabId:{type:'string'}},required:['ref','toRef'],
+    },async(input,ctx)=>{
+      const tab=target(ctx,input);
+      return withTrustedInput(tab.wc,ctx.signal,async send=>{
+        const from=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(str(input.ref))})`,ctx.signal);
+        const to=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(str(input.toRef))})`,ctx.signal);
+        // Scrolling the destination can move the source. Recheck both before pressing.
+        const again=await ctx.tabs.callBridge<InputTarget>(tab,`window.__nabsunAgent.prepareInput(${JSON.stringify(str(input.ref))})`,ctx.signal);
+        if(Math.abs(from.x-again.x)>1||Math.abs(from.y-again.y)>1)throw Error('Drag targets moved while scrolling. Keep both visible and retry.');
+        await send('Input.dispatchMouseEvent',mouse('mouseMoved',from.x,from.y,'none'));
+        await send('Input.dispatchMouseEvent',mouse('mousePressed',from.x,from.y));
+        for(let step=1;step<=12;step++)await send('Input.dispatchMouseEvent',{...mouse('mouseMoved',from.x+(to.x-from.x)*step/12,from.y+(to.y-from.y)*step/12),buttons:1});
+        await send('Input.dispatchMouseEvent',mouse('mouseReleased',to.x,to.y));
+        return 'Dragged with trusted pointer input. Check the page to verify the result.';
+      });
+    }),
 
     defineTool(
       {
@@ -383,6 +473,12 @@ export function browserTools(): Tool[] {
         const tab = target(ctx, input);
         const key = str(input.key);
         const modifiers = Array.isArray(input.modifiers) ? input.modifiers.map((m) => str(m)) : [];
+        const focus=await ctx.tabs.callBridge<{credential:boolean;file:boolean;frame:boolean}>(tab,'window.__nabsunAgent.keyboardTarget()',ctx.signal);
+        if(!['Tab','Escape','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Home','End'].includes(key)){
+          if(focus.credential)throw Error('The assistant does not send text or edit keys to password or one-time-code fields.');
+          if(focus.file)throw Error('Only you can choose files. Attach a file to this chat and use browser_upload.');
+          if(focus.frame)throw Error('Use browser_type with a fresh frame ref instead of an unscoped key press.');
+        }
         // Real input events go through the browser rather than the DOM, so the
         // page cannot tell them apart from the user's own typing.
         assertLive(ctx, 'this key press');

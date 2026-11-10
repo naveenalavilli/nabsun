@@ -1,4 +1,6 @@
 import type { DownloadEntry, ExtensionStatus, Settings, TabState, WindowState } from '../../shared/types';
+import { WorkflowsView } from './workflows';
+import {ActivityView} from './activity';
 import { ExtensionsView } from './extensions';
 import { BookmarksView, PasswordsView } from './vault';
 import { ChatView } from './chat';
@@ -497,6 +499,8 @@ const chat = new ChatView(() => void renderSessions(), assistantWindow);
 const bookmarksView = new BookmarksView(() => showView('bookmarks'));
 const passwordsView = new PasswordsView();
 const extensionsView = new ExtensionsView(() => void refreshSettings());
+const workflowsView = assistantWindow ? null : new WorkflowsView($('#workflows-body'));
+const activityView = assistantWindow ? null : new ActivityView($('#activity-body'));
 const settingsView = new SettingsView((next) => {
   settings = next;
   applyTheme(next.theme);
@@ -526,6 +530,9 @@ function wireExtensions() {
 }
 
 function wireSidebarButtons() {
+  $('#workflows-btn').addEventListener('click', () => {
+    if (chat.currentSessionId) void window.nabsun.workflows.open(chat.currentSessionId).catch(()=>{ $('#attachment-status').textContent='Could not open Data & workflows. Finish the current row or try again.'; });
+  });
   const menu = $<HTMLDetailsElement>('#assistant-menu');
   menu.addEventListener('click', event => {
     const button = (event.target as HTMLElement).closest('button');
@@ -643,11 +650,13 @@ window.nabsun.onCommand((command, arg) => {
       if (assistantWindow) break;
       $('#workspace').hidden = arg === null;
       document.documentElement.classList.toggle('workspace-open', arg !== null);
-      for (const name of ['settings', 'onboarding']) {
+      for (const name of ['settings', 'onboarding', 'workflows', 'activity']) {
         $(`#view-${name}`).classList.toggle('active', name === arg);
       }
       if (arg === 'settings') void settingsView.render();
       if (arg === 'onboarding') onboarding.render();
+      if (arg === 'workflows') void workflowsView?.render();
+      if (arg === 'activity') void activityView?.render();
       $('#workspace-close').focus();
       break;
     case 'prefill-prompt':

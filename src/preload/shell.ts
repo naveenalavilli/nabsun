@@ -9,6 +9,8 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 }
 
 const api: ShellApi = {
+  voice:{availability:()=>ipcRenderer.invoke(CH.voiceAvailability),start:(sessionId,requestId,language)=>ipcRenderer.invoke(CH.voiceStart,sessionId,requestId,language),stop:requestId=>ipcRenderer.send(CH.voiceStop,requestId),onEvent:callback=>on(CH.voiceEvent,callback)},
+  activity:{list:day=>ipcRenderer.invoke(CH.activityList,day),export:day=>ipcRenderer.invoke(CH.activityExport,day)},
   platform: process.platform,
   updates: {
     check: manual => ipcRenderer.invoke(CH.updateCheck, manual),
@@ -75,6 +77,36 @@ const api: ShellApi = {
     answer: (id, text) => ipcRenderer.send(CH.agentAnswer, id, text),
   },
 
+  workflows:{
+    open:(scope,workflowId)=>ipcRenderer.invoke(CH.dataOpen,scope,workflowId),
+    context:()=>ipcRenderer.invoke(CH.dataContext),
+    onScope:cb=>on(CH.workflowScope,cb),
+    onChanged:cb=>on(CH.batchChanged,cb),
+    datasets:scope=>ipcRenderer.invoke(CH.dataList,scope),
+    preview:(scope,id)=>ipcRenderer.invoke(CH.dataPreview,scope,id),
+    attach:scope=>ipcRenderer.invoke(CH.dataAttach,scope),
+    paste:(scope,text,name)=>ipcRenderer.invoke(CH.dataPaste,scope,text,name),
+    list:()=>ipcRenderer.invoke(CH.workflowList),
+    trace:scope=>ipcRenderer.invoke(CH.workflowTrace,scope),
+    saveTrace:(scope,name,successText,datasetId,variables)=>ipcRenderer.invoke(CH.workflowSave,scope,name,successText,datasetId,variables),
+    update:workflow=>ipcRenderer.invoke(CH.workflowUpdate,workflow),
+    import:()=>ipcRenderer.invoke(CH.workflowImport),
+    export:id=>ipcRenderer.invoke(CH.workflowExport,id),
+    batches:scope=>ipcRenderer.invoke(CH.batchList,scope),
+    start:spec=>ipcRenderer.invoke(CH.batchStart,spec),
+    control:(scope,id,action)=>ipcRenderer.invoke(CH.batchControl,scope,id,action),
+    report:(scope,id)=>ipcRenderer.invoke(CH.batchReport,scope,id),
+    exportReport:(scope,id,format)=>ipcRenderer.invoke(CH.batchExport,scope,id,format),
+  },
+
+  sitePermissions:{list:()=>ipcRenderer.invoke(CH.sitePermissionsList),revoke:origin=>ipcRenderer.invoke(CH.sitePermissionsRevoke,origin)},
+  files:{
+    preview:(sessionId,id)=>ipcRenderer.invoke(CH.filePreview,sessionId,id),
+    attach:sessionId=>ipcRenderer.invoke(CH.fileAttach,sessionId),
+    list:sessionId=>ipcRenderer.invoke(CH.fileList,sessionId),
+    remove:(sessionId,fileId)=>ipcRenderer.invoke(CH.fileRemove,sessionId,fileId),
+  },
+
   sessions: {
     list: () => ipcRenderer.invoke(CH.sessionList),
     load: (id) => ipcRenderer.invoke(CH.sessionLoad, id),
@@ -128,8 +160,12 @@ const api: ShellApi = {
   integrations: {
     mcpStatus: () => ipcRenderer.invoke(CH.mcpStatus),
     mcpReload: () => ipcRenderer.invoke(CH.mcpReload),
+    mcpApprove:(name,fingerprint)=>ipcRenderer.invoke(CH.mcpApprove,name,fingerprint),
+    mcpRevoke:name=>ipcRenderer.invoke(CH.mcpRevoke,name),
     pluginStatus: () => ipcRenderer.invoke(CH.pluginStatus),
     pluginReload: () => ipcRenderer.invoke(CH.pluginReload),
+    pluginApprove:(id,fingerprint)=>ipcRenderer.invoke(CH.pluginApprove,id,fingerprint),
+    pluginRevoke:id=>ipcRenderer.invoke(CH.pluginRevoke,id),
     openPluginFolder: () => ipcRenderer.send(CH.pluginOpenFolder),
   },
 

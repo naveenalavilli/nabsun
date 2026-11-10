@@ -10,7 +10,7 @@ async function main() {
     await win.loadURL('data:text/html,<main id="settings-body"></main>');
     await win.webContents.executeJavaScript(`(async () => {
       ${bundle.outputFiles[0].text}
-      let settings = { provider: 'local', baseUrls: {}, alwaysAllowTools: [], autoApprove: { safe: true, write: true, dangerous: true } };
+      let settings = { provider: 'local', baseUrls: {}, alwaysAllowTools: [], autoApprove: { safe: true, write: true, dangerous: false } };
       window.nabsun = {
         settings: { set: async patch => {
           await new Promise(r => setTimeout(r, 10));
@@ -27,7 +27,7 @@ async function main() {
         input.checked = checked;
         input.dispatchEvent(new Event('change'));
       };
-      toggle('Run high-risk actions', false);
+      toggle('Autopilot', false);
       await view.approvalSave;
       toggle('Run read-only actions', false);
       await view.approvalSave;
@@ -36,6 +36,10 @@ async function main() {
       toggle('Run read-only actions', true);
       await view.approvalSave;
       if (settings.autoApprove.dangerous || settings.autoApprove.write || !settings.autoApprove.safe) throw Error('Rapid toggles lost an edit');
+      view.setIntegrationControl('plugins',false);view.setIntegrationControl('mcp',false);await view.integrationSave;
+      if(settings.integrationControls.plugins || settings.integrationControls.mcp || !settings.integrationControls.extensions)throw Error('Integration toggles lost a revocation');
+      view.setIntegrationControl('extensions',false);view.setIntegrationControl('plugins',true);await view.integrationSave;
+      if(!settings.integrationControls.plugins || settings.integrationControls.mcp || settings.integrationControls.extensions)throw Error('Rapid integration toggles restored a disabled integration');
     })()`);
     console.log('PASS sequential and rapid permission toggles preserve revoked permissions');
   } finally { win.destroy(); }

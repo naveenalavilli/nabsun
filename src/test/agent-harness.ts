@@ -19,6 +19,7 @@ import type { AgentEvent, AgentQuestion, ProviderId, ToolSpec } from '../shared/
 import type { ModelMessage } from '../main/ai/provider';
 import { Agent, estimateTokens, fitToContext, pruneHistory, addUsage } from '../main/ai/agent';
 import { ApprovalManager } from '../main/ai/approvals';
+import {FileAuditSink} from '../main/ai/audit';
 import { QuestionManager } from '../main/ai/questions';
 import type { Provider, StreamEvent, StreamRequest } from '../main/ai/provider';
 import { SessionStore } from '../main/ai/sessions';
@@ -254,6 +255,10 @@ app.whenReady().then(async () => {
   const approvalPrompts: string[] = [];
   approvals.setEmitter((req) => {
     approvalPrompts.push(req.toolName);
+    // File fixture pages have no web origin and therefore cannot use autopilot.
+    if(req.toolName==='browser_type'||req.toolName==='browser_click'){
+      approvals.resolve(req.id,'allow');return;
+    }
     // Deny, so we also prove a denial stops the action rather than proceeding.
     approvals.resolve(req.id, 'deny');
   });
@@ -345,6 +350,13 @@ app.whenReady().then(async () => {
       JSON.stringify(approvalPrompts),
     );
     check('the denied tool reports denied', byName('browser_evaluate')?.status === 'denied');
+    {
+      const journal=new FileAuditSink(tmp),records=journal.days().flatMap(day=>journal.records(day));
+      const intents=records.filter(record=>record.event.phase==='intent'),results=records.filter(record=>record.event.phase==='result');
+      check('every attempted tool has a journal intent and result',intents.length===4&&results.length===4&&intents.every(intent=>results.some(result=>result.event.actionId===intent.event.actionId)));
+      check('journal records approved writes and denied JavaScript',results.some(record=>record.event.tool==='browser_type'&&record.event.status==='ok')&&results.some(record=>record.event.tool==='browser_evaluate'&&record.event.status==='denied'));
+      check('typed text never appears verbatim in the journal',!JSON.stringify(records).includes('agent@example.com'));
+    }
     check(
       'a denial is fed back to the model as an error result',
       /declined/i.test(byName('browser_evaluate')?.result ?? ''),

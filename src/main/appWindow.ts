@@ -51,7 +51,7 @@ export class AppWindow {
   private lastWindowState: WindowState | null = null;
   private lastContentRect = { x: 0, y: 0, width: 0, height: 0 };
   private readonly onTabsUpdated = () => this.pushState();
-  private workspaceName: 'settings' | 'onboarding' | null = null;
+  private workspaceName: 'settings' | 'onboarding' | 'workflows' | 'activity' | null = null;
   private workspaceOpen = false;
   private sidebarOpen: boolean;
   private sidebarWidth: number;
@@ -249,7 +249,7 @@ export class AppWindow {
     this.pushState();
   }
 
-  openWorkspace(name: 'settings' | 'onboarding' | null) {
+  openWorkspace(name: 'settings' | 'onboarding' | 'workflows' | 'activity' | null) {
     if (this.disposed || this.window.isDestroyed()) return;
     this.workspaceName = name;
     this.workspaceOpen = name !== null;

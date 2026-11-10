@@ -66,11 +66,10 @@ const INTERACTIVE_ROLES = new Set([
 /* ------------------------------------------------------------- utilities -- */
 
 function isVisible(el: Element): boolean {
-  const style = window.getComputedStyle(el);
-  if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
-    return false;
+  for(let current:Element|null=el;current;current=current.parentElement??((current.getRootNode() as ShadowRoot).host??null)){
+    const style=window.getComputedStyle(current);
+    if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||Number(style.opacity)===0||(current as HTMLElement).inert)return false;
   }
-  if (Number(style.opacity) === 0) return false;
   const rect = el.getBoundingClientRect();
   // Zero-size elements are invisible unless they legitimately wrap content
   // (some layouts collapse containers whose children are absolutely placed).
@@ -132,7 +131,7 @@ function accessibleName(el: Element): string {
   if (labelledBy) {
     const parts = labelledBy
       .split(/\s+/)
-      .map((id) => document.getElementById(id))
+      .map((id) => (el.getRootNode() as Document | ShadowRoot).getElementById(id))
       .filter(Boolean)
       .map((n) => clean((n as HTMLElement).innerText || n!.textContent));
     if (parts.length) return parts.join(' ');
@@ -329,7 +328,7 @@ function describe(el: Element, ref: string): ElementInfo {
     if (el.type === 'checkbox' || el.type === 'radio') info.checked = el.checked;
     // Any credential-bearing field, not only type=password: a one-time code
     // sits in a plain text input and was appearing in snapshots in full.
-    else if (!isCredentialField(el)) info.value = el.value.slice(0, 200);
+    else if (!withinCredentialField(el)) info.value = el.value.slice(0, 200);
     if (el.placeholder) info.placeholder = el.placeholder;
   }
   if (el instanceof HTMLTextAreaElement) {
@@ -337,10 +336,10 @@ function describe(el: Element, ref: string): ElementInfo {
     // serialisation branch does not call it: a textarea carrying a one-time
     // code went straight into the snapshot while the input beside it was
     // correctly redacted.
-    if (!isCredentialField(el)) info.value = el.value.slice(0, 200);
+    if (!withinCredentialField(el)) info.value = el.value.slice(0, 200);
     if (el.placeholder) info.placeholder = el.placeholder;
   }
-  if (el instanceof HTMLSelectElement && !isCredentialField(el)) info.value = el.value;
+  if (el instanceof HTMLSelectElement && !withinCredentialField(el)) info.value = el.value;
   const expanded = el.getAttribute('aria-expanded');
   if (expanded !== null) info.expanded = expanded === 'true';
   if (isDisabled(el)) info.disabled = true;
@@ -402,8 +401,15 @@ function buildSnapshot(opts: SnapshotOptions = {}): Snapshot {
     chars += line.length + 1;
   };
 
+  const visited=new WeakSet<Element>();
+  const children=(node:Element,depth:number)=>{
+    if(node.shadowRoot){push(`${'  '.repeat(Math.min(depth,8))}- shadow root (open)`);for(const child of Array.from(node.shadowRoot.children))walk(child,depth+1)}
+    const assigned=node instanceof HTMLSlotElement?node.assignedElements({flatten:true}):[];
+    for(const child of assigned.length?assigned:Array.from(node.children))walk(child,depth+1);
+  };
   const walk = (node: Element, depth: number) => {
-    if (truncated) return;
+    if (truncated || visited.has(node)) return;
+    visited.add(node);
     if (SKIP_TAGS.has(node.tagName)) return;
     if (node.getAttribute('aria-hidden') === 'true') return;
     if (!isVisible(node)) return;
@@ -425,7 +431,7 @@ function buildSnapshot(opts: SnapshotOptions = {}): Snapshot {
       // Inputs and buttons rarely have meaningful element children worth
       // descending into; links and custom widgets sometimes do.
       if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(node.tagName)) return;
-      for (const child of Array.from(node.children)) walk(child, depth + 1);
+      children(node,depth);
       return;
     }
 
@@ -448,7 +454,7 @@ function buildSnapshot(opts: SnapshotOptions = {}): Snapshot {
       push(`${indent}${directText}`);
     }
 
-    for (const child of Array.from(node.children)) walk(child, depth + 1);
+    children(node,depth);
   };
 
   const root = document.body ?? document.documentElement;
@@ -457,7 +463,7 @@ function buildSnapshot(opts: SnapshotOptions = {}): Snapshot {
   return {
     url: location.href,
     title: document.title,
-    text: lines.join('\n'),
+    text: lines.join('\n') + (document.querySelector('*') ? '\nClosed shadow roots cannot be inspected; use a screenshot if a control is missing.' : ''),
     elements,
     scroll: {
       x: Math.round(window.scrollX),
@@ -513,6 +519,79 @@ function scrollIntoView(el: Element) {
 function centerOf(el: Element): { x: number; y: number } {
   const r = el.getBoundingClientRect();
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/** Resolve and hit-test only. Trusted input is dispatched by the main process. */
+function prepareInput(ref: unknown, mode: 'pointer' | 'text' = 'pointer') {
+  const el = resolveActionable(ref);
+  if (mode === 'text') assertTextTarget(el, ref);
+  scrollIntoView(el);
+  const r = el.getBoundingClientRect();
+  const left = Math.max(0, r.left), right = Math.min(innerWidth, r.right);
+  const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom);
+  if (right <= left || bottom <= top) throw new Error('Target is outside the viewport.');
+  const x = (left + right) / 2, y = (top + bottom) / 2;
+  let hit = document.elementFromPoint(x, y);
+  while (hit?.shadowRoot) {
+    const deeper = hit.shadowRoot.elementFromPoint(x, y);
+    if (!deeper || deeper === hit) break;
+    hit = deeper;
+  }
+  if (!hit || (hit !== el && !el.contains(hit))) {
+    throw new Error(`Target is covered by ${hit ? hit.tagName.toLowerCase() : 'another surface'}. No input was sent.`);
+  }
+  return { x, y, width:r.width, height:r.height, role:implicitRole(el), name:accessibleName(el),
+    type:el instanceof HTMLInputElement ? el.type : '',
+    multiline:el instanceof HTMLTextAreaElement || (el as HTMLElement).isContentEditable,
+    value:mode === 'text' ? inputValue(el) : undefined };
+}
+function assertTextTarget(el: Element, ref: unknown) {
+  if (withinCredentialField(el)) throw new Error(`Element ref=${ref} is a password or one-time-code field. The assistant does not enter credentials.`);
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement).isContentEditable)) throw new Error('Target is not a text field.');
+  if ((el as HTMLInputElement).readOnly) throw new Error('Target is read-only.');
+  if (el instanceof HTMLInputElement && ['file','checkbox','radio','button','submit','reset','image','color','range','hidden'].includes(el.type)) throw new Error('Target does not accept text input.');
+}
+function inputValue(el: Element): string {
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? el.value : (el as HTMLElement).innerText;
+}
+function describeTarget(ref:unknown){
+  const el=resolveActionable(ref),credential=withinCredentialField(el);
+  const form=el instanceof HTMLInputElement||el instanceof HTMLButtonElement?el.form:null;
+  return {role:implicitRole(el),name:accessibleName(el),origin:location.origin,placeholder:el.getAttribute('placeholder')??undefined,
+    cssHint:el.id?'#'+CSS.escape(el.id):el.tagName.toLowerCase(),credential,
+    value:!credential&&!(el instanceof HTMLInputElement&&el.type==='file')&&(el instanceof HTMLInputElement||el instanceof HTMLTextAreaElement||el instanceof HTMLSelectElement||(el as HTMLElement).isContentEditable)?inputValue(el):undefined,
+    checked:el instanceof HTMLInputElement&&['checkbox','radio'].includes(el.type)?el.checked:el.hasAttribute('aria-checked')?el.getAttribute('aria-checked')==='true':undefined,
+    submits:!!form&&(el instanceof HTMLButtonElement?el.type==='submit':el instanceof HTMLInputElement&&['submit','image'].includes(el.type)),formAction:(el instanceof HTMLButtonElement||el instanceof HTMLInputElement)&&el.hasAttribute('formaction')?el.formAction:form?.action};
+}
+function keyboardTarget(){
+  let element=document.activeElement;
+  while(element?.shadowRoot?.activeElement)element=element.shadowRoot.activeElement;
+  return {credential:!!element&&withinCredentialField(element),file:element instanceof HTMLInputElement&&element.type==='file',frame:element instanceof HTMLIFrameElement};
+}
+function uploadTarget(ref:unknown){
+  const el=resolveActionable(ref);
+  if(!(el instanceof HTMLInputElement)||el.type!=='file')throw new Error('Target is not a file upload input.');
+  return prepareInput(ref);
+}
+function selectionTarget(ref:unknown) {
+  const el=resolveActionable(ref);
+  if(!(el instanceof HTMLSelectElement))throw new Error('Target is not a select element.');
+  if(withinCredentialField(el))throw new Error('The assistant does not enter credentials.');
+  return {multiple:el.multiple,options:Array.from(el.options).map(option=>({value:option.value,label:clean(option.text),disabled:option.disabled||!!option.closest('optgroup[disabled]')})),value:el.value};
+}
+function checkedTarget(ref:unknown) {
+  const el=resolveActionable(ref);
+  if(el instanceof HTMLInputElement && ['checkbox','radio'].includes(el.type))return el.checked;
+  if(['checkbox','radio','switch'].includes(implicitRole(el)))return el.getAttribute('aria-checked')==='true';
+  throw new Error('Target is not a checkbox, radio, or switch.');
+}
+function focusedInput(ref: unknown) {
+  const el = resolveActionable(ref);
+  assertTextTarget(el, ref);
+  let focused = document.activeElement;
+  while (focused?.shadowRoot?.activeElement) focused = focused.shadowRoot.activeElement;
+  if (focused !== el && !el.contains(focused)) throw new Error('Focus moved away from the approved field. Input stopped.');
+  return { value:inputValue(el) };
 }
 
 function fireMouse(el: Element, type: string, x: number, y: number) {
@@ -605,7 +684,7 @@ function isCredentialField(el: Element): boolean {
  * upwards, is what all of them needed.
  */
 function withinCredentialField(el: Element | null): boolean {
-  for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+  for (let cur: Element | null = el; cur; cur = cur.parentElement ?? ((cur.getRootNode() as ShadowRoot).host ?? null)) {
     if (isCredentialField(cur)) return true;
   }
   return false;
@@ -666,7 +745,7 @@ function withHidden<T>(root: Element, extraSelectors: string[], read: (root: Ele
 
 function fillRef(ref: unknown, text: string, submit: boolean): string {
   const el = resolveActionable(ref);
-  if (isCredentialField(el)) {
+  if (withinCredentialField(el)) {
     throw new Error(
       `Element ref=${ref} is a password or one-time-code field. The assistant does ` +
         'not enter credentials — the user should type this, or use saved passwords.',
@@ -946,6 +1025,13 @@ function readyState(): { ready: boolean; state: string; pendingImages: number } 
 const api = {
   version: 1,
   snapshot: (opts?: SnapshotOptions) => buildSnapshot(opts),
+  describeTarget,
+  keyboardTarget,
+  uploadTarget,
+  selectionTarget,
+  checkedTarget,
+  prepareInput,
+  focusedInput,
   click: clickRef,
   fill: fillRef,
   select: selectRef,

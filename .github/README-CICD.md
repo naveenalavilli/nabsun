@@ -7,6 +7,7 @@
 
 | Job | Purpose |
 | --- | --- |
+| `verify-action-workflows` | Trusted input, frames, attachments, delegation, replay/recovery, approvals, audit and integration isolation on Windows, macOS and Linux |
 | `verify-connections` | CLI installation, authentication interface, cleanup, and UI checks on Windows, macOS, and Linux |
 | `verify` | Windows build, type checking, regression checks, and local inference |
 | `verify-macos` | macOS verification, local inference, and packaged application checks |
@@ -20,6 +21,11 @@ Local inference must run with the bundled model; missing resources fail the CI s
 Model weights are cached and verified after restoration. Native engines use
 pinned downloads. Packaging checks the shipped engine, weights, and licenses.
 Linux connection checks do not imply Linux release support.
+
+The separate [task-benchmark workflow](workflows/benchmark.yml) requires all 111
+scripted attempts to pass on Windows and macOS for pull requests. Its scheduled
+local-model run records actual planner performance; scripted success does not
+establish model accuracy. Packaging also waits for the action-workflow matrix.
 
 ## Download artifacts
 

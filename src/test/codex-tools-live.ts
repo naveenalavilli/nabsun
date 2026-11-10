@@ -76,6 +76,10 @@ async function main() {
     cwd: os.tmpdir(),
     env: {
       ...process.env,
+      NABSUN_BRIDGE_URL:bridge.url,
+      NABSUN_BRIDGE_TOKEN:bridge.token,
+      ELECTRON_RUN_AS_NODE:'1',
+      ELECTRON_NO_ATTACH_CONSOLE:'1',
       NO_COLOR: '1',
       ...(launcher.runAsNode ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
     },

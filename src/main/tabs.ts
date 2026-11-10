@@ -1,3 +1,5 @@
+import { FrameBridge } from './frameBridge';
+import type { PageSnapshot } from '../shared/types';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +13,7 @@ import type { HistoryStore } from './history';
 const AGENT_WORLD_ID = 1729;
 
 let bridgeSource: string | null = null;
+const frameBridge=new FrameBridge(loadBridgeSource);
 
 function loadBridgeSource(): string {
   if (bridgeSource) return bridgeSource;
@@ -483,13 +486,35 @@ export class TabManager extends EventEmitter {
   }
 
   private disposed = false;
+  private inspectorStates=new WeakMap<WebContents,{desired:'right'|'undocked'|null;mode?:'right'|'undocked';opening:boolean;closing:boolean;timer?:ReturnType<typeof setTimeout>}>();
   /** Chromium's own inspector supplies Elements, Console, Network, Sources, and more. */
   pageDevTools(action: 'toggle' | 'detach' = 'toggle') {
     if (this.disposed || this.opts.window.isDestroyed()) return;
     const wc = this.active?.liveWc;
     if (!wc) return;
-    if (action === 'toggle' && wc.isDevToolsOpened()) wc.closeDevTools();
-    else wc.openDevTools({ mode: action === 'detach' ? 'undocked' : 'right', activate: true });
+    let state=this.inspectorStates.get(wc);
+    if(!state){
+      state={desired:wc.isDevToolsOpened()?'right':null,opening:false,closing:false};this.inspectorStates.set(wc,state);
+      const current=state;
+      wc.on('devtools-opened',()=>{if(current.timer)clearTimeout(current.timer);current.opening=false;this.driveInspector(wc)});
+      wc.on('devtools-closed',()=>{if(current.timer)clearTimeout(current.timer);current.opening=false;const requested=current.closing;current.closing=false;current.mode=undefined;if(!requested)current.desired=null;this.driveInspector(wc)});
+      wc.once('destroyed',()=>{if(current.timer)clearTimeout(current.timer);this.inspectorStates.delete(wc)});
+    }
+    state.desired=action==='detach'?'undocked':state.desired!==null||wc.isDevToolsOpened()?null:'right';
+    this.driveInspector(wc);
+  }
+  private driveInspector(wc:WebContents){
+    const state=this.inspectorStates.get(wc);if(!state||this.disposed||this.opts.window.isDestroyed()||wc.isDestroyed()||state.opening||state.closing)return;
+    if(wc.isDevToolsOpened()){
+      if(state.desired===null||state.desired!==state.mode){state.closing=true;wc.closeDevTools()}
+      return;
+    }
+    if(state.desired===null)return;
+    state.mode=state.desired;state.opening=true;
+    // Wait for close/open acknowledgements: isDevToolsOpened becomes false
+    // before teardown completes, so opening in the same tick can be discarded.
+    state.timer=setTimeout(()=>{state.opening=false;state.desired=null},5000);state.timer.unref();
+    wc.openDevTools({mode:state.desired,activate:true});
   }
   private updateTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -534,7 +559,24 @@ export class TabManager extends EventEmitter {
    * Evaluates an expression against the agent bridge in the tab's isolated
    * world, injecting the bridge first if this document has not seen it yet.
    */
+  refOrigin(tab:Tab,ref:string):string {
+    try{return new URL(frameBridge.origin(tab.wc,ref)??tab.url).origin}catch{return 'unknown origin'}
+  }
+
   async callBridge<T>(tab: Tab, expression: string, signal?: AbortSignal): Promise<T> {
+    const routed=await frameBridge.route(tab.wc,expression,signal);
+    if(routed.handled)return routed.value as T;
+    const result=await this.callMainBridge<T>(tab,expression,signal);
+    if(expression.startsWith('window.__nabsunAgent.snapshot(')){
+      const maxChars=Number(/maxChars:\s*(\d+)/.exec(expression)?.[1]??8000);
+      const snapshot=result as PageSnapshot;
+      snapshot.elements=snapshot.elements.map(element=>({...element,origin:this.refOrigin(tab,'')}));
+      return await frameBridge.append(tab.wc,snapshot,maxChars,signal) as T;
+    }
+    return result;
+  }
+
+  private async callMainBridge<T>(tab: Tab, expression: string, signal?: AbortSignal): Promise<T> {
     const wc = tab.wc;
 
     /**

@@ -1,3 +1,10 @@
+import type {DataWorkspace} from './data/workspace';
+import type {SitePermissions} from './sitePermissions';
+import {VoiceManager} from './voice';
+import {applyBrowserNetwork,defaultNetwork,validateNetwork} from './browserNetwork';
+import {csvReport} from './data/batches';
+import {readJson} from './data/storage';
+import type {Workflow} from '../shared/workflows';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog, session, shell } from 'electron';
@@ -39,7 +46,10 @@ import type { PasswordStore } from './passwords';
 import type { SecretStore, SettingsStore } from './store';
 
 export interface IpcDeps {
+  voice?:VoiceManager;
+  sitePermissions?:SitePermissions;
   win: AppWindow;
+  dataWorkspace?:DataWorkspace;
   settings: SettingsStore;
   secrets: SecretStore;
   history: HistoryStore;
@@ -79,6 +89,21 @@ export function registerIpc(deps: IpcDeps): void {
   ]);
 
   const updates = new UpdateChecker(app.getVersion());
+  const voice=deps.voice??new VoiceManager();
+  for(const contents of [win.assistant.webContents,win.shell.webContents]){const owner=contents.id;contents.once('destroyed',()=>voice.stop(owner))}
+  win.window.once('closed',()=>voice.stop());
+  win.assistant.on('hide',()=>voice.stop());
+  win.assistant.on('minimize',()=>voice.stop());
+  win.window.on('minimize',()=>voice.stop());
+  ipcMain.handle(CH.voiceAvailability,()=>voice.availability());
+  ipcMain.handle(CH.voiceStart,async(event,sessionId:string,requestId:string,language:string)=>{
+    if(!sessions.load(sessionId))throw Error('Open a chat before starting dictation.');
+    await voice.start(event.sender.id,sessionId,requestId,language,payload=>{if(!event.sender.isDestroyed())event.sender.send(CH.voiceEvent,payload)},async()=>{
+      const choice=await dialog.showMessageBox({type:'question',title:'Use microphone for this chat?',message:'Speak to draft your message',detail:'Nabsun will use Windows speech recognition on this computer for up to one minute. Audio is not sent to your AI provider or saved by Nabsun. Review the words and press Send yourself.',buttons:['Cancel','Start dictation'],defaultId:0,cancelId:0,noLink:true});
+      return choice.response===1&&!!sessions.load(sessionId)&&!event.sender.isDestroyed();
+    });
+  });
+  ipcMain.on(CH.voiceStop,(event,requestId:string)=>voice.stop(event.sender.id,requestId));
   ipcMain.handle(CH.updateCheck, (_event, manual?: boolean) => updates.check(manual === true));
   ipcMain.handle(CH.updateOpen, () => shell.openExternal(RELEASE_PAGE));
 
@@ -98,6 +123,7 @@ export function registerIpc(deps: IpcDeps): void {
   });
   ipcMain.on(CH.tabReorder, (_e, id: string, index: number) => win.tabs.reorder(id, index));
   ipcMain.on(CH.tabNavigate, (_e, id: string, input: string) => {
+    if(typeof input==='string'&&/^nabsun:\/\/activity\/?$/i.test(input.trim())){win.openWorkspace('activity');return}
     win.openWorkspace(null);
     win.tabs.navigate(id, resolveNavigationInput(input, settings.get().searchEngine));
   });
@@ -136,13 +162,14 @@ export function registerIpc(deps: IpcDeps): void {
     else win.window.maximize();
   });
   ipcMain.on(CH.winClose, () => win.window.close());
-  ipcMain.on(CH.sidebarToggle, (_e, open?: boolean) => win.toggleSidebar(open));
+  ipcMain.on(CH.sidebarToggle, (_e, open?: boolean) => {voice.stop();win.toggleSidebar(open)});
   ipcMain.on(CH.sidebarResize, (_e, width: number) => win.resizeSidebar(width));
   ipcMain.on(CH.starterPrompt, (_e, prompt: unknown) => {
     if (typeof prompt === 'string' && prompt.length <= 2000) win.showAssistantCommand({ command: 'prefill-prompt', arg: prompt });
   });
   ipcMain.on(CH.workspace, (_e, name: unknown) => {
-    if (name === null || name === 'settings' || name === 'onboarding') win.openWorkspace(name);
+    voice.stop();
+    if (name === null || name === 'settings' || name === 'onboarding' || name === 'workflows' || name === 'activity') win.openWorkspace(name);
   });
   ipcMain.on(CH.pageDevTools, (_e, action: unknown) => {
     if (action === 'toggle' || action === 'detach') {
@@ -182,7 +209,7 @@ export function registerIpc(deps: IpcDeps): void {
   );
 
   ipcMain.on(CH.overlayShow, (_e, kind: 'omnibox' | 'palette', payload?: unknown) => {
-    win.showOverlay(kind, payload ?? {});
+    win.showOverlay(kind,kind==='palette'?{...(payload&&typeof payload==='object'?payload:{}),workflows:deps.dataWorkspace?.workflows.list().map(({id,name})=>({id,name}))??[]}:payload??{});
   });
   ipcMain.on(CH.overlayClose, () => win.hideOverlay());
   ipcMain.on(CH.overlayCommand, (_e, command: string, arg?: unknown) => {
@@ -216,13 +243,67 @@ export function registerIpc(deps: IpcDeps): void {
     questions.answer(id, typeof text === 'string' ? text : null);
   });
 
+  ipcMain.handle(CH.fileList,(_event,sessionId:string)=>sessions.load(sessionId)?agent.files?.list(sessionId)??[]:[]);
+  ipcMain.handle(CH.filePreview,(_event,sessionId:string,id:string)=>{
+    if(!sessions.load(sessionId)||!agent.files)throw Error('Chat not found.');
+    if(!agent.files.isImage(sessionId,id))return null;
+    const image=agent.files.image(sessionId,id,true);return `data:${image.mediaType};base64,${image.data}`;
+  });
+  ipcMain.handle(CH.fileAttach,async(_event,sessionId:string)=>{
+    if(!sessions.load(sessionId)||!agent.files)throw Error('Open a chat before attaching files.');
+    const selection=await dialog.showOpenDialog({title:'Attach files to this chat',properties:['openFile','multiSelections']});
+    if(!selection.canceled)for(const file of selection.filePaths){if(!sessions.load(sessionId))throw Error('This chat was closed.');agent.files.attach(sessionId,file)}
+    return agent.files.list(sessionId);
+  });
+  ipcMain.handle(CH.fileRemove,(_event,sessionId:string,id:string)=>{if(!sessions.load(sessionId))throw Error('Chat not found.');agent.files?.remove(sessionId,id)});
+
+  const data=()=>{if(!deps.dataWorkspace)throw Error('Data workspace is unavailable.');return deps.dataWorkspace};
+  ipcMain.handle(CH.dataOpen,async(_event,scope:string,workflowId?:string)=>{await data().open(scope);win.send(CH.workflowScope,{scope,workflowId});win.openWorkspace('workflows')});
+  ipcMain.handle(CH.dataContext,()=>deps.dataWorkspace?.scope??null);
+  ipcMain.handle(CH.dataList,(_event,scope:string)=>{data().check(scope);return data().datasets.list(scope)});
+  ipcMain.handle(CH.dataPreview,(_event,scope:string,id:string)=>{data().check(scope);return data().datasets.get(scope,id).rows.slice(0,5)});
+  ipcMain.handle(CH.dataAttach,async(_event,scope:string)=>{
+    data().check(scope);if(!agent.files)throw Error('Attachments are unavailable.');
+    const selected=await dialog.showOpenDialog({title:'Add a table',properties:['openFile'],filters:[{name:'Tables',extensions:['csv','tsv','xlsx']}]});
+    if(selected.canceled)return null;const file=agent.files.attach(scope,selected.filePaths[0]);
+    try{return await data().datasets.fromFile(scope,file.id)}finally{agent.files.remove(scope,file.id)}
+  });
+  ipcMain.handle(CH.dataPaste,(_event,scope:string,text:string,name:string)=>{data().check(scope);if(typeof text!=='string'||typeof name!=='string')throw Error('Invalid pasted table.');return data().datasets.paste(scope,text,name)});
+  ipcMain.handle(CH.workflowList,()=>deps.dataWorkspace?.workflows.list()??[]);
+  ipcMain.handle(CH.sitePermissionsList,()=>deps.sitePermissions?.list()??[]);
+  ipcMain.handle(CH.activityList,(_event,day?:string)=>{const store=agent.activityStore();store.verify();const days=store.days();return {days,records:days.length?store.records(day??days.at(-1)!):[]}});
+  ipcMain.handle(CH.activityExport,async(_event,day:string)=>{const store=agent.activityStore();if(!store.days().includes(day))throw Error('Activity day not found.');const selected=await dialog.showSaveDialog({title:'Export activity journal',defaultPath:'nabsun-activity-'+day+'.jsonl',filters:[{name:'Activity journal',extensions:['jsonl']}]});if(!selected.canceled&&selected.filePath)store.exportDay(day,selected.filePath)});
+  ipcMain.handle(CH.sitePermissionsRevoke,(_event,origin?:string)=>{if(origin!==undefined&&typeof origin!=='string')throw Error('Invalid origin.');deps.sitePermissions?.revoke(origin)});
+  ipcMain.handle(CH.workflowTrace,(_event,scope:string)=>{data().check(scope);return agent.recordedTask(scope)});
+  ipcMain.handle(CH.workflowSave,(_event,scope:string,name:string,successText:string,datasetId?:string,variables?:Record<string,string>)=>data().saveTrace(scope,name,successText,datasetId,variables));
+  ipcMain.handle(CH.workflowUpdate,(_event,workflow:Workflow)=>data().workflows.save(workflow));
+  ipcMain.handle(CH.workflowImport,async()=>{const selected=await dialog.showOpenDialog({title:'Import workflow',properties:['openFile'],filters:[{name:'Workflow JSON',extensions:['json']}]});if(selected.canceled)return null;return data().workflows.import(readJson(selected.filePaths[0],1024*1024))});
+  ipcMain.handle(CH.workflowExport,async(_event,id:string)=>{const workflow=data().workflows.get(id);const selected=await dialog.showSaveDialog({title:'Export workflow',defaultPath:'nabsun-workflow.json',filters:[{name:'Workflow JSON',extensions:['json']}]});if(!selected.canceled&&selected.filePath)await fs.promises.writeFile(selected.filePath,JSON.stringify(workflow,null,2),{mode:0o600})});
+  ipcMain.handle(CH.batchList,(_event,scope:string)=>{data().check(scope);return data().batches.list(scope)});
+  ipcMain.handle(CH.batchStart,(_event,spec:Parameters<DataWorkspace['start']>[0])=>{data().check(spec.scope);win.openWorkspace(null);try{return data().start(spec)}catch(error){win.openWorkspace('workflows');throw error}});
+  ipcMain.handle(CH.batchControl,async(_event,scope:string,id:string,action:string)=>{data().check(scope);switch(action){case 'pause':return data().runner.pause(scope,id);case 'resume':win.openWorkspace(null);try{return data().runner.resume(scope,id)}catch(error){win.openWorkspace('workflows');throw error}case 'stop':return data().runner.stop(scope,id);case 'skip':return data().runner.skip(scope,id);case 'complete':return data().runner.markComplete(scope,id);case 'review-skip':return data().runner.reconcile(scope,id,'skip');case 'retry':return data().runner.reconcile(scope,id,'retry');default:throw Error('Unknown batch action.')}});
+  ipcMain.handle(CH.batchReport,(_event,scope:string,id:string)=>{data().check(scope);const batch=data().batches.get(scope,id);const start=Math.max(0,Math.min(batch.cursor-10,batch.rowCount-50));const rows=Array.from({length:Math.min(50,batch.rowCount)},(_,index)=>data().batches.row(batch,start+index+1)??{row:start+index+1,status:'pending',steps:0,durationMs:0,inputTokens:0,outputTokens:0,modelCalls:0,repairs:0,targets:[]});return {batch,rows:rows.map(row=>({...row,entries:('entries' in row?row.entries:undefined)?.map(entry=>({...entry,value:entry.value.slice(0,500)}))}))}});
+  ipcMain.handle(CH.batchExport,async(_event,scope:string,id:string,format:string)=>{
+    data().check(scope);if(!['csv','json'].includes(format))throw Error('Unsupported report format.');const batch=data().batches.get(scope,id),chunks:string[]=[];let bytes=0;
+    for(let row=1;row<=batch.rowCount;row++){
+      const file=path.join(data().batches.dir,batch.id,'rows',row+'.json');let record:unknown;
+      try{record=JSON.parse(await fs.promises.readFile(file,'utf8'))}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;record={row,status:'pending',steps:0,durationMs:0,inputTokens:0,outputTokens:0,modelCalls:0,repairs:0,targets:[]}}
+      const chunk=format==='csv'?csvReport({batch,rows:[record as ReturnType<DataWorkspace['batches']['report']>['rows'][0]]}).split('\n').slice(row===1?0:1).filter(Boolean).join('\n')+'\n':JSON.stringify(record);
+      bytes+=Buffer.byteLength(chunk);if(bytes>50*1024*1024)throw Error('Report exceeds the 50 MB export limit.');chunks.push(chunk);
+    }
+    const text=format==='csv'?chunks.join(''):'{"batch":'+JSON.stringify(batch)+',"rows":['+chunks.join(',')+']}';
+    const selected=await dialog.showSaveDialog({title:'Export run report',defaultPath:'nabsun-run.'+format,filters:[{name:'Run report',extensions:[format]}]});if(!selected.canceled&&selected.filePath)await fs.promises.writeFile(selected.filePath,text,{mode:0o600});
+  });
+
   /* ------------------------------------------------------------ sessions */
 
   ipcMain.handle(CH.sessionList, () => sessions.list());
-  ipcMain.handle(CH.sessionLoad, (_e, id: string) => sessions.load(id));
-  ipcMain.handle(CH.sessionNew, () => sessions.create());
+  ipcMain.handle(CH.sessionLoad, (_e, id: string) => {const loaded=sessions.load(id);if(loaded&&deps.dataWorkspace&&_e.sender===win.assistant.webContents)deps.dataWorkspace.scope=id;return loaded});
+  ipcMain.handle(CH.sessionNew, (_e) => {const created=sessions.create();if(deps.dataWorkspace&&_e.sender===win.assistant.webContents)deps.dataWorkspace.scope=created.id;return created});
   ipcMain.handle(CH.sessionDelete, (_e, id: string) => {
+    voice.stopSession(id);
     promptQueue.clear(id);
+    agent.cancelScope(id);
     sessions.remove(id);
   });
   ipcMain.handle(CH.sessionRename, (_e, id: string, title: string) => sessions.rename(id, title));
@@ -231,12 +312,17 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(CH.settingsGet, () => settings.get());
   ipcMain.handle(CH.settingsSet, async (_e, patch: Partial<Settings>) => {
+    if(patch.integrationControls&&(['plugins','mcp','extensions'].some(key=>typeof (patch.integrationControls as unknown as Record<string,unknown>)[key]!=='boolean')||Object.keys(patch.integrationControls).some(key=>!['plugins','mcp','extensions'].includes(key))))throw Error('Invalid integration controls.');
+    if(patch.auditRetentionDays!==undefined&&(!Number.isInteger(patch.auditRetentionDays)||patch.auditRetentionDays<7||patch.auditRetentionDays>365))throw Error('Choose 7 to 365 activity retention days.');
     const before = settings.get();
-    const next = settings.save(patch);
+    if(patch.browserNetwork){patch={...patch,browserNetwork:validateNetwork(patch.browserNetwork)};await applyBrowserNetwork(session.fromPartition('persist:nabsun'),patch.browserNetwork!)}
+    let next:Settings;
+    try{next=settings.save(patch)}catch(error){if(patch.browserNetwork)await applyBrowserNetwork(session.fromPartition('persist:nabsun'),before.browserNetwork??defaultNetwork);throw error}
     win.applySettings(next);
     if (patch.mcpServers && JSON.stringify(before.mcpServers) !== JSON.stringify(next.mcpServers)) {
       await deps.reloadIntegrations();
     }
+    if(patch.integrationControls&&JSON.stringify(before.integrationControls)!==JSON.stringify(next.integrationControls)){await deps.reloadIntegrations();win.hideExtensionPopup();await extensions.loadAll();win.send(CH.extChanged,extensions.status())}
     return next;
   });
 
@@ -497,13 +583,27 @@ export function registerIpc(deps: IpcDeps): void {
   /* -------------------------------------------------------- integrations */
 
   ipcMain.handle(CH.mcpStatus, () => mcp.status(settings.get().mcpServers));
+  ipcMain.handle(CH.mcpApprove,async(_event,name:string,fingerprint:string)=>{
+    const server=mcp.status(settings.get().mcpServers).find(server=>server.name===name);
+    if(!server||server.fingerprint!==fingerprint||!fingerprint)throw Error('MCP configuration changed. Reload and review it again.');
+    const answer=await dialog.showMessageBox({type:'question',title:'Approve MCP server',message:`Allow ${name} to run?`,detail:`Executable: ${server.resolvedCommand}\nSource/configuration SHA-256: ${fingerprint}\n\nReview its command, arguments and environment in Settings. This server runs as your user and may access your files and network. Only approve code you trust. Reconnecting stops active MCP calls.`,buttons:['Cancel','Approve and connect'],defaultId:0,cancelId:0,noLink:true});
+    if(answer.response===1){const config=settings.get().mcpServers[name];if(!config)throw Error('MCP server removed.');await mcp.approve(name,fingerprint,config);await mcp.reload(settings.get().mcpServers)}return mcp.status(settings.get().mcpServers);
+  });
+  ipcMain.handle(CH.mcpRevoke,async(_event,name:string)=>{mcp.revoke(name);await mcp.reload(settings.get().mcpServers);return mcp.status(settings.get().mcpServers)});
   ipcMain.handle(CH.mcpReload, async () => {
     await deps.reloadIntegrations();
     return mcp.status(settings.get().mcpServers);
   });
   ipcMain.handle(CH.pluginStatus, () => plugins.status());
-  ipcMain.handle(CH.pluginReload, () => {
-    plugins.reload();
+  ipcMain.handle(CH.pluginApprove,async(_event,id:string,fingerprint:string)=>{
+    const plugin=plugins.status().find(plugin=>plugin.id===id);
+    if(!plugin||plugin.fingerprint!==fingerprint||!fingerprint)throw Error('Plugin changed. Reload and review it again.');
+    const answer=await dialog.showMessageBox({type:'question',title:'Approve plugin source',message:`Allow ${plugin.name} ${plugin.version}?`,detail:`Source: ${plugin.path}\nSHA-256: ${fingerprint}\n\nThe plugin can use the network and its own storage. Profile files and child processes are restricted. Browser actions use your approval settings; page JavaScript asks separately. Only approve code you trust. Approving reloads plugins and stops any active plugin tasks.`,buttons:['Cancel','Approve this source'],defaultId:0,cancelId:0,noLink:true});
+    if(answer.response===1)await plugins.approve(id,fingerprint);return plugins.status();
+  });
+  ipcMain.handle(CH.pluginRevoke,async(_event,id:string)=>{await plugins.revoke(id);return plugins.status()});
+  ipcMain.handle(CH.pluginReload, async () => {
+    await plugins.reload();
     return plugins.status();
   });
   ipcMain.on(CH.pluginOpenFolder, () => void shell.openPath(plugins.directory));
@@ -613,6 +713,7 @@ export function sanitizeSettings(incoming: Partial<Settings>): Partial<Settings>
   const clean: Record<string, unknown> = {};
   for (const [key, fallback] of Object.entries(DEFAULT_SETTINGS)) {
     if (!(key in incoming)) continue;
+    if(key==='browserNetwork'||key==='siteToolGrants'||key==='approvalVersion'||key==='approvalMigrationNotice'||key==='integrationControls')continue;
     const value = (incoming as Record<string, unknown>)[key];
     if (value === null || value === undefined) continue;
     // Imported configuration cannot authorize disclosure of existing local notes.
@@ -909,6 +1010,13 @@ export function handleCommand(deps: IpcDeps, command: string, arg?: unknown): vo
     case 'toggle-sidebar':
       win.toggleSidebar();
       break;
+    case 'open-workflows':
+    case 'run-workflow': {
+      const data=deps.dataWorkspace;if(!data)break;
+      const scope=data.scope??deps.sessions.list()[0]?.id??deps.sessions.create().id;
+      void data.open(scope).then(()=>{const workflowId=command==='run-workflow'?data.workflows.get(String(arg)).id:undefined;win.send(CH.workflowScope,{scope,workflowId});win.openWorkspace('workflows')}).catch(()=>{void dialog.showMessageBox({type:'info',message:'Could not open the workflow.',detail:'Open Data & workflows from Assistant options and try again.'})});
+      break;
+    }
     case 'open-settings':
       win.send(CH.overlayCommand, { command: 'open-settings' });
       break;

@@ -58,6 +58,8 @@ export class SessionStore {
    * the repair the comments used to claim without implementing.
    */
   private unsaved = new Map<string, ChatSession>();
+  /** Late streaming callbacks must not recreate a chat the user deleted. */
+  private removed = new Set<string>();
 
   constructor(userDataPath: string) {
     this.dir = path.join(userDataPath, 'sessions');
@@ -74,13 +76,17 @@ export class SessionStore {
     return { id, title: 'New chat', createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
   }
 
-  create(): ChatSession {
+  create(kind?: ChatSession['kind']): ChatSession {
     const session = this.blank(randomUUID());
+    if (kind) session.kind = kind;
     this.save(session);
     return session;
   }
 
+  isDeleted(id: string): boolean { return this.removed.has(id); }
+
   load(id: string): ChatSession | null {
+    if (this.removed.has(id)) return null;
     // Anything still waiting to be written is newer than the file by
     // definition, so it wins.
     const pending = this.unsaved.get(id);
@@ -108,6 +114,7 @@ export class SessionStore {
    * claimed the latter, and was wrong.
    */
   save(session: ChatSession) {
+    if (this.removed.has(session.id)) throw new Error('This chat was deleted.');
     session.updatedAt = Date.now();
     const target = this.file(session.id);
     const tmp = `${target}.tmp`;
@@ -170,6 +177,7 @@ export class SessionStore {
    * nothing at all.
    */
   appendBestEffort(id: string, message: ChatMessage): ChatSession {
+    if (this.removed.has(id)) throw new Error('This chat was deleted.');
     try {
       return this.append(id, message);
     } catch (err) {
@@ -213,14 +221,14 @@ export class SessionStore {
       if (!name.endsWith('.json')) continue;
       try {
         const s = JSON.parse(fs.readFileSync(path.join(this.dir, name), 'utf8')) as ChatSession;
-        if (s.messages.length) out.push({ id: s.id, title: s.title, updatedAt: s.updatedAt });
+        if (s.messages.length && s.kind !== 'batch-row') out.push({ id: s.id, title: s.title, updatedAt: s.updatedAt });
       } catch {
         /* skip unreadable session files rather than failing the whole list */
       }
     }
     const latest = new Map(out.map((s) => [s.id, s]));
     for (const s of this.unsaved.values()) {
-      if (s.messages.length) latest.set(s.id, { id: s.id, title: s.title, updatedAt: s.updatedAt });
+      if (s.messages.length && s.kind !== 'batch-row') latest.set(s.id, { id: s.id, title: s.title, updatedAt: s.updatedAt });
     }
     return [...latest.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   }
@@ -233,6 +241,7 @@ export class SessionStore {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
     this.unsaved.delete(id);
+    this.removed.add(id);
   }
 
   rename(id: string, title: string) {

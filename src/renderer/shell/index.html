@@ -67,6 +67,8 @@
             <section id="view-settings" class="view">
               <div id="settings-body"></div>
             </section>
+            <section id="view-workflows" class="view"><div id="workflows-body" class="data-page"></div></section>
+            <section id="view-activity" class="view"><div id="activity-body" class="data-page"></div></section>
             <section id="view-onboarding" class="view"><div id="onboarding-body" class="welcome"></div></section>
         </section>
 
@@ -83,6 +85,7 @@
                 <div class="assistant-options" aria-label="Assistant options">
                   <p class="assistant-menu-label">Assistant</p>
                   <button id="history-btn">Chat history</button>
+                  <button id="workflows-btn">Data &amp; workflows</button>
                   <button id="assistant-detach" title="Detach assistant into a separate window">Detach assistant</button>
                   <div id="assistant-zoom" role="group" aria-label="Assistant text size"><span>Text size</span><button id="assistant-zoom-out" title="Smaller text (Ctrl+-)" aria-label="Smaller text">A&#8722;</button><button id="assistant-zoom-reset" title="Reset text size (Ctrl+0)" aria-label="Reset text size">100%</button><button id="assistant-zoom-in" title="Larger text (Ctrl++)" aria-label="Larger text">A+</button></div>
                   <div class="assistant-menu-divider"></div>
@@ -103,8 +106,16 @@
             <section id="view-chat" class="view active">
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
+                <div id="batch-progress" aria-label="Batch progress" aria-live="polite" hidden></div>
+                <div id="attached-files" aria-label="Attached files" aria-live="polite" hidden></div>
+                <p id="attachment-status" class="hint" role="status"></p>
+                <div id="voice-controls" hidden>
+                  <label>Speech language <select id="voice-language" aria-label="Speech language"></select></label>
+                  <p id="voice-status" class="hint" role="status" aria-live="polite"></p>
+                </div>
                 <div id="prompt-queue" aria-label="Queued prompts" aria-live="polite" hidden></div>
                 <div id="composer-chips">
+                  <button id="attach-files" class="chip" title="Attach images, documents or data. Up to 20 files, 20 MB each; visual analysis up to 5 MB per image.">Attach images or files</button>
                   <label class="chip" title="Include text from the open page with your question. Turn off to ask without sharing the page.">
                     <input type="checkbox" id="attach-page" checked />
                     <span>Use this page</span>
@@ -117,6 +128,7 @@
                   <span id="step-badge" class="muted"></span>
                 </div>
                 <div class="composer-row">
+                  <button id="voice-toggle" class="icon-btn" title="Dictate a message" aria-label="Dictate a message" aria-pressed="false" aria-controls="voice-controls"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9a6 6 0 0 0 12 0M10 15v3M7 18h6"/></svg></button>
                   <textarea id="prompt" rows="1" placeholder="Ask about this page, or tell me what to do…" aria-label="Message the assistant"></textarea>
                   <button id="send" class="primary" aria-label="Send">Send</button>
                   <button id="stop" class="danger" hidden aria-label="Stop">Stop</button>

@@ -17,7 +17,7 @@ export class DownloadManager extends EventEmitter {
   private nextId = 1;
 
   attach(session: Session) {
-    session.on('will-download', (_event, item) => {
+    session.on('will-download', (_event, item, contents) => {
       const id = String(this.nextId++);
       const savePath = this.uniquePath(item.getFilename());
       item.setSavePath(savePath);
@@ -34,6 +34,7 @@ export class DownloadManager extends EventEmitter {
         paused: false,
       };
       this.items.set(id, { entry, item });
+      this.emit('created',entry,contents?.id);
       this.emit('change');
 
       item.on('updated', (_e, state) => {
@@ -48,6 +49,8 @@ export class DownloadManager extends EventEmitter {
         entry.state = state === 'completed' ? 'completed' : state === 'cancelled' ? 'cancelled' : 'interrupted';
         entry.receivedBytes = item.getReceivedBytes();
         entry.completedAt = Date.now();
+        if(entry.state==='completed')this.emit('completed',entry);
+        this.emit('finished',entry);
         this.emit('change');
       });
     });

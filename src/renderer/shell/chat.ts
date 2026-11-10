@@ -11,6 +11,8 @@ import type {
   QueuedPrompt,
 } from '../../shared/types';
 import { renderMarkdown } from './markdown';
+import {VoiceInput} from './voice';
+import type { Batch } from '../../shared/workflows';
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
@@ -38,6 +40,7 @@ export class ChatView {
   private attachPage = $<HTMLInputElement>('#attach-page');
 
   private sessionId: string | null = null;
+  private voice?:VoiceInput;
   private live: LiveTurn | null = null;
   private runningSessionId: string | null = null;
   private queues = new Map<string, PromptQueueState>();
@@ -54,6 +57,11 @@ export class ChatView {
   constructor(private readonly onSessionChanged: () => void, enabled = true) {
     if (!enabled) return;
     this.wireComposer();
+    this.wireFiles();
+    this.voice=new VoiceInput(this.prompt,()=>this.sessionId);
+    window.nabsun.workflows?.onChanged(batch => {
+      if (batch.scope === this.sessionId) this.renderBatch(batch);
+    });
     window.nabsun.onAgentEvent((e) => this.handleEvent(e));
     window.nabsun.onApprovalRequest((r) => this.renderApproval(r));
     window.nabsun.onQuestion((q) => this.renderQuestion(q));
@@ -74,6 +82,7 @@ export class ChatView {
   }
 
   private setSession(session: ChatSession) {
+    this.voice?.stop();
     this.flushText();
     this.live = null;
     this.sessionId = session.id;
@@ -88,6 +97,10 @@ export class ChatView {
     }
     this.scrollToEnd();
     this.renderQueue();
+    void this.refreshFiles().catch(()=>{ $('#attachment-status').textContent='Could not load attachments. Reopen this chat to try again.'; });
+    void window.nabsun.workflows?.batches(session.id).then(batches => {
+      if (this.sessionId === session.id) this.renderBatch(batches[0]);
+    }).catch(() => {});
     void window.nabsun.agent.queue(session.id).then(state => {
       if (!this.queues.has(session.id)) this.queues.set(session.id, state);
       this.renderQueue();
@@ -104,9 +117,62 @@ export class ChatView {
 
   /* ------------------------------------------------------------ composer -- */
 
+  private renderBatch(batch?: Batch) {
+    const root = $('#batch-progress');
+    root.replaceChildren();
+    root.hidden = !batch;
+    if (!batch) return;
+    const label = document.createElement('span');
+    label.textContent = 'Batch ' + batch.state + ': ' + batch.successes + '/' + batch.rowCount + ' completed';
+    const action = (text: string, run: () => Promise<unknown>) => {
+      const button = document.createElement('button');
+      button.textContent = text;
+      button.addEventListener('click', () => {
+        void run().catch(() => { label.textContent = 'Could not update the batch. Open Data & workflows to review it.'; });
+      });
+      return button;
+    };
+    root.append(label, action('View results', () => window.nabsun.workflows.open(batch.scope)));
+    if (['running', 'pausing'].includes(batch.state)) {
+      root.append(action('Pause', () => window.nabsun.workflows.control(batch.scope, batch.id, 'pause')));
+      root.append(action('Stop', () => window.nabsun.workflows.control(batch.scope, batch.id, 'stop')));
+    }
+  }
+
+  private async refreshFiles(){
+    const sessionId=this.sessionId;if(!sessionId)return;
+    const files=await window.nabsun.files?.list(sessionId)??[];
+    if(this.sessionId!==sessionId)return;
+    const list=$('#attached-files');list.replaceChildren();list.hidden=!files.length;
+    for(const file of files){
+      const item=document.createElement('span');item.className='attached-file';
+      const name=document.createElement('span');name.textContent=`${file.name} (${Math.ceil(file.size/1024)} KB)`;name.title=file.name;
+      const remove=document.createElement('button');remove.textContent='Remove';remove.setAttribute('aria-label',`Remove ${file.name}`);
+      remove.addEventListener('click',async()=>{try{await window.nabsun.files.remove(sessionId,file.id);await this.refreshFiles()}catch{$('#attachment-status').textContent='Could not remove this file. Try again.'}});
+      item.append(name,remove);list.append(item);
+      if(/\.(png|jpe?g|webp|gif)$/i.test(file.name)){
+        void window.nabsun.files.preview(sessionId,file.id).then(url=>{
+          if(!url||this.sessionId!==sessionId||!item.isConnected)return;
+          const preview=document.createElement('img');preview.src=url;preview.alt=`Preview of ${file.name}`;preview.className='attachment-preview';item.prepend(preview);
+        }).catch(()=>{name.title+=' — Preview unavailable; the file is still attached.'});
+      }
+    }
+  }
+  private wireFiles(){
+    const button=$<HTMLButtonElement>('#attach-files');
+    button.addEventListener('click',async()=>{
+      if(!this.sessionId)return;
+      button.disabled=true;$('#attachment-status').textContent='';
+      try{const files=await window.nabsun.files.attach(this.sessionId);await this.refreshFiles();if(files.some(file=>/\.(png|jpe?g|webp|gif)$/i.test(file.name)))$('#attachment-status').textContent='Images are attached. To discuss their contents, choose a vision-capable model with image support enabled in Settings.'}
+      catch(error){$('#attachment-status').textContent=error instanceof Error?error.message:'Could not attach files.'}
+      finally{button.disabled=false}
+    });
+  }
+
   private wireComposer() {
     this.sendBtn.addEventListener('click', () => this.submit());
     this.stopBtn.addEventListener('click', () => {
+      this.voice?.stop();
       if (this.runningSessionId || this.sessionId) {
         window.nabsun.agent.abort(this.runningSessionId ?? this.sessionId!);
         this.setActivity('Stopping');
@@ -130,6 +196,7 @@ export class ChatView {
   private submit() {
     const text = this.prompt.value.trim();
     if (!text || !this.sessionId) return;
+    this.voice?.stop();
 
     window.nabsun.agent.send(this.sessionId, text, { attachPage: this.attachPage.checked });
     this.prompt.value = '';
@@ -453,7 +520,7 @@ export class ChatView {
     const actions = document.createElement('div');
     actions.className = 'actions';
 
-    const decide = (decision: 'allow' | 'allow_always' | 'deny') => {
+    const decide = (decision: 'allow' | 'allow_always' | 'allow_site' | 'deny') => {
       window.nabsun.agent.resolveApproval(req.id, decision);
       box.remove();
       const note = document.createElement('div');
@@ -466,8 +533,11 @@ export class ChatView {
 
     actions.append(
       button('Allow', 'primary', () => decide('allow')),
-      button('Always allow this tool', 'ghost', () => decide('allow_always')),
       button('Deny', 'ghost', () => decide('deny')),
+    );
+    if(!req.forceOnce&&req.origin)actions.append(
+      button('Allow for this task on this site','ghost',()=>decide('allow_always')),
+      button('Allow on this site for 24 hours','ghost',()=>decide('allow_site')),
     );
 
     box.append(title, tool, detail, actions);

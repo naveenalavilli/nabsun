@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Task benchmark</title><style>body{font:16px system-ui;padding:25px}input,button,select,[contenteditable]{margin:8px;padding:10px}label{display:block}.drop{padding:30px;border:2px dashed #666}iframe{width:700px;height:400px}</style></head><body><h1>Local task fixture</h1><main></main><output id="result"></output><script>
+const params=new URLSearchParams(location.search),kind=params.get('kind'),value=params.get('value');
+window.result={};const root=document.querySelector('main');
+const finish=data=>{window.result=data;document.querySelector('#result').textContent=JSON.stringify(data)};
+const field='<label>Customer name<input aria-label="Customer name" name="customer"></label>';
+const submit='<button type="submit">Save entry</button>';
+const form=()=>{root.innerHTML='<form>'+field+submit+'</form>';root.querySelector('form').onsubmit=e=>{e.preventDefault();finish({value:root.querySelector('input').value})}};
+if(kind==='plain')form();
+if(kind==='controlled'){root.id='react-root';const script=document.createElement('script');script.src='/react-fixture.js';document.head.append(script)}
+if(kind==='wizard'){root.innerHTML='<button>Begin entry</button>';root.querySelector('button').onclick=()=>{form()}};
+if(kind==='date'){root.innerHTML='<label>Appointment date<input type="date" aria-label="Appointment date"></label><button>Confirm date</button>';root.querySelector('button').onclick=()=>finish({value:root.querySelector('input').value})};
+if(kind==='autocomplete'){root.innerHTML='<label>City<input aria-label="City"></label><div id="suggestions"></div>';root.querySelector('input').oninput=e=>{const box=root.querySelector('#suggestions');box.replaceChildren();if(e.target.value){const b=document.createElement('button');b.textContent=value;b.onclick=()=>finish({value:b.textContent});box.append(b)}}};
+if(kind==='modal'){root.innerHTML='<button>Open dialog</button><dialog><form method="dialog">'+field+'<button>Save entry</button></form></dialog>';root.querySelector('button').onclick=()=>root.querySelector('dialog').showModal();root.querySelector('form').onsubmit=()=>finish({value:root.querySelector('input').value})};
+if(kind==='table'){root.innerHTML='<table><tr><th>Code</th><th>Amount</th></tr><tr><td>'+value+'</td><td>42</td></tr></table><label>Matching code<input aria-label="Matching code"></label><button>Confirm code</button>';root.querySelector('button').onclick=()=>finish({value:root.querySelector('input').value})};
+if(kind==='frame'){const iframe=document.createElement('iframe');iframe.src='http://127.0.0.1:__FRAME_PORT__/?kind=plain&value='+encodeURIComponent(value);root.append(iframe);window.addEventListener('message',e=>{if(e.origin==='http://127.0.0.1:__FRAME_PORT__'&&e.source===iframe.contentWindow)finish(e.data)})};
+if(kind==='shadow'){const host=document.createElement('div');root.append(host);const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<button>Confirm shadow</button>';shadow.querySelector('button').onclick=()=>finish({value})};
+if(kind==='upload'){root.innerHTML='<label>Upload file<input type="file" aria-label="Upload file"></label><button>Check upload</button>';root.querySelector('button').onclick=async()=>{const f=root.querySelector('input').files[0];if(f)finish({value:await f.text(),name:f.name})}};
+if(kind==='drag'){root.innerHTML='<div draggable="true" role="button" aria-label="Drag item">Drag item</div><div role="button" aria-label="Drop zone" class="drop">Drop zone</div>';const drop=root.lastElementChild;drop.ondragover=e=>e.preventDefault();drop.ondrop=e=>{e.preventDefault();if(e.isTrusted)finish({value})};root.firstElementChild.ondragstart=e=>e.dataTransfer.setData('text/plain',value)};
+if(kind==='signin'){root.innerHTML='<button>Sign in to continue</button><p>This fixture requires a human sign-in.</p>';root.querySelector('button').onclick=e=>{if(e.isTrusted)form()}};
+if(kind==='trusted'){root.innerHTML=field+'<button>Confirm trusted input</button>';const events=[];root.querySelector('input').addEventListener('input',e=>events.push(e.isTrusted));root.querySelector('button').onclick=e=>finish({value:root.querySelector('input').value,trusted:e.isTrusted&&events.length>0&&events.every(Boolean)})};
+if(window.parent!==window){const original=finish;new MutationObserver(()=>window.parent.postMessage(window.result,'http://127.0.0.1:__TOP_PORT__')).observe(document.querySelector('#result'),{childList:true,subtree:true})}
+</script></body></html>
