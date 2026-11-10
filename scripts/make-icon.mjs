@@ -2,7 +2,7 @@
  * Generates build/icon.png — a 1024x1024 app icon.
  *
  * Written by hand rather than pulled from a design tool so the repo has no
- * binary asset to keep in sync and no image dependency. electron-builder
+ * external design-tool dependency. electron-builder
  * derives the .ico (Windows) and .icns (macOS) from this single PNG.
  */
 import fs from 'node:fs';
@@ -47,54 +47,44 @@ const coverage = (d) => Math.min(1, Math.max(0, 0.5 - d));
 
 /* ----------------------------------------------------------------- shape -- */
 
-/*
- * A sun rising over a horizon.
- *
- * The product is nab-sun, so the mark should carry the name, but the obvious
- * reading of that - a radial burst - is territory Claude already occupies, in
- * the same orange, on the same cream. An eight-ray sun on a paper tile was a
- * near-collision rather than an homage, so the rays are gone entirely.
- *
- * What is left is a silhouette nothing else in the category has: a disc cut by
- * a bar. It still says sun, the bar reads as an address bar, and the dark tile
- * moves the whole mark off the cream ground the comparison depended on.
- *
- * Geometry is quoted on the 100-unit square that favicon.svg uses, so the two
- * cannot drift: disc r26 centred at (50,57), horizon 74x8 at y63, both clipped
- * to the tile.
- */
-
-const TILE = [34, 35, 31];    // --dark
-const ORANGE = [255, 91, 44]; // --orange
-const PAPER = [244, 242, 235];// --paper
-
-const c = SIZE / 2;
-const u = SIZE / 100; // one unit of the 100-square the mark is designed on
-
-/** Rounded-rectangle coverage, reused for the tile and the horizon bar. */
+// A freestanding rising sun: no tile or opaque backdrop. Keep generous optical
+// margins while making the mark large enough for taskbar and Dock sizes.
+const u = SIZE / 100;
+const clamp = (t) => Math.min(1, Math.max(0, t));
 function rrect(px, py, cx, cy, halfW, halfH, r) {
   return coverage(roundedRectSdf(px, py, cx, cy, halfW, halfH, r));
 }
-
 for (let y = 0; y < SIZE; y++) {
   for (let x = 0; x < SIZE; x++) {
     const px = x + 0.5;
     const py = y + 0.5;
-
-    const tile = rrect(px, py, c, c, 50 * u, 50 * u, 20 * u);
-    if (tile <= 0) continue;
-    setPixel(x, y, TILE, tile);
-
-    // The sun, clipped at the horizon line so it reads as rising rather than
-    // floating. The clip is a hard edge, which is what the bar sitting on top
-    // of it expects.
-    if (py < 63 * u) {
-      const sun = coverage(Math.hypot(px - 50 * u, py - 57 * u) - 26 * u);
-      if (sun > 0) setPixel(x, y, ORANGE, sun * tile);
+    const nx = px / u;
+    const ny = py / u;
+    const sun = coverage(Math.hypot(px - 50 * u, py - 55 * u) - 37 * u)
+      * coverage(py - 67 * u);
+    if (sun > 0) {
+      // Warm gold at the crown, vivid orange at the horizon. A broad soft
+      // reflection and a fine rim give depth without muddying the silhouette.
+      const height = clamp((ny - 18) / 49);
+      let color = mix([255, 220, 67], [255, 91, 20], height);
+      const light = Math.exp(-(((nx - 37) / 22) ** 2 + ((ny - 29) / 15) ** 2));
+      color = mix(color, [255, 249, 196], light * 0.72);
+      const gloss = clamp((43 - ny + 0.12 * (nx - 50)) / 3);
+      color = mix(color, [255, 249, 221], gloss * 0.15);
+      const radius = Math.hypot(nx - 50, ny - 55);
+      const rim = clamp((radius - 35.9) / 1.1) * clamp((53 - ny) / 20);
+      color = mix(color, [255, 244, 161], rim * 0.7);
+      setPixel(x, y, color, sun);
     }
-
-    const bar = rrect(px, py, 50 * u, 67 * u, 37 * u, 4 * u, 4 * u);
-    if (bar > 0) setPixel(x, y, PAPER, bar * tile);
+    // A warm rounded horizon remains visible against both light and dark
+    // surfaces, unlike the old paper-white bar. The top edge catches light.
+    const bar = rrect(px, py, 50 * u, 71 * u, 44 * u, 4 * u, 4 * u);
+    if (bar > 0) {
+      const vertical = clamp((ny - 67) / 8);
+      let color = mix([255, 193, 59], [232, 73, 19], vertical);
+      color = mix(color, [255, 239, 159], Math.exp(-(((ny - 68) / 0.8) ** 2)) * 0.65);
+      setPixel(x, y, color, bar);
+    }
   }
 }
 
