@@ -3,6 +3,7 @@ import type { VoiceAvailability, VoiceEvent } from '../../shared/voice';
 /** Dictation changes only the current draft; it never submits a prompt. */
 export class VoiceInput {
   private requestId: string | null = null;
+  private generation = 0;
   private availability?: VoiceAvailability;
   private button = document.querySelector<HTMLButtonElement>('#voice-toggle')!;
   private panel = document.querySelector<HTMLElement>('#voice-controls')!;
@@ -15,6 +16,10 @@ export class VoiceInput {
   ) {
     this.button.addEventListener('click', () => {
       void this.toggle();
+    });
+    document.querySelector('#voice-close')!.addEventListener('click', () => {
+      this.stop();
+      this.button.focus();
     });
     window.nabsun.voice.onEvent((event) => this.receive(event));
     document.addEventListener('visibilitychange', () => {
@@ -30,17 +35,21 @@ export class VoiceInput {
         attributes: true,
         attributeFilter: ['class', 'hidden'],
       });
-    this.prompt.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && this.requestId) {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !this.panel.hidden) {
         this.stop();
+        this.button.focus();
         event.preventDefault();
       }
     });
   }
   stop() {
+    this.generation++;
     const id = this.requestId;
     this.requestId = null;
     if (id) window.nabsun.voice.stop(id);
+    this.panel.hidden = true;
+    this.button.setAttribute('aria-expanded', 'false');
     this.render(false);
     if (id)
       this.status.textContent =
@@ -58,18 +67,24 @@ export class VoiceInput {
     this.languages.disabled = active;
   }
   private async toggle() {
-    if (this.requestId) {
+    if (!this.panel.hidden) {
       this.stop();
       return;
     }
     const sessionId = this.session();
     if (!sessionId) return;
     this.panel.hidden = false;
-    this.button.disabled = true;
+    this.button.setAttribute('aria-expanded', 'true');
+    const generation = ++this.generation;
+    this.status.textContent = 'Checking dictation availability...';
     try {
       const availability = (this.availability ??=
         await window.nabsun.voice.availability());
-      if (this.session() !== sessionId) return;
+      if (generation !== this.generation) return;
+      if (this.session() !== sessionId) {
+        this.stop();
+        return;
+      }
       if (!this.languages.options.length) {
         for (const language of availability.languages) {
           const option = document.createElement('option');
@@ -103,13 +118,15 @@ export class VoiceInput {
         this.languages.value,
       );
     } catch (error) {
-      this.stop();
+      if (generation !== this.generation) return;
+      const id = this.requestId;
+      this.requestId = null;
+      if (id) window.nabsun.voice.stop(id);
+      this.render(false);
       this.status.textContent =
         error instanceof Error
           ? error.message
           : 'Dictation is unavailable. You can continue typing.';
-    } finally {
-      this.button.disabled = false;
     }
   }
   private receive(event: VoiceEvent) {

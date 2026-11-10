@@ -110,6 +110,7 @@
                 <div id="attached-files" aria-label="Attached files" aria-live="polite" hidden></div>
                 <p id="attachment-status" class="hint" role="status"></p>
                 <div id="voice-controls" hidden>
+                  <button id="voice-close" type="button" class="icon-btn" title="Close dictation (Escape)" aria-label="Close dictation"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
                   <label>Speech language <select id="voice-language" aria-label="Speech language"></select></label>
                   <p id="voice-status" class="hint" role="status" aria-live="polite"></p>
                 </div>
@@ -128,7 +129,7 @@
                   <span id="step-badge" class="muted"></span>
                 </div>
                 <div class="composer-row">
-                  <button id="voice-toggle" class="icon-btn" title="Dictate a message" aria-label="Dictate a message" aria-pressed="false" aria-controls="voice-controls"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9a6 6 0 0 0 12 0M10 15v3M7 18h6"/></svg></button>
+                  <button id="voice-toggle" class="icon-btn" title="Dictate a message" aria-label="Dictate a message" aria-pressed="false" aria-controls="voice-controls" aria-expanded="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9a6 6 0 0 0 12 0M10 15v3M7 18h6"/></svg></button>
                   <textarea id="prompt" rows="1" placeholder="Ask about this page, or tell me what to do…" aria-label="Message the assistant"></textarea>
                   <button id="send" class="primary" aria-label="Send">Send</button>
                   <button id="stop" class="danger" hidden aria-label="Stop">Stop</button>

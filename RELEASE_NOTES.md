@@ -15,6 +15,12 @@ Development version in [PR #23](https://github.com/naveenalavilli/nabsun/pull/23
 These notes describe implemented changes; they do not certify the whole roadmap
 as complete or announce a public release.
 
+### Fixes
+
+- Dictation can be closed with its Close button, Escape or a second microphone
+  click, including during startup, after errors and when only system dictation
+  guidance is available. Closing cancels capture and ignores late speech.
+
 ### New
 
 - Attach images and files to a chat. Supported readers include text, CSV, TSV,

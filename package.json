@@ -51,7 +51,7 @@
     "verify:permissions": "node scripts/electron-run.mjs dist/test/site-permission-harness.js",
     "verify:network": "node scripts/electron-run.mjs dist/test/network-auth-harness.js && node scripts/electron-run.mjs dist/test/network-config-harness.js",
     "verify:integrations": "node dist/test/integration-trust-harness.js && node scripts/electron-run.mjs dist/test/plugin-isolation-harness.js",
-    "verify:voice": "node dist/test/voice-harness.js",
+    "verify:voice": "node dist/test/voice-harness.js && node scripts/electron-run.mjs scripts/verify-voice-ui.cjs",
     "verify:delegation": "node scripts/electron-run.mjs dist/test/delegation-harness.js"
   },
   "dependencies": {

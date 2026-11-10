@@ -41,6 +41,13 @@ jobs:
       - run: npm run build
       - run: node dist/test/audit-harness.js
       - run: node dist/test/voice-harness.js
+      - name: Dictation panel cancellation
+        run: |
+          if ($IsLinux) {
+            xvfb-run -a node scripts/electron-run.mjs scripts/verify-voice-ui.cjs --no-sandbox
+          } else {
+            node scripts/electron-run.mjs scripts/verify-voice-ui.cjs
+          }
       - run: node dist/test/integration-trust-harness.js
       - name: Input, frames, files, approvals, and durable workflows
         run: |
