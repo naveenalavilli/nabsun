@@ -71,7 +71,7 @@ preferences remain in Settings.
 Chat history, Settings, Extensions, Bookmarks, and Saved passwords are also in
 Assistant options. New chat and Hide remain directly in the compact header.
 
-### Work with files on your computer (development preview)
+### Work with files on your computer
 
 Click **Folder** beside the message box, choose a folder, and select **Read only**
 or **Read and make changes**. You can also ask Nabsun to work with local files;

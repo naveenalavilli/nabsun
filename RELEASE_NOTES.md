@@ -13,6 +13,44 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.1 - Prepared for release
+
+Promotes the approved Windows rc.4 preview to a non-prerelease version.
+Windows x64 and macOS Apple silicon installers are subject to the full release
+checks. This entry does not indicate that the release has been published.
+
+### New and improved
+
+- A clearer chat welcome, larger composer, and everyday task examples.
+- Optional per-tool permissions for the current chat, with visible revocation.
+  These choices do not grant folder access or upgrade a read-only folder.
+- Connect a local folder with read-only or read-and-change access. Read,
+  create, edit, append, copy, rename and organize supported files. Individual
+  deletions use Recycle Bin/Trash, with no permanent-delete fallback.
+- Create Word (.docx) documents, replace body text and append sections. Create
+  Excel (.xlsx) workbooks and update cell values or explicit formulas. Edits
+  preserve unrelated package parts and save original backups. Excel calculates
+  formula results when opened. Unsupported protected/advanced formats refuse
+  editing rather than overwriting them as text.
+- Folder permissions belong to the chat and expire on disconnect or app exit.
+  Revision checks detect conflicting edits; profile, path and link checks
+  constrain operations to approved folders.
+
+### Fixes
+
+- Interactive Codex/Claude CLI tasks have a 30-minute default deadline and
+  matching browser-access lifetime, replacing the silent five-minute cutoff.
+- Remove the implicit 128,000-token cap from interactive CLI chats so reused
+  context does not cause premature usage-limit stops. Usage reporting,
+  provider limits, the 100-action limit and explicit workflow budgets remain.
+- Distinct interruption reasons explain Stop, deadlines, disconnected access,
+  integrations and provider failures. Explanations remain in reopened chats.
+- Browser Stop still cancels pending work immediately and revokes delegated
+  access. A provider exiting with an action pending cannot leave it running.
+
+Preview builds remain unsigned on Windows and ad-hoc signed without Apple
+notarization on macOS. See the README for installation steps and known limits.
+
 ## 1.0.1-rc.4 - Windows test preview
 
 Windows x64 installer only, for testing before a production Windows/macOS
