@@ -349,6 +349,37 @@ async function main() {
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0], 'browser retains its full width');
     assert.equal(await win.assistant.webContents.executeJavaScript('getComputedStyle(document.querySelector("#topchrome")).display'), 'none');
     console.log('PASS separate assistant window and full-width browser');
+
+    const welcomeUI=win.assistant.webContents;
+    const welcomeTheme=await welcomeUI.executeJavaScript('document.documentElement.getAttribute("data-theme")');
+    for(const theme of ['light','dark']) {
+      await welcomeUI.executeJavaScript(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      for(const [width,zoom] of [[560,1],[380,1],[560,2]]) {
+        win.assistant.setSize(width,820);welcomeUI.setZoomFactor(zoom);await delay(150);
+        const layout=await welcomeUI.executeJavaScript(`(() => {
+          const cards=[...document.querySelectorAll('[data-starter]')];
+          const input=document.querySelector('#prompt').getBoundingClientRect();
+          const send=document.querySelector('#send').getBoundingClientRect();
+          const bounds=document.querySelector('#transcript').getBoundingClientRect();
+          return {count:cards.length,overflow:document.documentElement.scrollWidth>innerWidth,
+            cardsFit:cards.every(card=>{const r=card.getBoundingClientRect();return r.left>=bounds.left&&r.right<=bounds.right}),
+            composerFits:input.left>=0&&input.right<=innerWidth&&send.right<=innerWidth&&send.bottom<=innerHeight};
+        })()`);
+        assert.equal(layout.count,4);assert.equal(layout.overflow,false,JSON.stringify({theme,width,zoom,layout}));
+        assert.ok(layout.cardsFit&&layout.composerFits,JSON.stringify({theme,width,zoom,layout}));
+        if(zoom===1)fs.writeFileSync(path.join(artifacts,`chat-welcome-${theme}-${width}.png`),(await welcomeUI.capturePage()).toPNG());
+      }
+    }
+    welcomeUI.setZoomFactor(1);win.assistant.setSize(560,820);
+    await welcomeUI.executeJavaScript(`document.documentElement.${welcomeTheme?'setAttribute("data-theme",'+JSON.stringify(welcomeTheme)+')':'removeAttribute("data-theme")'}`);
+    for(const id of ['research','action','files','summary']) {
+      await welcomeUI.executeJavaScript(`document.querySelector('[data-starter="${id}"]').click()`);
+      const draft=await welcomeUI.executeJavaScript('document.querySelector("#prompt").value');
+      assert.ok(draft.length>30);assert.equal(provider.requests.length,0,'task cards only fill a draft');
+      assert.equal(await welcomeUI.executeJavaScript('document.activeElement===document.querySelector("#prompt")'),true);
+      assert.equal(await welcomeUI.executeJavaScript('document.querySelectorAll("[data-starter][aria-pressed=true]").length'),1);
+    }
+    console.log('PASS action-focused welcome and composer fit light/dark, narrow windows and 200% zoom; all four cards prefill without executing');
     await win.assistant.webContents.executeJavaScript('document.querySelector("[data-starter=summary]").click()');
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'), 'Summarize this page in three short bullet points.');
     assert.equal(provider.requests.length, 0, 'starter questions never send a request automatically');

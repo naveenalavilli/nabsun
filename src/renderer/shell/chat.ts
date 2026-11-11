@@ -90,6 +90,7 @@ export class ChatView {
     this.live = null;
     this.sessionId = session.id;
     this.transcript.textContent = '';
+    $('#view-chat').classList.toggle('is-empty', !session.messages.length);
     if (!session.messages.length) this.renderEmptyState();
     for (const msg of session.messages) this.transcript.appendChild(this.renderMessage(msg));
     // A question this chat is still waiting on is part of its state, so it
@@ -185,7 +186,10 @@ export class ChatView {
         this.setActivity('Stopping');
       }
     });
-    this.prompt.addEventListener('input', () => this.autoGrow());
+    this.prompt.addEventListener('input', () => {
+      this.autoGrow();
+      for (const card of this.transcript.querySelectorAll('[data-starter]')) card.removeAttribute('aria-pressed');
+    });
     this.prompt.addEventListener('keydown', (e) => {
       // Enter sends; Shift+Enter is a newline, the convention everywhere else.
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -224,7 +228,8 @@ export class ChatView {
     this.stopBtn.hidden = !working;
     this.busyBar.hidden = !working;
     const state = this.sessionId ? this.queues.get(this.sessionId) : undefined;
-    this.sendBtn.textContent = state?.active ? 'Send next' : 'Send';
+    const sendLabel = this.sendBtn.querySelector('.send-label') ?? this.sendBtn;
+    sendLabel.textContent = state?.active ? 'Send next' : 'Send';
     this.sendBtn.setAttribute('aria-label', state?.active ? 'Send after the current reply' : 'Send');
     this.sendBtn.title = state?.active ? 'Your message will wait until the current reply is finished.' : 'Send your message';
     this.stopBtn.title = 'Stop active work and cancel all queued prompts';
@@ -261,6 +266,7 @@ export class ChatView {
 
   private renderStartedPrompt(prompt: QueuedPrompt) {
     this.transcript.querySelector('.empty-state')?.remove();
+    $('#view-chat').classList.remove('is-empty');
     this.transcript.appendChild(this.renderMessage({
       id: prompt.id, role: 'user', blocks: [{ type: 'text', text: prompt.text }], createdAt: Date.now(),
     }));
@@ -769,34 +775,44 @@ export class ChatView {
   }
 
   private renderEmptyState() {
-    const el = document.createElement('div');
-    el.className = 'empty-state';
-    const h = document.createElement('h3');
-    h.textContent = 'What would you like help with?';
-    const p = document.createElement('div');
-    p.textContent =
-      'Open a website, then ask a question about it. You can start with an example below.';
+    const el = document.createElement('section');
+    el.className = 'empty-state chat-welcome';
+    el.setAttribute('aria-label', 'Start a task with Nabsun');
+    el.innerHTML = '<div class="welcome-brand"><span class="welcome-sun" aria-hidden="true"><svg viewBox="0 0 48 48"><defs><linearGradient id="chat-sun" x2="0" y2="1"><stop stop-color="#ffd781"/><stop offset="1" stop-color="#ff642e"/></linearGradient></defs><path d="M12 29a12 12 0 0 1 24 0Z" fill="url(#chat-sun)"/><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M24 7v5M9 14l4 4M3 27h5M39 14l-4 4M40 27h5M12 34h24M18 39h12"/></g></svg></span><span>NABSUN ASSISTANT</span></div><h2>Put your browser<br>to work.</h2><p class="welcome-intro">Find information, get help on websites, or make sense of a file.</p>';
     const examples = document.createElement('div');
     examples.className = 'starter-questions';
-    for (const [id, label, prompt] of [
-      ['summary', 'Summarize this page', 'Summarize this page in three short bullet points.'],
-      ['explain', 'Explain it simply', 'Explain this page in simple words. Start with the most important point.'],
-      ['help', 'Show me what you can do', 'What can you help me do in this browser?'],
-    ]) {
-      const button = document.createElement('button');
-      button.dataset.starter = id;
-      button.textContent = label;
-      button.addEventListener('click', () => this.ask(prompt));
-      examples.append(button);
+    const tasks = [
+      { id: 'research', title: 'Find & compare', detail: 'Explore choices. Find what fits.', icon: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6M10 7v6"/>', prompt: 'Help me find and compare a few options. Ask what I am looking for and what matters to me, then show the choices with links and explain the differences in plain language.' },
+      { id: 'action', title: 'Help with a task', detail: 'Fill in details. Follow the steps.', icon: '<path d="m5 3 14 9-7 2-3 7Z M14 15l5 5"/>', prompt: 'Help me with a task on this website. Ask what I want to do and which details to use, then guide me or help fill them in. Ask before sending anything.' },
+      { id: 'files', title: 'Use a file or image', detail: 'Ask about a document, photo or table.', icon: '<path d="M14 3H5v18h14V8Z M14 3v6h5M8 13h8M8 17h5"/>', prompt: 'Help me with a file or image. Ask me to add it using the paperclip button, then ask what I need help with. Explain your findings clearly.' },
+      { id: 'summary', title: 'Understand a page', detail: 'Get the main points in plain language.', icon: '<path d="M4 4h16v16H4Z M8 8h8M8 12h8M8 16h4"/>', prompt: 'Summarize this page in three short bullet points.' },
+    ];
+    for (const task of tasks) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.dataset.starter = task.id;
+      card.innerHTML = '<span class="starter-icon" aria-hidden="true"><svg viewBox="0 0 24 24">' + task.icon + '</svg></span><span class="starter-copy"><strong></strong><span></span></span><span class="starter-arrow" aria-hidden="true">&#8599;</span>';
+      card.querySelector('strong')!.textContent = task.title;
+      card.querySelector('.starter-copy > span')!.textContent = task.detail;
+      card.addEventListener('click', () => {
+        this.ask(task.prompt);
+        for (const other of examples.querySelectorAll('button')) other.removeAttribute('aria-pressed');
+        card.setAttribute('aria-pressed', 'true');
+      });
+      examples.append(card);
     }
+    const footer = document.createElement('div');
+    footer.className = 'welcome-footer';
     const hint = document.createElement('p');
     hint.className = 'starter-hint';
-    hint.textContent = 'An example fills the message box. Nothing is sent until you press Send. Use Stop whenever you want to cancel.';
+    hint.textContent = 'Choose an idea, or type what you need.';
     const tour = document.createElement('button');
+    tour.type = 'button';
     tour.className = 'starter-tour';
-    tour.textContent = 'Getting started guide';
+    tour.innerHTML = 'A quick tour <span aria-hidden="true">&#8594;</span>';
     tour.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
-    el.append(h, p, examples, hint, tour);
+    footer.append(hint, tour);
+    el.append(examples, footer);
     this.transcript.appendChild(el);
   }
 

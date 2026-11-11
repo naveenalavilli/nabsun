@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      branch_prerelease:
+        description: Publish a verified prerelease from this branch without merging
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
@@ -39,6 +44,7 @@ jobs:
       - run: npm run setup
       - run: npm run typecheck
       - run: npm run build
+      - run: node --test scripts/verify-branch-release.cjs
       - run: node dist/test/audit-harness.js
       - run: node dist/test/voice-harness.js
       - name: Dictation panel cancellation
@@ -442,7 +448,8 @@ jobs:
       # installers, and it happens in exactly one situation: a version that has
       # never been released lands on main. That means merging a version bump is
       # the act that ships — there is no separate tag to remember, and nothing
-      # cut from a branch, because this only ever runs on a push to main.
+      # cut from a branch through this default path. Explicit branch prereleases
+      # use the separate manually opted-in path at the end of this job.
       #
       # The installers are ~1.3 GB each and are uploaded from the runner that
       # built them, so the bytes never travel from a developer's machine.
@@ -501,6 +508,39 @@ jobs:
             on Windows, `shasum -a 256 <file>` on macOS.
 
             **macOS is Apple silicon only** for now - there is no Intel build yet.
+          files: |
+            release/Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe
+            release/Nabsun-${{ steps.installers.outputs.version }}-portable.exe
+            release/Nabsun-${{ steps.installers.outputs.version }}-arm64.zip
+            release/SHA256SUMS.txt
+
+      - name: Prepare explicit branch prerelease
+        id: branch_release
+        if: github.event_name == 'workflow_dispatch' && inputs.branch_prerelease && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_OPT_IN: ${{ inputs.branch_prerelease }}
+        run: |
+          node scripts/prepare-branch-release.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $existing = git ls-remote --tags origin "refs/tags/v$version"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify the release tag.' }
+          if ($existing) { throw "Tag v$version already exists; use a new prerelease version." }
+
+      - name: Publish branch prerelease
+        if: steps.branch_release.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.branch_release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Nabsun ${{ steps.branch_release.outputs.tag }}
+          prerelease: true
+          draft: false
+          make_latest: false
+          body_path: release/BRANCH_RELEASE_NOTES.md
+          fail_on_unmatched_files: true
           files: |
             release/Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe
             release/Nabsun-${{ steps.installers.outputs.version }}-portable.exe

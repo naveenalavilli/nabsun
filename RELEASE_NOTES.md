@@ -9,11 +9,29 @@ history. **Published** dates use America/Chicago. A tag, a draft release or a
 package-version change is not treated as proof of publication. Earlier versions
 are marked accordingly, and their behavior may differ from the current product.
 
-## 1.0.0 - Unreleased
+## 1.0.1-rc.1 - Branch preview
 
-Development version in [PR #23](https://github.com/naveenalavilli/nabsun/pull/23).
-These notes describe implemented changes; they do not certify the whole roadmap
-as complete or announce a public release.
+Prepared from the session-permissions branch, independently of main. This is a
+prerelease for review, with the broader 1.0 roadmap and release certification
+still incomplete.
+
+- New chat now starts with visual examples for finding and comparing options,
+  getting help on websites, using files or images, and understanding a page.
+- A larger message box keeps file attachments, microphone and Send together.
+  Page context and automatic-action choices remain within reach.
+- Everyday wording, light/dark layouts, narrow windows and 200% zoom support.
+  Starter cards fill a draft; nothing runs until you send it.
+- Optionally auto-allow an individual tool for the current chat, including page
+  JavaScript. This covers follow-up prompts and websites in that chat. Turn it
+  off below the conversation; grants reset on chat deletion or app shutdown.
+  Other chats, tools and integration sources remain separate. Host policy,
+  action limits, cancellation and structured credential checks still apply.
+
+## 1.0.0 - Prerelease 2026-11-10
+
+[GitHub prerelease](https://github.com/naveenalavilli/nabsun/releases/tag/v1.0.0),
+from [PR #23](https://github.com/naveenalavilli/nabsun/pull/23).
+These notes describe implemented changes, not certification of the full roadmap.
 
 ### Fixes
 
@@ -22,11 +40,6 @@ as complete or announce a public release.
   guidance is available. Closing cancels capture and ignores late speech.
 
 ### New
-
-- Optionally auto-allow a tool for the current chat using the checkbox in its
-  permission request, including page JavaScript. The choice covers follow-up
-  prompts and websites in that chat, can be turned off below the conversation,
-  and resets when Nabsun closes. Other chats and tools still ask independently.
 
 - Attach images and files to a chat. Supported readers include text, CSV, TSV,
   XLSX and text-based PDF. Images have previews and can be read by compatible
@@ -69,8 +82,7 @@ as complete or announce a public release.
 
 - Old global "always allow" grants are revoked with a migration notice. New
   approvals can apply once, to the current task on a site, or to a tool/site for
-  24 hours; saved site grants can be revoked in Settings. Opt-in chat-session
-  grants can be turned off beneath the conversation and are never saved to disk.
+  24 hours; saved site grants can be revoked in Settings.
 - New or changed plugins and MCP configurations require review. MCP servers must
   use an installed executable or entry script; dynamic runners such as `npx`
   are no longer accepted. MCP servers remain trusted native code.

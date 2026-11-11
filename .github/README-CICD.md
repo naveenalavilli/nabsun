@@ -45,7 +45,15 @@ as a publisher name.
 After successful packaging, a push to `main` whose package version has no
 existing tag creates that tag and a **draft GitHub release** with the artifacts.
 A maintainer must publish the draft. Pull requests, ordinary tag-triggered runs,
-and manual workflow runs do not take this release path.
+and ordinary manual workflow runs do not take this release path.
+
+To publish a branch preview without merging, use a prerelease package version
+(such as `1.0.1-rc.1`), add its entry to `RELEASE_NOTES.md`, and manually run
+`verify.yml` on that branch with `branch_prerelease=true`. The normal checks and
+Windows/macOS package jobs must pass first. The explicit branch path refuses
+main/master, stable version numbers and existing tags. It publishes the exact
+verified commit as a prerelease with installers and checksums, never as latest
+stable. The main-branch release path remains unchanged.
 
 [RELEASE_NOTES.md](../RELEASE_NOTES.md) is the maintained change history. The
 workflow's generated commit list is supporting metadata; before publishing a
@@ -55,7 +63,10 @@ America/Chicago date only after the release is published.
 
 `scripts/release.mjs` prepares a version-bump branch and pull request. Inspect
 its `--dry-run` output before using it; local installer generation alone does
-not create a release.
+not create a release. That helper accepts stable `x.y.z` versions. For branch
+previews use the manual workflow described above. Before promoting a preview
+to main, set the intended stable version (for example,
+`npm version 1.0.1 --no-git-tag-version`) in the reviewed release PR.
 
 ## Troubleshooting
 
