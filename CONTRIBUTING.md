@@ -22,6 +22,16 @@ which can otherwise make Electron exit without opening a window.
 
 ## Validate changes
 
+Create a working branch from current `main` and submit a pull request. `main`
+blocks direct pushes, force pushes, and deletion, with no bypass exceptions.
+The existing `verify` status must pass and review conversations must be resolved.
+A separate reviewer's approval is optional for the current solo-maintainer
+workflow; a PR is still mandatory. Keep the branch current with `main`.
+
+`releases/v-0-x` is a frozen archive of **0.1.13**, not a development or PR target.
+Its rules block updates and deletion. Published versions are recorded in
+[RELEASE_NOTES.md](RELEASE_NOTES.md).
+
 ```bash
 npm run typecheck
 npm run verify
@@ -73,7 +83,7 @@ plugins, or the external-agent bridge.
 
 See [Build installers](README.md#build-installers) and the [CI guide](.github/README-CICD.md).
 Build macOS artifacts on a Mac matching the target architecture. Apple silicon
-has local runtime coverage; Intel remains unverified. Windows builds are unsigned;
+is the published Mac target; Intel remains unverified. Windows builds are unsigned;
 Mac builds are ad-hoc signed and need Developer ID signing and notarization for
 signed public distribution. Linux release packaging is not supported.
 

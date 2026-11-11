@@ -13,11 +13,12 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
-## 1.0.1 - Prepared for release
+## 1.0.1 - Published November 11, 2026
 
-Promotes the approved Windows rc.4 preview to a non-prerelease version.
-Windows x64 and macOS Apple silicon installers are subject to the full release
-checks. This entry does not indicate that the release has been published.
+Promotes the approved Windows rc.4 preview to the stable release.
+Published after the Windows/macOS release checks and benchmarks passed, with
+Windows x64 setup/portable executables, an Apple-silicon Mac ZIP, and verified
+SHA-256 checksums. See the [published release](https://github.com/naveenalavilli/nabsun/releases/tag/v1.0.1).
 
 ### New and improved
 
@@ -48,7 +49,7 @@ checks. This entry does not indicate that the release has been published.
 - Browser Stop still cancels pending work immediately and revokes delegated
   access. A provider exiting with an action pending cannot leave it running.
 
-Preview builds remain unsigned on Windows and ad-hoc signed without Apple
+Builds remain unsigned on Windows and ad-hoc signed without Apple
 notarization on macOS. See the README for installation steps and known limits.
 
 ## 1.0.1-rc.4 - Windows test preview

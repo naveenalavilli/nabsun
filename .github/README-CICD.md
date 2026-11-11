@@ -43,9 +43,16 @@ electron-builder runs with `--publish never`; publish destinations are YAML
 as a publisher name.
 
 After successful packaging, a push to `main` whose package version has no
-existing tag creates that tag and a **draft GitHub release** with the artifacts.
-A maintainer must publish the draft. Pull requests, ordinary tag-triggered runs,
+existing tag prepares a **draft GitHub release** with the artifacts and verified
+commit as its target. A draft is not a public release, and its version tag may
+not exist until publication. A maintainer verifies the assets/checksums and
+publishes the draft. Pull requests, ordinary tag-triggered runs,
 and ordinary manual workflow runs do not take this release path.
+
+`main` updates require a PR, the existing `verify` status, and resolved review
+threads. There are no bypass actors; direct pushes, force pushes, and deletion
+are blocked. The protected `releases/v-0-x` branch preserves 0.1.13 and refuses
+updates/deletion. It is not a release-preparation branch.
 
 To publish a branch preview without merging, use a prerelease package version
 (such as `1.0.1-rc.1`), add its entry to `RELEASE_NOTES.md`, and manually run
