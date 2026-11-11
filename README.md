@@ -53,6 +53,10 @@ detached window to hide the assistant; reopening preserves your chat and draft.
 Use **Text size** in Assistant options or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
 or reset the assistant text. The zoom level is saved independently of website zoom.
 **Stop** cancels active assistant work and browser tool calls, including CLI subprocesses.
+Interactive Codex/Claude CLI chats have a 30-minute time limit; workflow tasks
+can have shorter explicit budgets. Automatic interruptions explain their cause
+and keep that explanation in chat history. Review completed actions before
+asking the assistant to continue.
 Send more prompts while a reply is running to queue follow-ups in the same chat.
 They run in order; use **Cancel** beside any queued prompt to remove it before
 it starts. **Stop** also clears queued prompts. Queues remain available when you

@@ -264,7 +264,7 @@ async function boot() {
   ];
 
   const agent:Agent = new Agent({
-    issueTaskBridge:access=>{const capability=bridge.issue(access);return {info:{url:bridge.url,token:capability.token,serverScript:mcpServerScript},revoke:capability.revoke}},
+    issueTaskBridge:(access,ttlMs)=>{const capability=bridge.issue(access,ttlMs);return {info:{url:bridge.url,token:capability.token,serverScript:mcpServerScript},revoke:capability.revoke}},
     files,datasets,localFiles,
     requestFolderAccess:(scope,reason,signal)=>folderAccess.request(scope,reason,signal),
     providers: providers as Map<string, Provider>,

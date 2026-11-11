@@ -361,6 +361,7 @@ export class ChatView {
       case 'turn_end':
         this.flushText();
         this.clearActivity();
+        if(event.message)this.appendNotice(event.message,'muted');
         this.live = null;
         this.setBusy(false);
         this.onSessionChanged();
@@ -372,7 +373,7 @@ export class ChatView {
         // Stop cancels the question too, so the card must go with it — leaving
         // it on screen invited an answer to a task that no longer exists.
         this.dropQuestions(event.sessionId);
-        this.appendNotice('Stopped.', 'muted');
+        this.appendNotice(event.message ?? 'The task was interrupted. You can ask me to continue.', 'muted');
         this.live = null;
         this.setBusy(false);
         break;
@@ -722,6 +723,7 @@ export class ChatView {
     for (const block of msg.blocks) this.appendBlock(body, block);
 
     root.append(who, body);
+    if(msg.stopMessage){const note=document.createElement('div');note.className='notice muted';note.textContent=msg.stopMessage;root.appendChild(note)}
     if (msg.usage) this.renderUsage(root, msg.usage);
     return root;
   }

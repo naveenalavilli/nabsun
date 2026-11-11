@@ -13,6 +13,18 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.1-rc.3 - Assistant interruption fixes
+
+Includes the local-file and Word/Excel features from 1.0.1-rc.2. Built from
+`fix/assistant-stop-reasons`, without merging to main.
+
+- Interactive Codex/Claude CLI chats now have a 30-minute task limit instead of
+  silently ending after five minutes. Browser-access credentials follow the
+  same deadline; explicit workflow time limits remain unchanged.
+- Interrupted turns explain whether Stop, a time limit, disconnected access,
+  an integration, or a provider failure ended the task. The reason remains
+  visible when reopening chat. AI usage/response limits also show an explanation.
+
 ## 1.0.1-rc.2 - Local files branch preview
 
 Prepared from `feature/local-folder-access`, without merging to main. Includes

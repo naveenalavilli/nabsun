@@ -53,7 +53,10 @@ site in a run; it does not permit arbitrary cross-origin writes.
 
 Targets are captured before approval and revalidated before dispatch. Stop cancels
 pending work, but cannot reverse an action that already completed. Hosted CLI
-tasks have a 100-browser-action and five-minute default limit. CLI-internal
+interactive chats have a 100-browser-action and 30-minute default limit.
+Explicit workflow budgets remain capped at five minutes. Delegated browser
+credentials expire with the remaining task deadline and are revoked immediately
+on cancellation. CLI-internal
 activity outside Nabsun's tools is not an OS sandbox, and unreported internal
 token use cannot be strictly limited by Nabsun.
 

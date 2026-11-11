@@ -324,7 +324,7 @@ export function registerIpc(deps: IpcDeps): void {
     approvals.clearSession(id);
     deps.folderAccess?.store.clear(id);
     promptQueue.clear(id);
-    agent.cancelScope(id);
+    agent.cancelScope(id,'Stopped because this chat was deleted.');
     sessions.remove(id);
     win.send(CH.localFolderChanged,{sessionId:id});
   });

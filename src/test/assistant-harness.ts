@@ -589,6 +589,16 @@ async function main() {
     assert.equal(provider.requests.length, 3, 'Stop does not launch a pending prompt');
     assert.equal(JSON.stringify(sessions.load(queuedSessionId)).includes('Discard this on Stop'), false);
     console.log('PASS follow-ups run in order; cancellation removes pending prompts before model history; Stop clears the queue');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("pressed Stop")'));
+    assert.equal(sessions.load(queuedSessionId)!.messages.at(-1)!.stopReason,'user_stop');
+    await agent.send(queuedSessionId,'Deadline explanation fixture.',{attachPage:false,budget:{steps:2,tokens:128000,timeMs:1000}});
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'));
+    assert.equal(sessions.load(queuedSessionId)!.messages.at(-1)!.stopReason,'time_limit');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-item").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript .notice")?.textContent.includes("pressed Stop")'));
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'),true,'deadline explanation survives reopening the conversation');
+    console.log('PASS live Stop/time-limit notices explain their cause and persist when reopening chat');
+
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Switching chat test"');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#attach-page").checked = false; document.querySelector("#send").click()');
