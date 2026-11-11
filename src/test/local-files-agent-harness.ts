@@ -107,7 +107,7 @@ async function main() {
   const tabs = new TabManager({ window, history, homepage: 'about:blank', partition: 'local-agent-fixture', preloadPath: path.join(__dirname, '../preload/page.js'), onFindResult: () => {} });
   const tab = tabs.create('http://127.0.0.1:' + (server.address() as { port: number }).port);
   await tabs.waitForSettled(tab, 5000);
-  const store = new LocalFolderStore([profile],async file=>{assert.equal(file,path.join(workspace,'Reports/note.txt'));fs.renameSync(file,path.join(workspace,'trash-fixture.txt'))}), chat = sessions.create();
+  const store = new LocalFolderStore([profile],async file=>{assert.equal(file,path.join(fs.realpathSync(workspace),'Reports/note.txt'));fs.renameSync(file,path.join(workspace,'trash-fixture.txt'))}), chat = sessions.create();
   let choices = 0, prompts = 0;
   const access = new FolderAccessController(store, { exists: scope => !!sessions.load(scope), choose: async () => { choices++;return workspace; }, confirm: async () => 'read-write', changed: () => {} });
   approvals.setEmitter(request => {
