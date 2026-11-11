@@ -1,7 +1,12 @@
 # Nabsun
 
-**A browser with an AI assistant built in.** Read pages, compare tabs, and complete
-browser tasks using a bundled local model, a cloud provider, Codex, or Claude Code.
+**An AI browser for getting things done across your tabs and files.** Find
+information, prepare forms, create a Word document, or update an Excel sheet.
+Choose the access, review the work, and use Stop whenever you need to.
+
+The latest stable release is [1.0.1](https://github.com/naveenalavilli/nabsun/releases/tag/v1.0.1),
+with Windows x64 and Apple-silicon Mac downloads. Free and open source under the
+MIT license. Optional online AI services may require an account and charge fees.
 
 [Website](https://nabsun.com) · [Downloads](https://github.com/naveenalavilli/nabsun/releases/latest) · [Release notes](RELEASE_NOTES.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
@@ -13,12 +18,36 @@ Get an available build for your platform from [GitHub Releases](https://github.c
 
 - **Windows x64:** choose `Nabsun-<version>-x64-setup.exe` to install, or
   `Nabsun-<version>-portable.exe` to run without installing.
-- **macOS:** check the release assets for your architecture, or build on a Mac.
-  Apple silicon has been tested locally; Intel remains unverified.
-- **Linux:** release packaging is not yet supported.
+- **Mac with an Apple M-series chip:** choose `Nabsun-<version>-arm64.zip`.
+  There is no Intel Mac installer in the current release.
+- **Linux:** no published installer; source builds require manual engine setup.
+
+### Windows
+
+1. Open the downloaded setup file and follow the installer.
+2. If Windows shows **Windows protected your PC**, choose **More info**. If you
+   trust the official download, choose **Run anyway**.
+3. Open **Nabsun** from the Start menu. The portable build opens directly.
+
+Windows builds are unsigned. Some managed computers or security policies do not
+offer an exception; ask your administrator rather than disabling protection.
+
+### Mac
+
+1. Check **Apple menu > About This Mac** for an Apple M-series chip.
+2. Open the downloaded ZIP and drag **Nabsun.app** to **Applications**.
+3. Open Nabsun. If macOS cannot verify the developer, dismiss the message. If
+   you trust the official download, use **System Settings > Privacy & Security >
+   Open Anyway**, then confirm the opening.
+
+Mac builds are ad-hoc signed, without an Apple Developer ID signature or
+notarization. A damage or malware warning needs investigation; do not treat it
+as an ordinary publisher warning. See the [illustrated installation steps](https://nabsun.com/#download).
+
+### Local AI and download checks
 
 The bundled Qwen3 1.7B model runs on your CPU without an account or API key.
-Windows downloads are about 1.4 GB because they include the model. Local inference
+Downloads are about 1.4 GB because they include the model. Local inference
 works offline; accessing websites and cloud assistants requires internet access.
 
 Windows builds are unsigned; Mac builds use ad-hoc signing without notarization.
@@ -28,7 +57,22 @@ Compare your download with the release's `SHA256SUMS.txt`, for example:
 Get-FileHash .\Nabsun-<version>-x64-setup.exe -Algorithm SHA256
 ```
 
+On Mac, use `shasum -a 256` followed by the downloaded ZIP's path. A matching
+checksum confirms the file matches that release; it does not establish publisher
+identity or guarantee safety.
+
 ## Use the assistant
+
+1. Choose the built-in assistant in the getting-started guide. No account or
+   API key is needed; you can also choose to browse without the assistant.
+2. Open a website, then open the assistant. Choose **Use this page** when you
+   want to include page context.
+3. Type a task or choose an editable example, review it, and press **Send**.
+   Approve requested actions and check the result.
+
+Try "Find this store's return policy," "Compare these open tabs," or "Prepare
+this form and let me review it before submitting." The video above shows an
+earlier version; current releases also work with approved local folders.
 
 Nabsun checks for new releases at startup and every 24 hours. Click **Update
 available** in the toolbar to download one, or use **Settings > App updates** to
@@ -45,7 +89,7 @@ stay collapsed until requested. Preferences save as you change them. Use **Back 
 browser** or Escape to return to the same tab; your chat and assistant layout
 are preserved. The setup tour is available from **Getting started**.
 
-Open the assistant with **Ctrl+Shift+A** and ask about a page or give it a task.
+Open the assistant with **Ctrl+Shift+A** (**Cmd+Shift+A** on Mac) and ask about a page or give it a task.
 Open **Assistant options (⋯)** for **Detach assistant** to move it into a separate
 window, or **Attach assistant** to bring it back. Your choice is saved. Use the
 header's **Hide assistant** button or close the
@@ -53,8 +97,10 @@ detached window to hide the assistant; reopening preserves your chat and draft.
 Use **Text size** in Assistant options or **Ctrl/Cmd + Plus, Minus, or 0** to enlarge, shrink,
 or reset the assistant text. The zoom level is saved independently of website zoom.
 **Stop** cancels active assistant work and browser tool calls, including CLI subprocesses.
-Interactive Codex/Claude CLI chats have a 30-minute time limit; workflow tasks
-can have shorter explicit budgets. Automatic interruptions explain their cause
+Interactive Codex/Claude CLI chats have a 30-minute default time limit and a
+100-action limit for Nabsun tools; workflows can have shorter explicit budgets.
+Ordinary interactive CLI chats have no extra cumulative token cap; provider
+limits still apply. Automatic interruptions explain their cause
 and keep that explanation in chat history. Review completed actions before
 asking the assistant to continue.
 Send more prompts while a reply is running to queue follow-ups in the same chat.
@@ -71,6 +117,26 @@ preferences remain in Settings.
 Chat history, Settings, Extensions, Bookmarks, and Saved passwords are also in
 Assistant options. New chat and Hide remain directly in the compact header.
 
+### Permissions, attachments, and dictation
+
+Read tools run automatically by default; actions that change a page ask first.
+Approval choices can apply once, to a task on a site, or to a tool/site for 24
+hours. Old global grants are revoked during migration.
+
+The optional **Auto-allow this tool for this chat session** checkbox reduces
+repeat prompts for that tool across sites and follow-up messages in this chat.
+It can include powerful tools such as page JavaScript and uploads. Uncheck the
+grant below the conversation to ask again. Choices last in memory until
+revoked, the chat is deleted, or the app closes; Stop cancels the task but keeps
+them for later prompts. They do not grant folder access, upgrade a read-only
+folder, or bypass host policy. See [Security](SECURITY.md).
+
+Attach files or images beside the message box. Image understanding requires a
+vision-capable model. The microphone dictates into the draft on Windows using
+installed speech languages; review the words before sending. The microphone
+control or Escape stops dictation. macOS/Linux show system dictation guidance;
+Nabsun does not use cloud transcription.
+
 ### Work with files on your computer
 
 Click **Folder** beside the message box, choose a folder, and select **Read only**
@@ -79,8 +145,9 @@ it will ask you to choose and approve a folder when needed.
 
 For example: "Read the reports in this folder and save a summary as a Markdown
 file," or "Organize these files into a new subfolder." Access applies to this
-chat until you disconnect the folder or close Nabsun. **Disconnect** also stops
-the current task. Files you read may be shared with your selected AI service.
+chat until you disconnect the folder, delete the chat, or close Nabsun.
+**Disconnect** cancels active and queued work. Files you read may be shared with
+your selected AI service and remain in chat history after access is revoked.
 
 Create and edit text, CSV and code files, Word (.docx) documents, and Excel
 (.xlsx) workbooks. Ask "Create a Word project plan" or "Update the expenses in
@@ -98,6 +165,7 @@ location and rename it with its original extension (for example, `.docx` or
 `.xlsx` instead of `.bak`). Keep the current file until you confirm the restored
 copy is correct.
 Files are limited to 20 MB for reading/copying and 2 MB for text changes.
+See the [local files guide](https://nabsun.com/local-files) for examples.
 
 ## Developer tools
 
@@ -154,7 +222,8 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
 - Windows microphone dictation into the chat draft, using installed speech
   languages. Review the words before sending. macOS/Linux provide OS dictation guidance.
 - A full data workspace for datasets, saved workflows, batch replay and per-row
-  reports. Uncertain rows pause for review before another attempt.
+  reports. Uncertain rows pause for review before another attempt. Tasks that
+  modify local files cannot yet be saved as browser-only workflows.
 - A local activity journal with integrity checks and export.
 - Optional personal context in `soul.md`, shared only with local models by default.
 - Plugins, MCP servers, and unpacked Chrome extensions. Chrome API support is partial;
@@ -163,19 +232,23 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
 To let an external agent use Nabsun, copy the MCP configuration from
 **Settings → Integrations → Connect an external agent**. Browser tools use the
 same approval settings as the sidebar. Only install plugins and MCP servers you trust.
+External clients cannot claim an existing chat's folder permissions or
+chat-session grants. Hosted Codex/Claude tasks instead receive temporary
+credentials bound to the owning chat and its permitted tools.
 New or changed integrations require source review. MCP servers must be installed
 locally and configured through their executable or entry script; dynamic package
 runners such as `npx` are no longer accepted. Plugins, MCP and unpacked extensions
 can be disabled independently in Settings.
 See [Security](SECURITY.md) for permissions, credential handling, and limitations.
 
-The 1.0.0 development branch is still being verified. The
-[implementation and evidence record](docs/improvement-status.md) lists unfinished
-release gates. Scripted browser-tool success is not a model-quality guarantee.
+The [implementation and evidence record](docs/improvement-status.md) tracks
+remaining release work and evaluation limits. Scripted browser-tool success is
+not a model-quality guarantee. A stable release designation does not imply
+independent security certification or reliable completion on every website.
 
 ## Develop
 
-With Node.js and npm installed, run these commands from the repository root:
+Use Node.js 22 (the CI version) and npm. From the repository root:
 
 ```bash
 npm ci
@@ -206,11 +279,20 @@ Output goes to `release/`. Packaging verifies the bundled engine, model, and
 licenses. macOS packaging requires a Mac; public signed distribution also requires
 a Developer ID certificate and notarization.
 
+Current public Mac downloads are Apple silicon ZIPs; building a DMG locally
+does not publish a release. All updates to `main` go through a PR and required
+checks. The protected [`releases/v-0-x`](https://github.com/naveenalavilli/nabsun/tree/releases/v-0-x)
+branch preserves **0.1.13** and is locked against updates and deletion.
+See the [CI guide](.github/README-CICD.md) for previews and draft publication.
+
 ## Current limits
 
-Nabsun is a developer preview. There is no automatic update installation, profile sync, or
+Nabsun is an early open-source product. There is no automatic update installation, profile sync, or
 private browsing mode. The small local model can struggle with long tasks, and
 website compatibility varies. Review actions before approving them.
+Prompt injection remains a risk. Plugins and MCP servers are trusted native
+code, not a complete OS sandbox. Trusted publisher signing and Apple
+notarization remain unfinished; see [Security](SECURITY.md).
 
 [Architecture](ARCHITECTURE.md) · [MIT license](LICENSE) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
