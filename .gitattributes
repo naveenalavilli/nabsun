@@ -1,3 +1,4 @@
 # Preserve byte offsets and archive contents across Windows/macOS checkouts.
 *.pdf binary
 *.xlsx binary
+*.docx binary

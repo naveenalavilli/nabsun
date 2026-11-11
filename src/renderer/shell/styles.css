@@ -1245,3 +1245,19 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 #composer-chips .chip { padding:5px 8px; background:transparent; font-size:10.5px; cursor:pointer; }
 #composer-chips .chip:has(input:checked) { background:var(--accent-tint); color:var(--accent-text); border-color:var(--accent-tint-strong); }
 #attachment-status:empty { display:none; }
+
+#local-folder-status:empty, #local-folder-access[hidden] { display:none; }
+#local-folder-access { max-height:150px; overflow:auto; margin-bottom:10px; padding:10px; border:1px solid var(--border); border-radius:12px; background:var(--bg-input); }
+#local-folder-access summary { font-size:11px; color:var(--text-dim); cursor:pointer; }
+.local-folder-row { display:flex; align-items:center; gap:10px; padding-top:9px; }
+.local-folder-row > div { flex:1; min-width:0; }
+.local-folder-row strong { font-size:12px; }
+.local-folder-mode,.local-folder-path { display:block; font-size:10px; color:var(--text-dim); overflow-wrap:anywhere; margin-top:3px; }
+.local-folder-row button { flex-shrink:0; font-size:10px; }
+.composer-tool.folder-access-button { width:auto; display:flex; gap:5px; font:inherit; font-size:11px; }
+@container (max-width:340px) { .folder-access-button span { display:none; } .composer-tool.folder-access-button { width:36px; } }
+
+#composer { min-height:0; max-height:85%; overflow-y:auto; flex-shrink:0; }
+.composer-box .composer-row { flex-wrap:wrap; }
+.composer-box #send,.composer-box #stop { flex-shrink:0; white-space:nowrap; }
+.composer-box #stop { min-height:34px; border-radius:11px; }

@@ -1,7 +1,7 @@
 {
   "name": "nabsun",
   "productName": "Nabsun",
-  "version": "1.0.1-rc.1",
+  "version": "1.0.1-rc.2",
   "description": "A browser for AI: Chromium as an execution environment for agents, with a bundled local model and pluggable backends (Claude, Codex/OpenAI, Ollama).",
   "main": "dist/main/index.js",
   "author": "Naveen Alavilli",
@@ -14,7 +14,7 @@
     "start": "npm run build && node scripts/electron-run.mjs",
     "setup": "node node_modules/electron/install.js",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:updates && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:delegation && npm run verify:local && npm run verify:bench && npm run verify:input && npm run verify:frames && npm run verify:files && npm run verify:voice && npm run verify:workflows && npm run verify:approvals && npm run verify:audit && npm run verify:permissions && npm run verify:network && npm run verify:integrations",
+    "verify": "npm run build && npm run verify:payload && npm run verify:cli && npm run verify:connections && npm run verify:review && npm run verify:updates && npm run verify:browse && npm run verify:page && npm run verify:agent && npm run verify:mcp && npm run verify:delegation && npm run verify:local && npm run verify:bench && npm run verify:input && npm run verify:frames && npm run verify:files && npm run verify:local-files && npm run verify:office && npm run verify:voice && npm run verify:workflows && npm run verify:approvals && npm run verify:audit && npm run verify:permissions && npm run verify:network && npm run verify:integrations",
     "verify:review": "node scripts/electron-run.mjs dist/test/review-harness.js && node scripts/electron-run.mjs scripts/verify-permissions-ui.cjs && npm run verify:assistant",
     "verify:assistant": "node scripts/electron-run.mjs dist/test/assistant-harness.js",
     "verify:updates": "node scripts/electron-run.mjs scripts/verify-updates.cjs",
@@ -52,11 +52,15 @@
     "verify:network": "node scripts/electron-run.mjs dist/test/network-auth-harness.js && node scripts/electron-run.mjs dist/test/network-config-harness.js",
     "verify:integrations": "node dist/test/integration-trust-harness.js && node scripts/electron-run.mjs dist/test/plugin-isolation-harness.js",
     "verify:voice": "node dist/test/voice-harness.js && node scripts/electron-run.mjs scripts/verify-voice-ui.cjs",
-    "verify:delegation": "node scripts/electron-run.mjs dist/test/delegation-harness.js"
+    "verify:delegation": "node scripts/electron-run.mjs dist/test/delegation-harness.js",
+    "verify:local-files": "node dist/test/local-files-harness.js && node scripts/electron-run.mjs dist/test/local-files-agent-harness.js",
+    "verify:office": "node dist/test/office-harness.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
+    "@xmldom/xmldom": "0.9.12",
+    "fflate": "0.8.3",
     "openai": "^6.10.0",
     "pdfjs-dist": "6.5.438",
     "read-excel-file": "9.3.14"

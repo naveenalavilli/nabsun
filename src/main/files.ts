@@ -185,7 +185,9 @@ export class FileStore {
   ): { mediaType: string; data: string } {
     if (!this.isImage(scope, id))
       throw Error('Image previews support PNG, JPEG, WebP and GIF.');
-    const bytes = this.bytes(scope, id);
+    return this.imageFromBytes(this.bytes(scope, id), thumbnail);
+  }
+  imageFromBytes(bytes: Buffer, thumbnail = false): {mediaType:string;data:string} {
     if (bytes.length > 5 * 1024 * 1024)
       throw Error(
         'Choose an image no larger than 5 MB for visual analysis. The original can still be uploaded to a website.',
@@ -259,11 +261,16 @@ export class FileStore {
     if (signal?.aborted) throw Error('Stopped before reading file.');
     const record = this.record(scope, id),
       bytes = this.bytes(scope, id);
+    return this.parseBytes(record.name, bytes, signal);
+  }
+  async parseBytes(name:string,bytes:Buffer,signal?:AbortSignal):Promise<ParsedFile> {
+    if(signal?.aborted)throw Error('Stopped before reading file.');
+    if(bytes.length>MAX_BYTES)throw Error('File exceeds 20 MB.');
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.parserPath, {
         workerData: {
           bytes,
-          extension: path.extname(record.name).toLowerCase(),
+          extension: path.extname(name).toLowerCase(),
         },
         execArgv: ['--no-addons'],
         resourceLimits: { maxOldGenerationSizeMb: 128 },

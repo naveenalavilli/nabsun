@@ -6,7 +6,7 @@ import {defaultPolicy,integrationPolicy,PolicyDeniedError,type PolicyProvider} f
 
 type Emit = (req: ApprovalRequest) => void;
 export type ApprovalMode='read-only'|'autopilot'|'task'|'site'|'session'|'user'|'denied';
-interface ApprovalMetadata {sessionId?:string;origin?:string;fileName?:string;target?:{role:string;name:string;value?:string;credential?:boolean};crossOriginSubmit?:boolean;onDecision?:(mode:ApprovalMode)=>void}
+interface ApprovalMetadata {folderLabel?:string;sessionId?:string;origin?:string;fileName?:string;target?:{role:string;name:string;value?:string;credential?:boolean};crossOriginSubmit?:boolean;onDecision?:(mode:ApprovalMode)=>void}
 
 interface Pending {
   resolve: (decision: ApprovalDecision) => void;
@@ -81,7 +81,7 @@ export class ApprovalManager {
       id: randomUUID(),
       toolName: tool.name,
       risk: tool.risk,
-      title: tool.name==='browser_upload'?`Upload ${JSON.stringify(metadata.fileName??'attached file')} to ${metadata.origin??'the page'}`:metadata.target?`${describe(tool,input)}: ${metadata.target.role} ${JSON.stringify(metadata.target.name)} on ${origin??'this page'}`:describe(tool, input),
+      title: tool.source==='local-files' ? describe(tool,input)+(metadata.folderLabel?' in '+metadata.folderLabel.replace(/[\x00-\x1f\x7f]/g,' '):'') : tool.name==='browser_upload'?`Upload ${JSON.stringify(metadata.fileName??'attached file')} to ${metadata.origin??'the page'}`:metadata.target?`${describe(tool,input)}: ${metadata.target.role} ${JSON.stringify(metadata.target.name)} on ${origin??'this page'}`:describe(tool, input),
       detail: metadata.target?`${metadata.target.credential?'Credential field: the assistant cannot type here.':metadata.target.value!==undefined?'Current value: '+metadata.target.value.slice(0,500):''}\n${metadata.crossOriginSubmit?'This form sends data to another origin.\n':''}${summarizeInput(input)}`:summarizeInput(input),
       input,
       origin,
@@ -149,6 +149,18 @@ export class ApprovalManager {
 
 function describe(tool: Tool, input: Record<string, unknown>): string {
   switch (tool.name) {
+    case 'local_request_folder': return 'Choose a folder on your computer';
+    case 'local_word_create': return 'Create Word document '+JSON.stringify(String(input.path??''));
+    case 'local_word_edit': return 'Edit Word document '+JSON.stringify(String(input.path??''));
+    case 'local_excel_create': return 'Create Excel workbook '+JSON.stringify(String(input.path??''));
+    case 'local_excel_edit': return 'Update Excel cells in '+JSON.stringify(String(input.path??''));
+    case 'local_write': return 'Save local file '+JSON.stringify(String(input.path??''));
+    case 'local_edit': return 'Edit local file '+JSON.stringify(String(input.path??''));
+    case 'local_append': return 'Add text to local file '+JSON.stringify(String(input.path??''));
+    case 'local_trash': return 'Move local file '+JSON.stringify(String(input.path??''))+' to Recycle Bin/Trash';
+    case 'local_mkdir': return 'Create local folder '+JSON.stringify(String(input.path??''));
+    case 'local_copy': return 'Copy local file '+JSON.stringify(String(input.from??''))+' to '+JSON.stringify(String(input.to??''));
+    case 'local_move': return 'Move local file '+JSON.stringify(String(input.from??''))+' to '+JSON.stringify(String(input.to??''));
     case 'browser_navigate':
       return `Navigate to ${String(input.url ?? '')}`;
     case 'browser_click':

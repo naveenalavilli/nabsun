@@ -9,6 +9,35 @@ history. **Published** dates use America/Chicago. A tag, a draft release or a
 package-version change is not treated as proof of publication. Earlier versions
 are marked accordingly, and their behavior may differ from the current product.
 
+## Unreleased
+
+No additional changes yet.
+
+## 1.0.1-rc.2 - Local files branch preview
+
+Prepared from `feature/local-folder-access`, without merging to main. Includes
+the chat and session-permission improvements from 1.0.1-rc.1.
+
+- Choose a local folder for the current chat, with read-only or read-and-change
+  access. The assistant can request access through a native folder picker and
+  permission dialog; it cannot choose paths or grant itself access.
+- Read text/code, CSV/TSV, XLSX, text PDFs and supported images. Create or edit
+  UTF-8 text/CSV/code, append text, create subfolders, copy or rename regular
+  files, and move files to Recycle Bin/Trash without permanent deletion.
+  Binary document formats are not overwritten as text.
+- Create Word (.docx) documents with headings and paragraphs, replace body text,
+  and append new sections. Create Excel (.xlsx) workbooks and update cell values
+  or explicit formulas. Unrelated package parts, including images and charts,
+  are preserved. Formula results require recalculation in Excel. Unsupported
+  protected, signed and advanced document structures are refused. Locked Word
+  content controls and enclosing tracked revisions are also protected.
+- Original text and Office files are backed up before edits. File hashes detect stale
+  changes; path/link checks keep tool operations inside approved folders and
+  protect Nabsun profile data. Activity records keep the existing redaction.
+- Connected folders show their location and access level in chat. Disconnect
+  revokes access and stops current work. Grants are memory-only, chat-bound,
+  and expire on deletion or app shutdown.
+
 ## 1.0.1-rc.1 - Branch preview
 
 Prepared from the session-permissions branch, independently of main. This is a

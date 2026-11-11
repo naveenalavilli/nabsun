@@ -1,3 +1,5 @@
+import type {LocalFolderStore} from '../../localFiles';
+import type {LocalFolder} from '../../../shared/localFiles';
 import type {DatasetStore} from '../../data/datasets';
 import type { FileStore } from '../../files';
 import type { RiskLevel, ToolSpec } from '../../../shared/types';
@@ -37,6 +39,8 @@ export interface ToolContext {
   signal: AbortSignal;
   userDataPath: string;
   files?:FileStore;
+  localFiles?:LocalFolderStore;
+  requestFolderAccess?:(reason:string)=>Promise<LocalFolder|null>;
   supportsImages?:boolean;
   datasets?:DatasetStore;
   fileScope?:string|null;

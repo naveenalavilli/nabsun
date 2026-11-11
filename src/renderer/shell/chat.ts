@@ -12,6 +12,7 @@ import type {
   QueuedPrompt,
 } from '../../shared/types';
 import { renderMarkdown } from './markdown';
+import {LocalFoldersView} from './localFolders';
 import {VoiceInput} from './voice';
 import type { Batch } from '../../shared/workflows';
 
@@ -42,6 +43,7 @@ export class ChatView {
 
   private sessionId: string | null = null;
   private voice?:VoiceInput;
+  private localFolders?:LocalFoldersView;
   private live: LiveTurn | null = null;
   private runningSessionId: string | null = null;
   private queues = new Map<string, PromptQueueState>();
@@ -62,6 +64,7 @@ export class ChatView {
     this.wireComposer();
     this.wireFiles();
     this.voice=new VoiceInput(this.prompt,()=>this.sessionId);
+    this.localFolders=new LocalFoldersView(()=>this.sessionId);
     window.nabsun.workflows?.onChanged(batch => {
       if (batch.scope === this.sessionId) this.renderBatch(batch);
     });
@@ -102,6 +105,7 @@ export class ChatView {
     for (const pending of this.pendingApprovals.values()) {
       if (pending.sessionId === session.id) this.renderApproval(pending);
     }
+    void this.localFolders?.refresh();
     void this.refreshSessionGrants();
     this.scrollToEnd();
     this.renderQueue();
@@ -539,10 +543,11 @@ export class ChatView {
         const toggle = document.createElement('input');
         toggle.type = 'checkbox';
         toggle.checked = true;
-        const name = grant.toolName === 'browser_evaluate'
+        const localNames:Record<string,string>={local_word_create:'Create Word documents',local_word_edit:'Edit Word documents',local_excel_create:'Create Excel workbooks',local_excel_edit:'Edit Excel cells',local_write:'Save local text files',local_edit:'Edit local text files',local_copy:'Copy local files',local_move:'Move or rename local files',local_mkdir:'Create local folders',local_append:'Add text to local files',local_trash:'Move local files to Recycle Bin/Trash'};
+        const name = localNames[grant.toolName] ?? (grant.toolName === 'browser_evaluate'
           ? 'Run JavaScript in the page'
-          : grant.toolName.replace(/^browser_/, '').replace(/_/g, ' ');
-        const source = grant.source && grant.source !== 'browser' ? ' (' + grant.source + ')' : '';
+          : grant.toolName.replace(/^browser_/, '').replace(/_/g, ' '));
+        const source = grant.source && !['browser','local-files'].includes(grant.source) ? ' (' + grant.source + ')' : '';
         label.append(toggle, document.createTextNode(name + source));
         toggle.addEventListener('change', () => {
           toggle.disabled = true;
@@ -580,7 +585,7 @@ export class ChatView {
 
     const tool = document.createElement('div');
     tool.className = 'muted';
-    tool.textContent = req.toolName+(req.source&&req.source!=='browser'?' ('+req.source+')':'');
+    tool.textContent = req.source==='local-files'?'Local files in this chat':req.toolName+(req.source&&req.source!=='browser'?' ('+req.source+')':'');
 
     const detail = document.createElement('pre');
     detail.textContent = req.detail;
@@ -784,7 +789,7 @@ export class ChatView {
     const tasks = [
       { id: 'research', title: 'Find & compare', detail: 'Explore choices. Find what fits.', icon: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6M10 7v6"/>', prompt: 'Help me find and compare a few options. Ask what I am looking for and what matters to me, then show the choices with links and explain the differences in plain language.' },
       { id: 'action', title: 'Help with a task', detail: 'Fill in details. Follow the steps.', icon: '<path d="m5 3 14 9-7 2-3 7Z M14 15l5 5"/>', prompt: 'Help me with a task on this website. Ask what I want to do and which details to use, then guide me or help fill them in. Ask before sending anything.' },
-      { id: 'files', title: 'Use a file or image', detail: 'Ask about a document, photo or table.', icon: '<path d="M14 3H5v18h14V8Z M14 3v6h5M8 13h8M8 17h5"/>', prompt: 'Help me with a file or image. Ask me to add it using the paperclip button, then ask what I need help with. Explain your findings clearly.' },
+      { id: 'files', title: 'Use a file or image', detail: 'Ask about a document, photo or table.', icon: '<path d="M14 3H5v18h14V8Z M14 3v6h5M8 13h8M8 17h5"/>', prompt: 'Help me with a file or image. Ask what I need to do, then help me add a file or choose a folder with the access you need. Ask before making changes.' },
       { id: 'summary', title: 'Understand a page', detail: 'Get the main points in plain language.', icon: '<path d="M4 4h16v16H4Z M8 8h8M8 12h8M8 16h4"/>', prompt: 'Summarize this page in three short bullet points.' },
     ];
     for (const task of tasks) {

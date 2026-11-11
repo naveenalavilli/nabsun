@@ -1,3 +1,4 @@
+import {LocalFolderStore,FolderAccessController} from '../main/localFiles';
 import {FileStore} from '../main/files';
 import {DatasetStore} from '../main/data/datasets';
 import {DataWorkspace} from '../main/data/workspace';
@@ -91,7 +92,12 @@ async function main() {
     override start(...args:Parameters<VoiceManager['start']>){args[5]=async()=>true;return super.start(...args)}
   }
   const fixtureVoice=new FixtureVoice({availability:async()=>({available:true,languages:[{code:'en-US',name:'English'},{code:'te-IN',name:'Telugu'}],help:'Local test recognizer'}),listen:(_language,emit)=>{voiceEmit=emit;setImmediate(()=>emit({type:'listening'}));return()=>{voiceStops++}}});
+  const localFixture=fs.mkdtempSync(path.join(os.tmpdir(),'nabsun-folder-ui-'));
+  const localStore=new LocalFolderStore([tmp]);
+  let folderChoice:string|null=localFixture;
+  const folderAccess=new FolderAccessController(localStore,{choose:async()=>folderChoice,confirm:async()=> 'read',exists:scope=>!!sessions.load(scope),changed:scope=>win.send(CH.localFolderChanged,{sessionId:scope})});
   registerIpc({
+    folderAccess,
     voice:fixtureVoice,
     dataWorkspace, win, settings, sessions, history, providers, approvals, questions, agent, mcp,
     secrets: new SecretStore(), downloads: new DownloadManager(), passwords: new PasswordStore(),
@@ -483,6 +489,38 @@ async function main() {
     win.assistant.setSize(560, 820);
     console.log('PASS hide/reopen preserves draft; independent zoom persists, clamps and resets');
 
+
+    const folderScope=fs.readdirSync(path.join(tmp,'sessions')).find(name=>name.endsWith('.json'))!.slice(0,-5);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#choose-local-folder").click()');
+    await until(()=>localStore.list(folderScope).length===1);
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access").textContent.includes("Read only")'));
+    assert.equal(localStore.list(folderScope)[0].mode,'read');
+    await delay(100);
+    fs.writeFileSync(path.join(artifacts,'assistant-local-folder.png'),(await win.assistant.webContents.capturePage()).toPNG());
+    for(const theme of ['light','dark']) {
+      await win.assistant.webContents.executeJavaScript(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      win.assistant.setSize(380,820);win.assistant.webContents.setZoomFactor(2);await delay(80);
+      const folderLayout=await win.assistant.webContents.executeJavaScript(`(() => {
+        document.querySelector('#stop').hidden=false;
+        document.querySelector('#send .send-label').textContent='Send next';
+        document.querySelector('#stop').focus();
+        const stop=document.querySelector('#stop').getBoundingClientRect();
+        return {overflow:document.documentElement.scrollWidth>innerWidth,stopVisible:stop.top>=0&&stop.bottom<=innerHeight&&stop.right<=innerWidth};
+      })()`);
+      assert.equal(folderLayout.overflow,false,JSON.stringify({theme,folderLayout}));
+      assert.equal(folderLayout.stopVisible,true,JSON.stringify({theme,folderLayout}));
+    }
+    win.assistant.webContents.setZoomFactor(1);win.assistant.setSize(560,820);
+    await win.assistant.webContents.executeJavaScript('document.documentElement.dataset.theme="light";document.querySelector("#stop").hidden=true;document.querySelector("#send .send-label").textContent="Send"');
+    folderChoice=null;
+    await until(()=>win.assistant.webContents.executeJavaScript('!document.querySelector("#choose-local-folder").disabled'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#choose-local-folder").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-status").textContent.includes("No new folder")'));
+    assert.equal(localStore.list(folderScope).length,1,'cancelled chooser preserves earlier access');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access button").click()');
+    await until(()=>localStore.list(folderScope).length===0);
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access").hidden'));
+    console.log('PASS folder button opens chat-bound access, shows read-only mode and location, cancellation adds nothing, and Disconnect revokes it');
 
     const permissionSession=fs.readdirSync(path.join(tmp,'sessions')).find(name=>name.endsWith('.json'))!.slice(0,-5);
     const evaluate=defineTool({name:'browser_evaluate',description:'permission fixture',risk:'dangerous',properties:{}},async()=> 'ok');

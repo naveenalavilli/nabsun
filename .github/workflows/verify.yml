@@ -47,6 +47,8 @@ jobs:
       - run: node --test scripts/verify-branch-release.cjs
       - run: node dist/test/audit-harness.js
       - run: node dist/test/voice-harness.js
+      - run: node dist/test/local-files-harness.js
+      - run: npm run verify:office
       - name: Dictation panel cancellation
         run: |
           if ($IsLinux) {
@@ -57,7 +59,7 @@ jobs:
       - run: node dist/test/integration-trust-harness.js
       - name: Input, frames, files, approvals, and durable workflows
         run: |
-          foreach ($harness in @('input', 'frame', 'file', 'delegation', 'approval', 'site-permission', 'network-auth', 'network-config', 'plugin-isolation', 'workflow')) {
+          foreach ($harness in @('input', 'frame', 'file', 'local-files-agent', 'delegation', 'approval', 'site-permission', 'network-auth', 'network-config', 'plugin-isolation', 'workflow')) {
             if ($IsLinux) {
               xvfb-run -a node scripts/electron-run.mjs "dist/test/$harness-harness.js" --no-sandbox
             } else {

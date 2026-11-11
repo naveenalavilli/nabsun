@@ -46,6 +46,7 @@ import type { PasswordStore } from './passwords';
 import type { SecretStore, SettingsStore } from './store';
 
 export interface IpcDeps {
+  folderAccess?:import('./localFiles').FolderAccessController;
   voice?:VoiceManager;
   sitePermissions?:SitePermissions;
   win: AppWindow;
@@ -248,6 +249,19 @@ export function registerIpc(deps: IpcDeps): void {
     questions.answer(id, typeof text === 'string' ? text : null);
   });
 
+  ipcMain.handle(CH.localFolderList,(_event,scope:string)=>sessions.load(scope)?deps.folderAccess?.store.list(scope,true)??[]:[]);
+  ipcMain.handle(CH.localFolderChoose,async(event,scope:string)=>{
+    if(!sessions.load(scope)||!deps.folderAccess)throw Error('Open a chat before choosing a folder.');
+    const controller=new AbortController(),abort=()=>controller.abort();
+    event.sender.once('destroyed',abort);
+    try{return await deps.folderAccess.request(scope,'Work with files in this chat',controller.signal)}
+    finally{if(!event.sender.isDestroyed())event.sender.removeListener('destroyed',abort)}
+  });
+  ipcMain.handle(CH.localFolderRevoke,(_event,scope:string,id:string)=>{
+    if(!sessions.load(scope)||!deps.folderAccess)return;
+    deps.folderAccess.store.revoke(scope,id);promptQueue.clear(scope);agent.cancelScope(scope);
+    win.send(CH.localFolderChanged,{sessionId:scope});
+  });
   ipcMain.handle(CH.fileList,(_event,sessionId:string)=>sessions.load(sessionId)?agent.files?.list(sessionId)??[]:[]);
   ipcMain.handle(CH.filePreview,(_event,sessionId:string,id:string)=>{
     if(!sessions.load(sessionId)||!agent.files)throw Error('Chat not found.');
@@ -308,9 +322,11 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CH.sessionDelete, (_e, id: string) => {
     voice.stopSession(id);
     approvals.clearSession(id);
+    deps.folderAccess?.store.clear(id);
     promptQueue.clear(id);
     agent.cancelScope(id);
     sessions.remove(id);
+    win.send(CH.localFolderChanged,{sessionId:id});
   });
   ipcMain.handle(CH.sessionRename, (_e, id: string, title: string) => sessions.rename(id, title));
 
