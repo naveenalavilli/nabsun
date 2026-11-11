@@ -54,6 +54,8 @@ site in a run; it does not permit arbitrary cross-origin writes.
 Targets are captured before approval and revalidated before dispatch. Stop cancels
 pending work, but cannot reverse an action that already completed. Hosted CLI
 interactive chats have a 100-browser-action and 30-minute default limit.
+They do not impose an extra cumulative token cap on the CLI; provider usage
+limits still apply, and reported usage remains visible.
 Explicit workflow budgets remain capped at five minutes. Delegated browser
 credentials expire with the remaining task deadline and are revoked immediately
 on cancellation. CLI-internal

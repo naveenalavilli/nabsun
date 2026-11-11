@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      windows_test_installer:
+        description: Build and publish only a Windows test installer from this branch
+        type: boolean
+        default: false
       branch_prerelease:
         description: Publish a verified prerelease from this branch without merging
         type: boolean
@@ -28,6 +32,7 @@ env:
 
 jobs:
   verify-action-workflows:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     strategy:
       fail-fast: false
       matrix:
@@ -69,6 +74,7 @@ jobs:
           }
 
   verify-connections:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     strategy:
       fail-fast: false
       matrix:
@@ -115,6 +121,7 @@ jobs:
         run: xvfb-run -a node scripts/electron-run.mjs scripts/verify-onboarding-ui.cjs --no-sandbox
 
   verify:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -200,6 +207,7 @@ jobs:
           retention-days: 7
 
   verify-macos:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     runs-on: macos-latest
     timeout-minutes: 45
     defaults:
@@ -274,6 +282,7 @@ jobs:
   # Mac sold since 2020, and a zip skips the disk-image mount for a 1.3 GB file.
   # Add `--x64` and a dmg target here if Intel users ask.
   package-macos:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     runs-on: macos-latest
     needs: [verify-macos, verify-connections]
     timeout-minutes: 60
@@ -335,6 +344,7 @@ jobs:
           retention-days: 7
 
   package:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     runs-on: windows-2022
     needs: [verify, verify-macos, package-macos, verify-connections, verify-action-workflows]
     timeout-minutes: 60
@@ -547,4 +557,90 @@ jobs:
             release/Nabsun-${{ steps.installers.outputs.version }}-x64-setup.exe
             release/Nabsun-${{ steps.installers.outputs.version }}-portable.exe
             release/Nabsun-${{ steps.installers.outputs.version }}-arm64.zip
+            release/SHA256SUMS.txt
+
+  windows-test:
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_test_installer && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: node --test scripts/verify-branch-release.cjs scripts/verify-ci-publishing.cjs
+      - run: npm run build
+      - name: Windows regression checks
+        timeout-minutes: 20
+        run: |
+          foreach ($check in @('verify:delegation', 'verify:agent', 'verify:assistant', 'verify:cli', 'verify:mcp', 'verify:local-files', 'verify:office', 'verify:files', 'verify:approvals', 'verify:audit', 'verify:workflows')) {
+            npm.cmd run $check
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - uses: actions/cache@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Fetch and verify bundled model and engine
+        run: |
+          npm.cmd run fetch:model
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm.cmd run check:payload
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm.cmd run verify:local
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Windows installer only
+        timeout-minutes: 35
+        run: |
+          npm.cmd run icon
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx.cmd electron-builder --win nsis --x64 --config electron-builder.ci.yml --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify installer and checksum
+        id: package
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = "release/Nabsun-$version-x64-setup.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'Missing Windows installer.' }
+          if ((Get-Item -LiteralPath $installer).Length -eq 0) { throw 'Empty Windows installer.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $installer)" | Set-Content -LiteralPath release/SHA256SUMS.txt -Encoding ascii
+      - name: Prepare Windows-only test prerelease
+        id: release
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_OPT_IN: ${{ inputs.windows_test_installer }}
+          RELEASE_WINDOWS_ONLY: 'true'
+        run: |
+          node scripts/prepare-branch-release.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $existing = git ls-remote --tags origin "refs/tags/v$version"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify release tag.' }
+          if ($existing) { throw "Tag v$version already exists. Use a new preview version." }
+      - name: Publish Windows test installer
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Nabsun ${{ steps.release.outputs.tag }} - Windows test
+          prerelease: true
+          make_latest: false
+          draft: false
+          fail_on_unmatched_files: true
+          body_path: release/BRANCH_RELEASE_NOTES.md
+          files: |
+            release/Nabsun-${{ steps.package.outputs.version }}-x64-setup.exe
             release/SHA256SUMS.txt

@@ -59,8 +59,9 @@ async function main() {
   });
   await bridge.start();
   let last: StreamRequest | undefined,
-    mode: 'budget' | 'stop' | 'timeout' | 'failure' | 'normal' | 'pending' | 'response-limit' = 'budget',
+    mode: 'budget' | 'stop' | 'timeout' | 'failure' | 'normal' | 'pending' | 'response-limit' | 'high-usage' | 'action-cap' = 'budget',
     results: { content: string; isError?: boolean }[] = [];
+  let highUsageCalls=0;
   const provider: Provider = {
     id: 'codex-cli',
     label: 'Delegated fixture',
@@ -70,6 +71,24 @@ async function main() {
       last = req;
       assert.ok(req.browserBridge);
       assert.notEqual(req.browserBridge.token, bridge.token);
+      if(mode==='high-usage'){
+        if(highUsageCalls++===0){
+          yield {type:'usage',usage:{inputTokens:200000,outputTokens:1000,cacheReadTokens:190000}};
+          yield {type:'tool_use',id:'high-usage-action',name:tool.name,input:{}};
+          yield {type:'stop',reason:'tool_use'};return;
+        }
+        const result=req.messages.flatMap(m=>m.content).find(b=>b.type==='tool_result'&&b.toolUseId==='high-usage-action');
+        assert.ok(result&&result.type==='tool_result'&&!result.isError,'work continues after the high-usage request');
+        yield {type:'text',delta:'Finished the requested work.'};yield {type:'stop',reason:'end_turn'};return;
+      }
+      if(mode==='action-cap'){
+        results=[];
+        for(let count=0;count<101;count++){
+          const response=await fetch(req.browserBridge.url+'/call',{method:'POST',headers:{authorization:'Bearer '+req.browserBridge.token},body:JSON.stringify({name:tool.name,arguments:{}})});
+          results.push(await response.json() as {content:string;isError?:boolean});
+        }
+        yield {type:'stop',reason:'end_turn'};return;
+      }
       if(mode==='failure'){yield {type:'text',delta:'Partial answer stays.'};throw Error('Fixture connection lost.');}
       if(mode==='response-limit'){yield {type:'text',delta:'Partial response.'};yield {type:'stop',reason:'max_tokens'};return;}
       if(mode==='normal'){
@@ -213,6 +232,23 @@ async function main() {
     assert.equal(sessions.load(chat.id)!.messages.at(-1)!.stopReason,'provider_ended');assert.match(sessions.load(chat.id)!.messages.at(-1)!.stopMessage!,/browser action was still pending/);
     assert.equal(effects,2,'interrupted pending calls never run');
     console.log('PASS Stop, deadlines, provider exits/errors and response limits have distinct persisted explanations; normal CLI tasks receive a 30-minute limit');
+    tool.risk='safe';
+    mode='high-usage';highUsageCalls=0;const beforeUsage=effects;
+    await agent.send(chat.id,'Complete a normal task with substantial reused context.');
+    assert.equal(highUsageCalls,2);assert.equal(effects,beforeUsage+1);
+    const completed=new SessionStore(profile).load(chat.id)!.messages.at(-1)!;
+    assert.equal(completed.stopReason,'end_turn');assert.equal(completed.stopMessage,undefined);
+    assert.equal(completed.usage!.inputTokens,200000,'usage is still reported accurately');
+    assert.equal(completed.usage!.cacheReadTokens,190000);
+    mode='high-usage';highUsageCalls=0;const beforeExplicit=effects;
+    await agent.send(chat.id,'Run a workflow with an explicit usage budget.',{budget:{steps:2,tokens:128000,timeMs:5000}});
+    assert.equal(highUsageCalls,1);assert.equal(effects,beforeExplicit);
+    assert.equal(sessions.load(chat.id)!.messages.at(-1)!.stopReason,'token_budget');
+    mode='action-cap';const beforeActions=effects;
+    await agent.send(chat.id,'Exercise the interactive browser action limit.');
+    assert.equal(effects-beforeActions,100);assert.equal(results.length,101);assert.equal(results[100].isError,true);assert.match(results[100].content,/action budget/);
+    console.log('PASS interactive CLI work continues beyond 128k reported tokens without a usage-limit notice; usage reporting, explicit workflow budgets and the 100-action limit remain enforced');
+
 
   } finally {
     agent.abortAll();

@@ -34,3 +34,29 @@ test('the actual workflow publishes only the verified commit and keeps prereleas
   assert.match(publish.if,/branch_release.outputs.tag/);
   assert.deepEqual(workflow.jobs.package.needs,['verify','verify-macos','package-macos','verify-connections','verify-action-workflows']);
 });
+
+test('Windows-only test release has one installer plus checksum and does not claim Mac assets',()=>{
+  const release=prepareBranchRelease({...spec,windowsOnly:true});
+  assert.deepEqual(release.files,['Nabsun-1.0.1-rc.1-x64-setup.exe','SHA256SUMS.txt']);
+  assert.match(release.body,/Windows-only test preview/);
+  assert.doesNotMatch(release.body,/-portable\.exe|-arm64\.zip/);
+  for(const patch of [{event:'push'},{optIn:'false'},{ref:'refs/heads/main'}])assert.throws(()=>prepareBranchRelease({...spec,...patch,windowsOnly:true}),/explicit manual/);
+});
+test('Windows-only workflow is opt-in, verifies before NSIS build, and publishes the exact tested commit',()=>{
+  const workflow=yaml.load(fs.readFileSync('.github/workflows/verify.yml','utf8'));
+  assert.equal(workflow.on.workflow_dispatch.inputs.windows_test_installer.default,false);
+  for(const[name,job]of Object.entries(workflow.jobs)){
+    if(name==='windows-test')continue;
+    assert.match(job.if,/!inputs.windows_test_installer/);
+  }
+  const job=workflow.jobs['windows-test'];assert.equal(job['runs-on'],'windows-2022');
+  assert.match(job.if,/inputs.windows_test_installer/);assert.match(job.if,/workflow_dispatch/);assert.match(job.if,/github.ref != 'refs\/heads\/main'/);
+  const build=job.steps.findIndex(step=>step.name==='Build Windows installer only');
+  assert.match(job.steps[build].run,/--win nsis --x64/);
+  assert.ok(job.steps.findIndex(step=>step.name==='Windows regression checks')<build);
+  assert.match(job.steps.find(step=>step.name==='Windows regression checks').run,/verify:delegation/);
+  assert.equal(job.steps.find(step=>step.id==='release').env.RELEASE_OPT_IN,'${{ inputs.windows_test_installer }}');
+  const publish=job.steps.find(step=>step.name==='Publish Windows test installer');
+  assert.equal(publish.with.target_commitish,'${{ github.sha }}');assert.equal(publish.with.prerelease,true);assert.equal(publish.with.make_latest,false);
+  assert.equal(publish.with.files.trim().split(/\r?\n/).length,2);assert.doesNotMatch(publish.with.files,/portable|arm64/);
+});

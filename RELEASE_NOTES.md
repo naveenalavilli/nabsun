@@ -13,6 +13,16 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.1-rc.4 - Windows test preview
+
+Windows x64 installer only, for testing before a production Windows/macOS
+release. Includes the features and interruption fixes from 1.0.1-rc.3.
+
+- Remove the implicit 128,000-token cap from interactive Codex/Claude chats.
+  Reused context no longer triggers a premature AI usage-limit stop. Usage
+  reporting, provider limits, 30-minute timeouts, the 100-action limit, and
+  explicitly budgeted workflows remain unchanged.
+
 ## 1.0.1-rc.3 - Assistant interruption fixes
 
 Includes the local-file and Word/Excel features from 1.0.1-rc.2. Built from

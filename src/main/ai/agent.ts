@@ -588,12 +588,12 @@ export class Agent {
     if(opts.fileScope&&!this.deps.sessions.load(opts.fileScope))throw Error('File scope chat not found.');
     if(opts.tabId&&(!this.deps.tabs.byId(opts.tabId)||this.workflowLeases.has(opts.tabId)))throw Error('The batch target tab is unavailable or busy.');
     const timeLimit=turnTimeLimit(this.deps.settings.get().provider,opts.budget);
-    if(!opts.budget&&this.deps.settings.get().provider.endsWith('-cli'))opts={...opts,budget:{steps:100,tokens:128000,timeMs:timeLimit!}};
     const run = this.startRun(sessionId, 'chat');
     if(timeLimit)run.deadline=Date.now()+timeLimit;
     if(opts.fileScope){run.fileScope=opts.fileScope;run.forbidMemory=true}
     if(opts.tabId){run.tabId=opts.tabId;run.followsUser=false;this.workflowLeases.set(opts.tabId,run.id)}
     if(opts.budget)run.actionLimit=Math.max(1,Math.min(100,opts.budget.steps));
+    else if(this.deps.settings.get().provider.endsWith('-cli'))run.actionLimit=100;
     const timer=timeLimit?setTimeout(()=>run.controller.abort(timeLimitInterruption(timeLimit)),timeLimit):undefined;
     const messageId = randomUUID();
 
@@ -651,6 +651,7 @@ export class Agent {
     const { settings, sessions, tabs, emit } = this.deps;
     const config = settings.get();
     if(opts.budget)config.maxAgentSteps=Math.max(1,Math.min(config.maxAgentSteps,opts.budget.steps));
+    else if(config.provider.endsWith('-cli'))config.maxAgentSteps=Math.min(config.maxAgentSteps,100);
     const provider = this.deps.providers.get(config.provider);
     if (!provider) throw new Error(`Unknown provider "${config.provider}".`);
     run.memoryOnDevice = isOnDevice(config.provider, config.baseUrls);
