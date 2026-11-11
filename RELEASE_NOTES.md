@@ -9,11 +9,118 @@ history. **Published** dates use America/Chicago. A tag, a draft release or a
 package-version change is not treated as proof of publication. Earlier versions
 are marked accordingly, and their behavior may differ from the current product.
 
-## 1.0.0 - Unreleased
+## Unreleased
 
-Development version in [PR #23](https://github.com/naveenalavilli/nabsun/pull/23).
-These notes describe implemented changes; they do not certify the whole roadmap
-as complete or announce a public release.
+No additional changes yet.
+
+## 1.0.1 - Prepared for release
+
+Promotes the approved Windows rc.4 preview to a non-prerelease version.
+Windows x64 and macOS Apple silicon installers are subject to the full release
+checks. This entry does not indicate that the release has been published.
+
+### New and improved
+
+- A clearer chat welcome, larger composer, and everyday task examples.
+- Optional per-tool permissions for the current chat, with visible revocation.
+  These choices do not grant folder access or upgrade a read-only folder.
+- Connect a local folder with read-only or read-and-change access. Read,
+  create, edit, append, copy, rename and organize supported files. Individual
+  deletions use Recycle Bin/Trash, with no permanent-delete fallback.
+- Create Word (.docx) documents, replace body text and append sections. Create
+  Excel (.xlsx) workbooks and update cell values or explicit formulas. Edits
+  preserve unrelated package parts and save original backups. Excel calculates
+  formula results when opened. Unsupported protected/advanced formats refuse
+  editing rather than overwriting them as text.
+- Folder permissions belong to the chat and expire on disconnect or app exit.
+  Revision checks detect conflicting edits; profile, path and link checks
+  constrain operations to approved folders.
+
+### Fixes
+
+- Interactive Codex/Claude CLI tasks have a 30-minute default deadline and
+  matching browser-access lifetime, replacing the silent five-minute cutoff.
+- Remove the implicit 128,000-token cap from interactive CLI chats so reused
+  context does not cause premature usage-limit stops. Usage reporting,
+  provider limits, the 100-action limit and explicit workflow budgets remain.
+- Distinct interruption reasons explain Stop, deadlines, disconnected access,
+  integrations and provider failures. Explanations remain in reopened chats.
+- Browser Stop still cancels pending work immediately and revokes delegated
+  access. A provider exiting with an action pending cannot leave it running.
+
+Preview builds remain unsigned on Windows and ad-hoc signed without Apple
+notarization on macOS. See the README for installation steps and known limits.
+
+## 1.0.1-rc.4 - Windows test preview
+
+Windows x64 installer only, for testing before a production Windows/macOS
+release. Includes the features and interruption fixes from 1.0.1-rc.3.
+
+- Remove the implicit 128,000-token cap from interactive Codex/Claude chats.
+  Reused context no longer triggers a premature AI usage-limit stop. Usage
+  reporting, provider limits, 30-minute timeouts, the 100-action limit, and
+  explicitly budgeted workflows remain unchanged.
+
+## 1.0.1-rc.3 - Assistant interruption fixes
+
+Includes the local-file and Word/Excel features from 1.0.1-rc.2. Built from
+`fix/assistant-stop-reasons`, without merging to main.
+
+- Interactive Codex/Claude CLI chats now have a 30-minute task limit instead of
+  silently ending after five minutes. Browser-access credentials follow the
+  same deadline; explicit workflow time limits remain unchanged.
+- Interrupted turns explain whether Stop, a time limit, disconnected access,
+  an integration, or a provider failure ended the task. The reason remains
+  visible when reopening chat. AI usage/response limits also show an explanation.
+
+## 1.0.1-rc.2 - Local files branch preview
+
+Prepared from `feature/local-folder-access`, without merging to main. Includes
+the chat and session-permission improvements from 1.0.1-rc.1.
+
+- Choose a local folder for the current chat, with read-only or read-and-change
+  access. The assistant can request access through a native folder picker and
+  permission dialog; it cannot choose paths or grant itself access.
+- Read text/code, CSV/TSV, XLSX, text PDFs and supported images. Create or edit
+  UTF-8 text/CSV/code, append text, create subfolders, copy or rename regular
+  files, and move files to Recycle Bin/Trash without permanent deletion.
+  Binary document formats are not overwritten as text.
+- Create Word (.docx) documents with headings and paragraphs, replace body text,
+  and append new sections. Create Excel (.xlsx) workbooks and update cell values
+  or explicit formulas. Unrelated package parts, including images and charts,
+  are preserved. Formula results require recalculation in Excel. Unsupported
+  protected, signed and advanced document structures are refused. Locked Word
+  content controls and enclosing tracked revisions are also protected.
+- Original text and Office files are backed up before edits. File hashes detect stale
+  changes; path/link checks keep tool operations inside approved folders and
+  protect Nabsun profile data. Activity records keep the existing redaction.
+- Connected folders show their location and access level in chat. Disconnect
+  revokes access and stops current work. Grants are memory-only, chat-bound,
+  and expire on deletion or app shutdown.
+
+## 1.0.1-rc.1 - Branch preview
+
+Prepared from the session-permissions branch, independently of main. This is a
+prerelease for review, with the broader 1.0 roadmap and release certification
+still incomplete.
+
+- New chat now starts with visual examples for finding and comparing options,
+  getting help on websites, using files or images, and understanding a page.
+- A larger message box keeps file attachments, microphone and Send together.
+  Page context and automatic-action choices remain within reach.
+- Everyday wording, light/dark layouts, narrow windows and 200% zoom support.
+  Starter cards fill a draft; nothing runs until you send it.
+- Optionally auto-allow an individual tool for the current chat, including page
+  JavaScript. This covers follow-up prompts and websites in that chat. Turn it
+  off below the conversation; grants reset on chat deletion or app shutdown.
+  Other chats, tools and integration sources remain separate. Host policy,
+  action limits, cancellation and structured credential checks still apply.
+
+## 1.0.0 - Prerelease 2026-11-10
+
+[GitHub prerelease](https://github.com/naveenalavilli/nabsun/releases/tag/v1.0.0),
+from [PR #23](https://github.com/naveenalavilli/nabsun/pull/23).
+These notes describe implemented changes, not certification of the full roadmap.
 
 ### Fixes
 

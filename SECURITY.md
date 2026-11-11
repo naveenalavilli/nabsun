@@ -40,16 +40,74 @@ instructions discourage following them, but do not reliably prevent prompt injec
 By default, read tools run automatically; write and dangerous tools ask first.
 Old global **Always allow this tool** grants are revoked during migration.
 Approvals can allow an action once, for the current task on a site, or for that
-tool and site for 24 hours. Settings can revoke saved site grants. Uploads,
-arbitrary page JavaScript and detected cross-origin submissions require an
-individual approval. Legacy automatic-write mode is restricted to the first
+tool and site for 24 hours. Settings can revoke saved site grants. A separate,
+unchecked **Auto-allow this tool for this chat session** checkbox grants that
+tool (and integration source) permission across sites and follow-up prompts in
+the current chat. This includes uploads, arbitrary page JavaScript and detected
+cross-origin submissions; without this explicit session choice they require
+individual approval. Active session grants appear below the conversation and
+can be unchecked to ask again. They are memory-only, disappear on chat deletion
+or app shutdown, and never bypass host policy, credential guards or Stop. Stop
+cancels the current task; session choices remain for later prompts in that chat. Legacy automatic-write mode is restricted to the first
 site in a run; it does not permit arbitrary cross-origin writes.
 
 Targets are captured before approval and revalidated before dispatch. Stop cancels
 pending work, but cannot reverse an action that already completed. Hosted CLI
-tasks have a 100-browser-action and five-minute default limit. CLI-internal
+interactive chats have a 100-browser-action and 30-minute default limit.
+They do not impose an extra cumulative token cap on the CLI; provider usage
+limits still apply, and reported usage remains visible.
+Explicit workflow budgets remain capped at five minutes. Delegated browser
+credentials expire with the remaining task deadline and are revoked immediately
+on cancellation. CLI-internal
 activity outside Nabsun's tools is not an OS sandbox, and unreported internal
 token use cannot be strictly limited by Nabsun.
+
+## Local folder access
+
+Only the trusted native picker and confirmation dialog issue local-folder
+capabilities. The user chooses both the folder and read-only/read-and-change
+mode. Tool inputs cannot supply an authorized absolute path, session identity,
+or access mode. Grants stay in memory and are bound to the host chat. Deleting
+a chat or closing the app revokes them; Disconnect also cancels its queued and
+active work. A stopped/deleted chat cannot gain access from late consent.
+
+Built-in local operations share policy, action budgets, approvals and the
+hashed activity journal. Browser-origin grants and browser automatic-action
+settings do not approve filesystem writes. Explicit per-tool chat approval can
+suppress repeat prompts, but never upgrades a read-only folder. Unbound external
+clients cannot claim a chat's access. Hosted CLI tasks use their host-owned chat
+scope. Plugins' browser-helper API does not expose these file capabilities.
+
+Relative paths reject traversal, absolute/drive paths, alternate streams and
+reserved names. Symbolic links/junctions are not followed; hard-linked files
+are refused. Nabsun profile files are protected even when an ancestor folder
+is approved. Reads use bounded file handles and identity/version checks.
+Edits require a current content hash, keep a backup inside the chosen folder,
+and stage the replacement before committing it. New destinations must not
+already exist. The model cannot alter internal backups or staging files through
+these tools. Deletion uses the operating system Trash API for individual regular files,
+requires a current file hash and read/write authority, keeps an original backup
+before invoking Trash, and has no permanent-delete fallback. Append uses the same revision and backup checks as editing.
+This feature has no shell execution or permanent-delete tool.
+
+These are host application scope checks, not an OS sandbox against another
+program running as the same user. Directory replacement races by such a program
+are not eliminated by Node's path-based rename/link APIs. Do not treat a folder
+actively manipulated by untrusted local code as an isolated security boundary.
+Read data can reach the selected model and remain in chat history; disconnecting
+prevents future access and does not erase data already shared. Document/image
+parsing uses the existing bounded workers/previews without importing copies into
+the attachment index. DOCX body-text replacement/appending and XLSX cell updates
+use a bounded worker (25 seconds, 256 MB JS heap, no native addons), validated
+ZIP members (20 MB package, 8 MB per part, 64 MB expanded total, 1000 members),
+and XML parsing that refuses DTD/entities. It never extracts archives to disk
+or follows external Office relationships. Unchanged package parts retain their
+bytes; edits keep backups and require current hashes. Encrypted, macro/ActiveX,
+protected and signed-document edits are refused. XLSX formulas are explicit and
+limited to a function subset; leading-equals strings remain literal text. Nabsun
+does not calculate formulas or execute Office code. Existing manual calculation
+mode remains intact. Desktop-app automation is outside this feature. Browser-only workflow recording refuses tasks that modify
+local files rather than saving unusable folder capabilities into a replay.
 
 ## Credentials and private content
 

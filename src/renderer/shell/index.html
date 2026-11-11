@@ -106,6 +106,9 @@
             <section id="view-chat" class="view active">
               <div id="transcript" aria-live="polite"></div>
               <div id="composer">
+                <div id="local-folder-access" aria-label="Connected local folders" hidden></div>
+                <p id="local-folder-status" class="hint" role="status" aria-live="polite"></p>
+                <div id="session-tool-grants" aria-label="Session tool permissions" hidden></div>
                 <div id="batch-progress" aria-label="Batch progress" aria-live="polite" hidden></div>
                 <div id="attached-files" aria-label="Attached files" aria-live="polite" hidden></div>
                 <p id="attachment-status" class="hint" role="status"></p>
@@ -115,25 +118,31 @@
                   <p id="voice-status" class="hint" role="status" aria-live="polite"></p>
                 </div>
                 <div id="prompt-queue" aria-label="Queued prompts" aria-live="polite" hidden></div>
+                <div class="composer-box">
+                  <textarea id="prompt" rows="2" placeholder="Tell me what you need help with..." aria-label="Message the assistant" title="Enter to send. Shift+Enter for a new line."></textarea>
+                  <div class="composer-row">
+                    <button id="attach-files" class="composer-tool" aria-label="Attach images or files" title="Attach images, documents or data. Up to 20 files, 20 MB each; visual analysis up to 5 MB per image."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 7-7a4 4 0 0 1 6 6L10 22a6 6 0 0 1-8-8L13 3M6 16 17 5"/></svg></button>
+                    <button id="choose-local-folder" class="composer-tool folder-access-button" aria-label="Choose a folder on your computer" title="Choose a folder and decide whether Nabsun can read files or make changes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 3h9v11H3Z M16 12v5M13.5 14.5h5"/></svg><span>Folder</span></button>
+                    <button id="voice-toggle" class="icon-btn" title="Dictate a message" aria-label="Dictate a message" aria-pressed="false" aria-controls="voice-controls" aria-expanded="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9a6 6 0 0 0 12 0M10 15v3M7 18h6"/></svg></button>
+                    <div class="grow"></div>
+                    <span class="composer-shortcut">Enter to send</span>
+                    <button id="send" class="primary" aria-label="Send"><span class="send-label">Send</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5M5 10l5-5 5 5"/></svg></button>
+                    <button id="stop" class="danger" hidden aria-label="Stop">Stop</button>
+                  </div>
+                </div>
                 <div id="composer-chips">
-                  <button id="attach-files" class="chip" title="Attach images, documents or data. Up to 20 files, 20 MB each; visual analysis up to 5 MB per image.">Attach images or files</button>
                   <label class="chip" title="Include text from the open page with your question. Turn off to ask without sharing the page.">
                     <input type="checkbox" id="attach-page" checked />
                     <span>Use this page</span>
                   </label>
-                  <label class="chip" title="Allows clicks, typing, and navigation without asking first. Leave off if you want to approve actions.">
+                  <label class="chip" title="Automatically allow routine actions on the first site in each task. Other actions follow your permission choices.">
                     <input type="checkbox" id="autopilot" />
                     <span>Automatic actions</span>
                   </label>
                   <div class="grow"></div>
                   <span id="step-badge" class="muted"></span>
                 </div>
-                <div class="composer-row">
-                  <button id="voice-toggle" class="icon-btn" title="Dictate a message" aria-label="Dictate a message" aria-pressed="false" aria-controls="voice-controls" aria-expanded="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="2" width="6" height="10" rx="3"/><path d="M4 9a6 6 0 0 0 12 0M10 15v3M7 18h6"/></svg></button>
-                  <textarea id="prompt" rows="1" placeholder="Ask about this page, or tell me what to do…" aria-label="Message the assistant"></textarea>
-                  <button id="send" class="primary" aria-label="Send">Send</button>
-                  <button id="stop" class="danger" hidden aria-label="Stop">Stop</button>
-                </div>
+
               </div>
             </section>
 

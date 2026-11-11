@@ -1,3 +1,4 @@
+import {LocalFolderStore,FolderAccessController} from '../main/localFiles';
 import {FileStore} from '../main/files';
 import {DatasetStore} from '../main/data/datasets';
 import {DataWorkspace} from '../main/data/workspace';
@@ -11,6 +12,7 @@ import { SettingsStore, SecretStore } from '../main/store';
 import { HistoryStore } from '../main/history';
 import { SessionStore } from '../main/ai/sessions';
 import { Agent } from '../main/ai/agent';
+import { defineTool } from '../main/ai/tools/types';
 import { ApprovalManager } from '../main/ai/approvals';
 import { QuestionManager } from '../main/ai/questions';
 import type { Provider, StreamEvent, StreamRequest } from '../main/ai/provider';
@@ -90,7 +92,12 @@ async function main() {
     override start(...args:Parameters<VoiceManager['start']>){args[5]=async()=>true;return super.start(...args)}
   }
   const fixtureVoice=new FixtureVoice({availability:async()=>({available:true,languages:[{code:'en-US',name:'English'},{code:'te-IN',name:'Telugu'}],help:'Local test recognizer'}),listen:(_language,emit)=>{voiceEmit=emit;setImmediate(()=>emit({type:'listening'}));return()=>{voiceStops++}}});
+  const localFixture=fs.mkdtempSync(path.join(os.tmpdir(),'nabsun-folder-ui-'));
+  const localStore=new LocalFolderStore([tmp]);
+  let folderChoice:string|null=localFixture;
+  const folderAccess=new FolderAccessController(localStore,{choose:async()=>folderChoice,confirm:async()=> 'read',exists:scope=>!!sessions.load(scope),changed:scope=>win.send(CH.localFolderChanged,{sessionId:scope})});
   registerIpc({
+    folderAccess,
     voice:fixtureVoice,
     dataWorkspace, win, settings, sessions, history, providers, approvals, questions, agent, mcp,
     secrets: new SecretStore(), downloads: new DownloadManager(), passwords: new PasswordStore(),
@@ -348,6 +355,37 @@ async function main() {
     assert.equal(win.contentBounds.width, win.window.getContentSize()[0], 'browser retains its full width');
     assert.equal(await win.assistant.webContents.executeJavaScript('getComputedStyle(document.querySelector("#topchrome")).display'), 'none');
     console.log('PASS separate assistant window and full-width browser');
+
+    const welcomeUI=win.assistant.webContents;
+    const welcomeTheme=await welcomeUI.executeJavaScript('document.documentElement.getAttribute("data-theme")');
+    for(const theme of ['light','dark']) {
+      await welcomeUI.executeJavaScript(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      for(const [width,zoom] of [[560,1],[380,1],[560,2]]) {
+        win.assistant.setSize(width,820);welcomeUI.setZoomFactor(zoom);await delay(150);
+        const layout=await welcomeUI.executeJavaScript(`(() => {
+          const cards=[...document.querySelectorAll('[data-starter]')];
+          const input=document.querySelector('#prompt').getBoundingClientRect();
+          const send=document.querySelector('#send').getBoundingClientRect();
+          const bounds=document.querySelector('#transcript').getBoundingClientRect();
+          return {count:cards.length,overflow:document.documentElement.scrollWidth>innerWidth,
+            cardsFit:cards.every(card=>{const r=card.getBoundingClientRect();return r.left>=bounds.left&&r.right<=bounds.right}),
+            composerFits:input.left>=0&&input.right<=innerWidth&&send.right<=innerWidth&&send.bottom<=innerHeight};
+        })()`);
+        assert.equal(layout.count,4);assert.equal(layout.overflow,false,JSON.stringify({theme,width,zoom,layout}));
+        assert.ok(layout.cardsFit&&layout.composerFits,JSON.stringify({theme,width,zoom,layout}));
+        if(zoom===1)fs.writeFileSync(path.join(artifacts,`chat-welcome-${theme}-${width}.png`),(await welcomeUI.capturePage()).toPNG());
+      }
+    }
+    welcomeUI.setZoomFactor(1);win.assistant.setSize(560,820);
+    await welcomeUI.executeJavaScript(`document.documentElement.${welcomeTheme?'setAttribute("data-theme",'+JSON.stringify(welcomeTheme)+')':'removeAttribute("data-theme")'}`);
+    for(const id of ['research','action','files','summary']) {
+      await welcomeUI.executeJavaScript(`document.querySelector('[data-starter="${id}"]').click()`);
+      const draft=await welcomeUI.executeJavaScript('document.querySelector("#prompt").value');
+      assert.ok(draft.length>30);assert.equal(provider.requests.length,0,'task cards only fill a draft');
+      assert.equal(await welcomeUI.executeJavaScript('document.activeElement===document.querySelector("#prompt")'),true);
+      assert.equal(await welcomeUI.executeJavaScript('document.querySelectorAll("[data-starter][aria-pressed=true]").length'),1);
+    }
+    console.log('PASS action-focused welcome and composer fit light/dark, narrow windows and 200% zoom; all four cards prefill without executing');
     await win.assistant.webContents.executeJavaScript('document.querySelector("[data-starter=summary]").click()');
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value'), 'Summarize this page in three short bullet points.');
     assert.equal(provider.requests.length, 0, 'starter questions never send a request automatically');
@@ -451,6 +489,67 @@ async function main() {
     win.assistant.setSize(560, 820);
     console.log('PASS hide/reopen preserves draft; independent zoom persists, clamps and resets');
 
+
+    const folderScope=fs.readdirSync(path.join(tmp,'sessions')).find(name=>name.endsWith('.json'))!.slice(0,-5);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#choose-local-folder").click()');
+    await until(()=>localStore.list(folderScope).length===1);
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access").textContent.includes("Read only")'));
+    assert.equal(localStore.list(folderScope)[0].mode,'read');
+    await delay(100);
+    fs.writeFileSync(path.join(artifacts,'assistant-local-folder.png'),(await win.assistant.webContents.capturePage()).toPNG());
+    for(const theme of ['light','dark']) {
+      await win.assistant.webContents.executeJavaScript(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      win.assistant.setSize(380,820);win.assistant.webContents.setZoomFactor(2);await delay(80);
+      const folderLayout=await win.assistant.webContents.executeJavaScript(`(() => {
+        document.querySelector('#stop').hidden=false;
+        document.querySelector('#send .send-label').textContent='Send next';
+        document.querySelector('#stop').focus();
+        const stop=document.querySelector('#stop').getBoundingClientRect();
+        return {overflow:document.documentElement.scrollWidth>innerWidth,stopVisible:stop.top>=0&&stop.bottom<=innerHeight&&stop.right<=innerWidth};
+      })()`);
+      assert.equal(folderLayout.overflow,false,JSON.stringify({theme,folderLayout}));
+      assert.equal(folderLayout.stopVisible,true,JSON.stringify({theme,folderLayout}));
+    }
+    win.assistant.webContents.setZoomFactor(1);win.assistant.setSize(560,820);
+    await win.assistant.webContents.executeJavaScript('document.documentElement.dataset.theme="light";document.querySelector("#stop").hidden=true;document.querySelector("#send .send-label").textContent="Send"');
+    folderChoice=null;
+    await until(()=>win.assistant.webContents.executeJavaScript('!document.querySelector("#choose-local-folder").disabled'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#choose-local-folder").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-status").textContent.includes("No new folder")'));
+    assert.equal(localStore.list(folderScope).length,1,'cancelled chooser preserves earlier access');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access button").click()');
+    await until(()=>localStore.list(folderScope).length===0);
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#local-folder-access").hidden'));
+    console.log('PASS folder button opens chat-bound access, shows read-only mode and location, cancellation adds nothing, and Disconnect revokes it');
+
+    const permissionSession=fs.readdirSync(path.join(tmp,'sessions')).find(name=>name.endsWith('.json'))!.slice(0,-5);
+    const evaluate=defineTool({name:'browser_evaluate',description:'permission fixture',risk:'dangerous',properties:{}},async()=> 'ok');
+    approvals.setEmitter(req=>win.send(CH.agentApprovalRequest,req));
+    const requestPermission=()=>approvals.request(evaluate,{script:'document.title'},new AbortController().signal,{sessionId:permissionSession,origin:'https://fixture.example'});
+    let permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").checked'),false,'session auto-allow is opt-in');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".approval .primary").click()');
+    assert.equal(await permission,true);
+    assert.equal(approvals.grantsForSession(permissionSession).length,0,'Allow alone grants only this call');
+    permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").click();document.querySelector(".approval .primary").click()');
+    assert.equal(await permission,true);
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector("#session-tool-grants input:checked")'));
+    await delay(150);
+    fs.writeFileSync(path.join(artifacts,'assistant-session-permissions.png'),(await win.assistant.webContents.capturePage()).toPNG());
+    assert.equal(await requestPermission(),true,'next call needs no approval card');
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelectorAll(".approval").length'),0);
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#session-tool-grants input").click()');
+    await until(()=>approvals.grantsForSession(permissionSession).length===0);
+    permission=requestPermission();
+    await until(()=>win.assistant.webContents.executeJavaScript('!!document.querySelector(".session-approval-choice input")'));
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-approval-choice input").click();[...document.querySelectorAll(".approval button")].find(button=>button.textContent==="Deny").click()');
+    assert.equal(await permission,false);
+    assert.equal(approvals.grantsForSession(permissionSession).length,0,'Deny never creates a session grant');
+    console.log('PASS session permission checkbox defaults off, Allow once, repeat tool approval suppression, visible revocation and Deny');
+
     const submitPrompt = (text: string) => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value = ${JSON.stringify(text)}; document.querySelector('#attach-page').checked = false; document.querySelector('#send').click()`);
     await submitPrompt('First queued test');
     await until(() => provider.requests.length === 1);
@@ -490,6 +589,16 @@ async function main() {
     assert.equal(provider.requests.length, 3, 'Stop does not launch a pending prompt');
     assert.equal(JSON.stringify(sessions.load(queuedSessionId)).includes('Discard this on Stop'), false);
     console.log('PASS follow-ups run in order; cancellation removes pending prompts before model history; Stop clears the queue');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("pressed Stop")'));
+    assert.equal(sessions.load(queuedSessionId)!.messages.at(-1)!.stopReason,'user_stop');
+    await agent.send(queuedSessionId,'Deadline explanation fixture.',{attachPage:false,budget:{steps:2,tokens:128000,timeMs:1000}});
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'));
+    assert.equal(sessions.load(queuedSessionId)!.messages.at(-1)!.stopReason,'time_limit');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-item").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript .notice")?.textContent.includes("pressed Stop")'));
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'),true,'deadline explanation survives reopening the conversation');
+    console.log('PASS live Stop/time-limit notices explain their cause and persist when reopening chat');
+
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Switching chat test"');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#attach-page").checked = false; document.querySelector("#send").click()');

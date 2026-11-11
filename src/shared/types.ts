@@ -75,6 +75,8 @@ export interface ChatMessage {
   createdAt: number;
   /** Present on assistant messages once the turn is finished. */
   stopReason?: string;
+  /** Host explanation for an interrupted or failed turn, retained when reopening chat. */
+  stopMessage?: string;
   usage?: TokenUsage;
 }
 
@@ -124,9 +126,9 @@ export type AgentEvent =
     }
   | { type: 'step'; messageId: string; step: number; maxSteps: number }
   | { type: 'usage'; messageId: string; usage: TokenUsage }
-  | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: string }
+  | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: string; message?: string }
   | { type: 'error'; sessionId: string; message: string }
-  | { type: 'aborted'; sessionId: string };
+  | { type: 'aborted'; sessionId: string; message?: string };
 
 export interface QueuedPrompt {
   id: string;
@@ -149,6 +151,9 @@ export interface ApprovalRequest {
   input: unknown;
   origin?: string;
   forceOnce?: boolean;
+  sessionId?: string;
+  allowSession?: boolean;
+  source?: string;
 }
 
 export interface ActivityRecord {
@@ -156,7 +161,9 @@ export interface ActivityRecord {
   event:{actionId:string;phase:'intent'|'result';tool:string;task:string;origin?:string;status?:string;approver?:string;target?:unknown;input?:unknown};
 }
 
-export type ApprovalDecision = 'allow' | 'allow_always' | 'allow_site' | 'deny';
+export interface SessionToolGrant { toolName: string; source?: string }
+
+export type ApprovalDecision = 'allow' | 'allow_always' | 'allow_site' | 'allow_session' | 'deny';
 
 /**
  * A question the assistant is waiting on an answer to.

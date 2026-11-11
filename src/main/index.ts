@@ -2,11 +2,13 @@ import {DatasetStore} from './data/datasets';
 import {DataWorkspace} from './data/workspace';
 import {datasetTools} from './ai/tools/datasets';
 import {FileStore,bindOwnedDownloads} from './files';
+import {LocalFolderStore,FolderAccessController} from './localFiles';
+import {localFileTools} from './ai/tools/localFiles';
 import {fileTools} from './ai/tools/files';
 import { BLOCKED_HOSTS } from './blockedHosts';
 import path from 'node:path';
 import fs from 'node:fs';
-import { Menu, app, ipcMain, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { Menu, app, dialog, ipcMain, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { CH } from '../shared/ipc';
 import type { ProviderId } from '../shared/types';
 import { Agent } from './ai/agent';
@@ -237,7 +239,21 @@ async function boot() {
   // turn so reloading an integration takes effect without a restart.
   const files=new FileStore(userDataPath);
   const datasets=new DatasetStore(userDataPath,files);
+  const localFiles=new LocalFolderStore([userDataPath],file=>shell.trashItem(file));
+  const folderAccess=new FolderAccessController(localFiles,{
+    exists:scope=>!!sessions.load(scope),
+    changed:scope=>win.send(CH.localFolderChanged,{sessionId:scope}),
+    choose:async()=>{
+      const result=await dialog.showOpenDialog({title:'Choose a folder for Nabsun',buttonLabel:'Choose folder',defaultPath:app.getPath('documents'),properties:['openDirectory','dontAddToRecent']});
+      return result.canceled?null:result.filePaths[0]??null;
+    },
+    confirm:async(folder,reason,scope)=>{
+      const result=await dialog.showMessageBox({type:'question',title:'Folder access',message:'Let Nabsun use this folder?',detail:'Folder: '+folder.replace(/[\x00-\x1f\x7f]/g,' ')+'\nChat: '+JSON.stringify(sessions.load(scope)?.title??'This chat')+'\n\nTask: '+JSON.stringify(reason)+'\n\nChoose read-only access, or allow creating, editing, copying, moving and deleting files too. Deleted files go to Recycle Bin/Trash. This includes files in subfolders, for this chat until you disconnect the folder or close Nabsun. File contents you ask it to read may be sent to your selected AI service. Changes still follow your approval choices.',buttons:['Cancel','Read only','Read and make changes'],defaultId:0,cancelId:0,noLink:true});
+      return result.response===1?'read':result.response===2?'read-write':null;
+    },
+  });
   const builtins: Tool[] = [
+    ...localFileTools(),
     ...fileTools(),
     ...datasetTools(),
     ...browserTools(),
@@ -248,8 +264,9 @@ async function boot() {
   ];
 
   const agent:Agent = new Agent({
-    issueTaskBridge:access=>{const capability=bridge.issue(access);return {info:{url:bridge.url,token:capability.token,serverScript:mcpServerScript},revoke:capability.revoke}},
-    files,datasets,
+    issueTaskBridge:(access,ttlMs)=>{const capability=bridge.issue(access,ttlMs);return {info:{url:bridge.url,token:capability.token,serverScript:mcpServerScript},revoke:capability.revoke}},
+    files,datasets,localFiles,
+    requestFolderAccess:(scope,reason,signal)=>folderAccess.request(scope,reason,signal),
     providers: providers as Map<string, Provider>,
     settings,
     sessions,
@@ -289,6 +306,7 @@ async function boot() {
   };
 
   const deps: IpcDeps = {
+    folderAccess,
     win,
     sitePermissions,
     settings,
@@ -466,6 +484,7 @@ async function boot() {
     accounts.cancelAll();
     agent.abortAll();
     approvals.denyAll();
+    localFiles.clear();
     questions.cancelAll();
     // A stranded llama-server would keep a gigabyte of weights resident.
     local.stop();

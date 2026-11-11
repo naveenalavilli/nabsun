@@ -1,5 +1,6 @@
 import type {DatasetSummary,Workflow,RecordedTask,Batch,BatchReport} from './workflows';
 import type { UpdateStatus } from './updates';
+import type {LocalFolder} from './localFiles';
 import type {VoiceAvailability,VoiceEvent} from './voice';
 import type {
   AttachedFile,
@@ -9,6 +10,7 @@ import type {
   AgentQuestion,
   ApprovalDecision,
   ApprovalRequest,
+  SessionToolGrant,
   Bookmark,
   BridgeInfo,
   ChatSession,
@@ -88,9 +90,15 @@ export const CH = {
   agentTools: 'agent:tools',
   agentApprovalRequest: 'agent:approval-request', // main -> renderer push
   agentApprovalResolve: 'agent:approval-resolve',
+  agentSessionGrants: 'agent:session-grants',
+  agentRevokeSessionTool: 'agent:revoke-session-tool',
   agentQuestion: 'agent:question', // main -> renderer push
   agentAnswer: 'agent:answer',
   agentAttachPage: 'agent:attach-page',
+  localFolderChoose:'local-folders:choose',
+  localFolderList:'local-folders:list',
+  localFolderRevoke:'local-folders:revoke',
+  localFolderChanged:'local-folders:changed',
   fileAttach:'files:attach',
   fileList:'files:list',
   filePreview:'files:preview',
@@ -300,6 +308,8 @@ export interface ShellApi {
     cancelQueued(sessionId: string, id: string): Promise<boolean>;
     tools(): Promise<ToolSpec[]>;
     resolveApproval(id: string, decision: ApprovalDecision): void;
+    sessionGrants(sessionId:string):Promise<SessionToolGrant[]>;
+    revokeSessionTool(sessionId:string,toolName:string,source?:string):Promise<void>;
     /** Answers a question from the assistant; null means the user skipped it. */
     answer(id: string, text: string | null): void;
   };
@@ -326,6 +336,12 @@ export interface ShellApi {
     exportReport(scope:string,id:string,format:'csv'|'json'):Promise<void>;
   };
 
+  localFolders:{
+    choose(sessionId:string):Promise<LocalFolder|null>;
+    list(sessionId:string):Promise<LocalFolder[]>;
+    revoke(sessionId:string,id:string):Promise<void>;
+    onChanged(callback:(event:{sessionId:string})=>void):()=>void;
+  };
   files:{
     preview(sessionId:string,id:string):Promise<string|null>;
     attach(sessionId:string):Promise<AttachedFile[]>;

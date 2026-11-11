@@ -50,6 +50,8 @@ const webBundle = (entry, outfile) => ({
 });
 
 const configs = [
+  nodeBundle('src/test/office-harness.ts', `${out}/test/office-harness.js`),
+  nodeBundle('src/main/officeWorker.ts', `${out}/main/office-worker.js`),
   nodeBundle('src/main/fileParser.ts', `${out}/main/file-parser.js`),
   nodeBundle('src/main/integrations/pluginWorker.ts', `${out}/main/plugin-worker.js`),
   nodeBundle('src/main/index.ts', `${out}/main/index.js`),
@@ -59,6 +61,8 @@ const configs = [
   nodeBundle('src/test/bench/runner.ts', `${out}/test/bench-runner.js`),
   webBundle('scripts/fixtures/bench/react-entry.js', `${out}/test/bench/react-fixture.js`),
   nodeBundle('src/test/frame-harness.ts', `${out}/test/frame-harness.js`),
+  nodeBundle('src/test/local-files-agent-harness.ts', `${out}/test/local-files-agent-harness.js`),
+  nodeBundle('src/test/local-files-harness.ts', `${out}/test/local-files-harness.js`),
   nodeBundle('src/test/file-harness.ts', `${out}/test/file-harness.js`),
   nodeBundle('src/test/voice-harness.ts', `${out}/test/voice-harness.js`),
   nodeBundle('src/test/delegation-harness.ts', `${out}/test/delegation-harness.js`),
