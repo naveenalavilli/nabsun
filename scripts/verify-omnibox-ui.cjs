@@ -37,6 +37,15 @@ async function main() {
       type('choices'); pending.at(-1).resolve([{kind:'search',title:'first',value:'one'},{kind:'history',title:'second',value:'two'}]); await tick();
       key('ArrowDown'); key('Enter'); check('arrow selection opens selected destination', calls.at(-1)[1] === 'two');
       check('selection is exposed to assistive technology', input.getAttribute('aria-activedescendant') === 'suggestion-1');
+      type('example'); key('Enter', {ctrlKey:true});
+      check('Ctrl+Enter completes bare site names without suggestions', calls.at(-1)[1] === 'https://www.example.com');
+      type('https://example.org/path?q=one'); key('Enter', {ctrlKey:true});
+      check('Ctrl+Enter preserves full URLs', calls.at(-1)[1] === 'https://example.org/path?q=one');
+      type('example.org/path'); key('Enter', {ctrlKey:true});
+      check('Ctrl+Enter preserves domains and paths', calls.at(-1)[1] === 'example.org/path');
+      const beforeComposition = calls.length;
+      key('Enter', {ctrlKey:true,isComposing:true});
+      check('Ctrl+Enter does not interrupt IME composition', calls.length === beforeComposition);
       key('Escape'); check('Escape dismisses editor', closed === 1);
       open({ kind:'omnibox',payload:{query:'nabsun://home'},theme:'dark' });
       check('new tab starts empty without a fake URL', input.value === '' && !document.querySelector('#list').textContent);

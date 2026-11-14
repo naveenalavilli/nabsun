@@ -8,6 +8,7 @@ import { ApprovalManager } from '../main/ai/approvals';
 import { defineTool } from '../main/ai/tools/types';
 import type { ApprovalDecision } from '../shared/types';
 import { integrationPolicy } from '../main/ai/policy';
+import { approvalSettings } from '../shared/assistantSettings';
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-approvals-'));
 app.setPath('userData', profile);
 async function main() {
@@ -207,6 +208,23 @@ async function main() {
   blocked=true;
   await assert.rejects(guarded.request(evaluate,{},new AbortController().signal,{sessionId:'chat-a'}),/fixture policy/);
   console.log('PASS opt-in tool/source chat grants, cross-turn reuse, revocation, deletion, restart, Stop and enforced host policy');
+  settings.save(approvalSettings('full'));
+  const full = new ApprovalManager(settings);
+  full.setEmitter(() => { throw Error('Full access unexpectedly prompted'); });
+  assert.equal(await full.request(evaluate, {}, new AbortController().signal), true);
+  const localWrite = {...click, source: 'local-files'};
+  assert.equal(await full.request(localWrite, {}, new AbortController().signal), true, 'full mode permits tools but actual folder checks remain in handlers');
+  const required = new ApprovalManager(settings, {evaluate:()=>({allowed:true,requirePrompt:true})});
+  required.setEmitter(req => required.resolve(req.id, 'deny'));
+  assert.equal(await required.request(evaluate, {}, new AbortController().signal), false, 'full mode cannot waive policy-required approval');
+  const denied = new ApprovalManager(settings, {evaluate:()=>({allowed:false,reason:'blocked host policy'})});
+  await assert.rejects(denied.request(evaluate, {}, new AbortController().signal), /blocked host policy/);
+  const revoked = new AbortController(); revoked.abort();
+  assert.equal(await full.request(evaluate, {}, revoked.signal), false, 'Stop remains effective in full mode');
+  settings.save(approvalSettings('ask')); full.resetGrants();
+  full.setEmitter(req => full.resolve(req.id, 'deny'));
+  assert.equal(await full.request(evaluate, {}, new AbortController().signal), false, 'leaving full access restores prompts');
+  console.log('PASS full access respects host policy and Stop, and revocation restores prompts');
   approvals.denyAll();
   settings.flush();
 }

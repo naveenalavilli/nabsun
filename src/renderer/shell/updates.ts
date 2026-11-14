@@ -11,6 +11,9 @@ function paint() {
   if (toolbar) {
     toolbar.hidden = !availableVersion;
     toolbar.title = `Nabsun ${availableVersion} is available. Open the download page.`;
+    toolbar.setAttribute('aria-label', `Update Nabsun to version ${availableVersion}. Open the download page.`);
+    const version = toolbar.querySelector('#update-version');
+    if (version) version.textContent = availableVersion ? `v${availableVersion}` : '';
   }
   document.querySelectorAll<HTMLElement>('[data-update-status]').forEach(node => {
     const prefix = status.currentVersion ? `Nabsun ${status.currentVersion}. ` : '';

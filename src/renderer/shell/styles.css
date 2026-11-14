@@ -751,7 +751,7 @@ body.sidebar-closed #sidebar, body.sidebar-closed #sidebar-resizer { display: no
   font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
   background: var(--border-strong); color: var(--text-dim);
 }
-.approval .risk.dangerous { background: var(--danger-tint); color: var(--danger); }
+.approval .risk.dangerous { background: var(--panel); color: var(--warn); }
 .approval pre {
   background: var(--sunken); border-radius: 5px; padding: 7px 9px; margin: 7px 0;
   font-size: 11px; max-height: 160px; overflow: auto;
@@ -1172,6 +1172,7 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 #voice-controls { padding:8px 0; }
 #voice-close { float:right; width:32px; height:32px; }
 #voice-controls[hidden], #voice-controls label[hidden] { display:none; }
+#voice-toggle[hidden] { display:none !important; }
 #voice-controls label { display:flex; align-items:center; gap:8px; font-size:12px; }
 #voice-language { max-width:100%; min-width:0; color:var(--text); background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:6px; }
 #voice-toggle { flex-shrink:0; width:36px; height:36px; align-self:flex-end; }
@@ -1261,3 +1262,40 @@ legend { padding: 0 6px; color: var(--text-dim); font-size: 11px; text-transform
 .composer-box .composer-row { flex-wrap:wrap; }
 .composer-box #send,.composer-box #stop { flex-shrink:0; white-space:nowrap; }
 .composer-box #stop { min-height:34px; border-radius:11px; }
+
+/* Approval display is independent of verbose tracing. */
+.approval-result { display:none; }
+.show-approval-messages .approval-result { display:block; }
+.approval-mode-options { display:grid; gap:8px; margin:12px 0; }
+.approval-mode-choice { display:flex; gap:14px; width:100%; text-align:left; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--panel); color:var(--text); cursor:pointer; }
+.approval-mode-choice[aria-pressed="true"] { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 10%, transparent); }
+.approval-mode-copy { display:grid; gap:5px; }
+.approval-mode-copy > span { font-size:12px; line-height:1.5; opacity:.8; }
+.approval-mode-mark { flex:none; width:22px; height:22px; border:1.5px solid currentColor; border-radius:50%; display:grid; place-items:center; }
+.approval-mode-choice[aria-pressed="true"] .approval-mode-mark::after { content:"\2713"; }
+.approval-mode-choice[data-approval-mode="full"] { color:var(--warn); }
+.full-access-confirmation { padding:16px; border:1px solid var(--warn); border-radius:14px; margin:12px 0; }
+.full-access-confirmation button { margin:4px 8px 0 0; }
+.usage-agreement { max-width:850px; margin:0 auto; }
+.agreement-points { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:24px 0; }
+.agreement-points article { border:1px solid var(--border); border-radius:16px; padding:20px; }
+.agreement-points h2 { font-size:17px; margin:0 0 10px; }
+.agreement-points p { line-height:1.6; font-size:13px; }
+.agreement-accept { display:flex; align-items:flex-start; gap:10px; margin:20px 0; line-height:1.6; }
+.agreement-accept input { margin-top:5px; }
+.usage-agreement .actions { display:flex; flex-wrap:wrap; gap:10px; }
+.agreement-accept input { width:18px; height:18px; flex-shrink:0; accent-color:var(--accent); }
+@media(max-width:600px) { .agreement-points { grid-template-columns:1fr; } }
+
+.approval-mode-choice[aria-pressed="true"] .approval-mode-mark { font-size:0; }
+.approval-mode-choice[aria-pressed="true"] .approval-mode-mark::after { font-size:14px; }
+.approval-mode-copy > span { color:var(--text-dim); opacity:1; }
+
+/* Keep available updates prominent without competing with page content. */
+#update-btn { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:7px 12px; flex-shrink:0; border:1px solid transparent; border-radius:11px; background:var(--accent-text); color:var(--bg); font-size:12px; font-weight:700; box-shadow:0 2px 8px var(--accent-tint-strong); cursor:pointer; white-space:nowrap; }
+#update-btn:hover { background:var(--accent-text); color:var(--bg); border-color:var(--bg); }
+#update-btn:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
+#update-btn svg { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+#update-version { font-size:10px; padding-left:7px; border-left:1px solid currentColor; }
+#update-btn[hidden] { display:none !important; }
+@media(max-width:1000px) { #update-version { display:none; } }

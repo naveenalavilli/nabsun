@@ -77,6 +77,21 @@ async function main() {
       check('trying an example preserves the assistant and passes only an editable draft', settings.provider === 'claude-cli' && finished[1] === 'chat' && finished[2] === examplePrompt);
       welcome.render(); check('reopening resets the tour without resetting settings', !main.querySelector('#guide-panel-0').hidden && settings.provider === 'claude-cli');
 
+      settings = {...settings, onboardingCompleted:false, usageAgreementRequired:true, usageAgreementVersion:0};
+      let exited = 0;
+      window.nabsun.window = {close:()=>exited++};
+      welcome.render(settings);
+      check('new users receive an unchecked agreement before the tour', !!main.querySelector('#usage-agreement-heading') && !main.querySelector('#usage-agreement-check').checked && main.querySelector('#usage-agreement-continue').disabled && !main.querySelector('[data-action=local]'));
+      main.querySelector('#usage-agreement-exit').click();
+      check('agreement offers an exit without accepting', exited === 1 && settings.usageAgreementVersion === 0);
+      const acknowledgement = main.querySelector('#usage-agreement-check');
+      acknowledgement.checked = true; acknowledgement.dispatchEvent(new Event('change'));
+      fail = true; main.querySelector('#usage-agreement-continue').click(); await tick();
+      check('failed agreement save leaves the agreement visible and retryable', !!main.querySelector('#usage-agreement-heading') && !main.querySelector('#usage-agreement-continue').disabled && settings.usageAgreementVersion === 0);
+      fail = false; main.querySelector('#usage-agreement-continue').click(); await tick();
+      check('explicit acceptance saves its version and opens onboarding without completing setup', settings.usageAgreementVersion === 1 && settings.onboardingCompleted === false && !!main.querySelector('[data-action=local]'));
+      welcome.render(settings);
+      check('accepted agreement does not repeat when the guide is reopened', !main.querySelector('#usage-agreement-heading'));
       return results;
     })()`);
     results.forEach(name => console.log('PASS ' + name));

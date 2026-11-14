@@ -1,4 +1,5 @@
 import type { Settings } from '../../shared/types';
+import { needsUsageAgreement, USAGE_AGREEMENT_VERSION } from '../../shared/assistantSettings';
 
 const examples = [
   { label: 'Fill a form', prompt: 'Fill this form using the details I provide. Ask me for anything missing and let me review it before submitting.', steps: ['Find the right fields', 'Enter the details you provide', 'Leave the form ready for your review'], note: 'Open the form first. Add your details to the draft before sending.' },
@@ -17,7 +18,8 @@ export class OnboardingView {
     private finish: (next: Settings, destination: 'chat' | 'extensions' | 'browse', prompt?: string) => void,
   ) {}
 
-  render() {
+  render(settings?: Settings) {
+    if (settings && needsUsageAgreement(settings)) { this.renderAgreement(); return; }
     this.selectedExample = 0;
     this.step = 0;
     this.root.classList.remove('guide-progressed');
@@ -37,7 +39,7 @@ export class OnboardingView {
         <div class="welcome-illustration guide-map" role="img" aria-label="Illustration of the browser toolbar: address bar for opening a website and panel button on the right for the assistant. The webpage is beside an assistant with a message box and Send button.">
           <div class="guide-browserbar"><span aria-hidden="true">&larr; &nbsp; &rarr;</span><span class="guide-address">Search or enter address</span><span class="guide-panel-button">${panelIcon}</span></div>
           <div class="guide-page"><span class="tour-tag">YOUR WEBSITE</span><strong>The place you want to work</strong><div class="guide-field"></div><div class="guide-field short"></div><span class="guide-map-caption">Browse, sign in, and open your page as usual.</span></div>
-          <div class="guide-assistant"><strong>Assistant</strong><span class="guide-bubble">Tell me what you want done.</span><span class="guide-map-caption">Use this page &middot; Automatic actions</span><div class="guide-message">Your request <b>Send</b></div></div>
+          <div class="guide-assistant"><strong>Assistant</strong><span class="guide-bubble">Tell me what you want done.</span><span class="guide-map-caption">Use this page &middot; Ask for approval</span><div class="guide-message">Your request <b>Send</b></div></div>
         </div>
         <div class="guide-tip-grid"><article><h3>Use this page</h3><p>Includes text from the open page with your message. Turn it off for a question that does not need that context.</p></article><article><h3>Make room for your work</h3><p>Drag the assistant divider to resize it. Its options menu has Detach assistant and Text size.</p></article></div>
       </section>
@@ -54,7 +56,7 @@ export class OnboardingView {
           <article><span class="guide-control-symbol" aria-hidden="true">&#9632;</span><h3>Stop or change direction</h3><p>Press Stop to cancel the running task and clear queued follow-ups. Cancellation cannot undo an action already completed on a website.</p></article>
           <article><span class="guide-control-symbol" aria-hidden="true">&#8644;</span><h3>Line up your next request</h3><p>While the assistant works, use Send next to queue a follow-up. Remove a pending prompt with its cancel button before it starts.</p></article>
         </div>
-        <div class="guide-permission-note"><strong>Leave Automatic actions off while you learn.</strong><p>Turning it on allows clicks, typing, and navigation without asking each time. It stays on until you turn it off. Page code has its own permission in Settings.</p></div>
+        <div class="guide-permission-note"><strong>Start with Ask for approval while you learn.</strong><p>Choose your approval mode in Settings. Approve routine actions reduces prompts on one site; Full access can run powerful tools without asking. Folder access still needs your permission.</p></div>
         <p class="hint">The local model runs on your computer. Websites still use the internet. An online assistant receives the messages and context you send to it.</p>
       </section>
       <div class="guide-navigation"><button data-guide-back hidden>Back</button><span class="guide-progress" aria-live="polite">Section 1 of 3</span><button data-guide-next>Next: Try a task &rarr;</button></div>
@@ -95,6 +97,41 @@ export class OnboardingView {
     const next = this.root.querySelector<HTMLButtonElement>('[data-guide-next]')!;
     next.textContent = this.step === 0 ? 'Next: Try a task \u2192' : this.step === 1 ? 'Next: Stay in control \u2192' : 'Choose a task \u2192';
     this.root.querySelector('.guide-progress')!.textContent = `Section ${this.step + 1} of 3`;
+  }
+
+  private renderAgreement() {
+    this.root.classList.remove('guide-progressed');
+    this.root.innerHTML = `
+      <section class="usage-agreement" aria-labelledby="usage-agreement-heading">
+        <span class="welcome-eyebrow">BEFORE YOU START</span>
+        <h1 id="usage-agreement-heading">A little clarity. Your choice.</h1>
+        <p class="welcome-intro">Nabsun can browse and take actions for you. Please understand what you are choosing before you begin.</p>
+        <div class="agreement-points">
+          <article><h2>You choose the access</h2><p>Start with Ask for approval. Other approval modes can allow actions without asking again. Full access includes page scripts and uploads. Nabsun file tools only use folders you explicitly connect; extra integrations can have their own access.</p></article>
+          <article><h2>Review important work</h2><p>AI can make mistakes or follow misleading instructions on websites. Check messages, forms, and edited documents. Stop cancels pending work; it cannot undo completed actions.</p></article>
+          <article><h2>Know what you share</h2><p>The included model runs locally. Online assistants receive the messages, page context, images, and file contents you share. Provider accounts may have their own terms, fees, and limits.</p></article>
+          <article><h2>An early open-source product</h2><p>Nabsun is provided under the MIT license without warranty. Publisher signing and Apple notarization are not yet available. Only use integrations and downloads you trust.</p></article>
+        </div>
+        <label class="agreement-accept"><input id="usage-agreement-check" type="checkbox"> <span>I understand how Nabsun uses AI and the access I choose.</span></label>
+        <div class="actions"><button class="primary" id="usage-agreement-continue" disabled>Agree and continue</button><button class="ghost" id="usage-agreement-exit">Exit Nabsun</button></div>
+        <p id="usage-agreement-status" role="status" aria-live="polite"></p>
+      </section>`;
+    const check = this.root.querySelector<HTMLInputElement>('#usage-agreement-check')!;
+    const proceed = this.root.querySelector<HTMLButtonElement>('#usage-agreement-continue')!;
+    check.addEventListener('change', () => { proceed.disabled = !check.checked; });
+    this.root.querySelector('#usage-agreement-exit')!.addEventListener('click', () => window.nabsun.window.close());
+    proceed.addEventListener('click', async () => {
+      if (!check.checked) return;
+      proceed.disabled = true; check.disabled = true;
+      try {
+        const next = await window.nabsun.settings.set({ usageAgreementVersion: USAGE_AGREEMENT_VERSION });
+        this.render(next);
+      } catch {
+        this.root.querySelector('#usage-agreement-status')!.textContent = 'Could not save your choice. Please try again.';
+        proceed.disabled = false; check.disabled = false;
+      }
+    });
+    check.focus();
   }
 
   private updateExample() {

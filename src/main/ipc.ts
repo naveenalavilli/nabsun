@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { uiIpc } from './uiSecurity';
 import { UpdateChecker, RELEASE_PAGE } from './updates';
 import { CH } from '../shared/ipc';
+import { approvalMode, approvalSettings } from '../shared/assistantSettings';
 import type {
   ApprovalDecision,
   Bookmark,
@@ -337,9 +338,19 @@ export function registerIpc(deps: IpcDeps): void {
     if(patch.integrationControls&&(['plugins','mcp','extensions'].some(key=>typeof (patch.integrationControls as unknown as Record<string,unknown>)[key]!=='boolean')||Object.keys(patch.integrationControls).some(key=>!['plugins','mcp','extensions'].includes(key))))throw Error('Invalid integration controls.');
     if(patch.auditRetentionDays!==undefined&&(!Number.isInteger(patch.auditRetentionDays)||patch.auditRetentionDays<7||patch.auditRetentionDays>365))throw Error('Choose 7 to 365 activity retention days.');
     const before = settings.get();
+    if (patch.showApprovalMessages !== undefined && typeof patch.showApprovalMessages !== 'boolean') throw Error('Invalid approval display setting.');
+    if (patch.approvalMode !== undefined) {
+      if (!['ask', 'automatic', 'full'].includes(patch.approvalMode)) throw Error('Invalid approval mode.');
+      patch = { ...patch, ...approvalSettings(patch.approvalMode) };
+    } else if (patch.autoApprove) {
+      // Legacy controls cannot accidentally preserve unrestricted access.
+      patch = { ...patch, approvalMode: patch.autoApprove.write ? 'automatic' : 'ask', autoApprove: { ...patch.autoApprove, dangerous: false } };
+    }
+    if (patch.approvalMode && patch.approvalMode !== approvalMode(before)) patch.siteToolGrants = [];
     if(patch.browserNetwork){patch={...patch,browserNetwork:validateNetwork(patch.browserNetwork)};await applyBrowserNetwork(session.fromPartition('persist:nabsun'),patch.browserNetwork!)}
     let next:Settings;
     try{next=settings.save(patch)}catch(error){if(patch.browserNetwork)await applyBrowserNetwork(session.fromPartition('persist:nabsun'),before.browserNetwork??defaultNetwork);throw error}
+    if (patch.approvalMode && patch.approvalMode !== approvalMode(before)) approvals.resetGrants();
     win.applySettings(next);
     if (patch.mcpServers && JSON.stringify(before.mcpServers) !== JSON.stringify(next.mcpServers)) {
       await deps.reloadIntegrations();
@@ -735,7 +746,7 @@ export function sanitizeSettings(incoming: Partial<Settings>): Partial<Settings>
   const clean: Record<string, unknown> = {};
   for (const [key, fallback] of Object.entries(DEFAULT_SETTINGS)) {
     if (!(key in incoming)) continue;
-    if(key==='browserNetwork'||key==='siteToolGrants'||key==='approvalVersion'||key==='approvalMigrationNotice'||key==='integrationControls')continue;
+    if(key==='browserNetwork'||key==='siteToolGrants'||key==='approvalVersion'||key==='approvalMigrationNotice'||key==='integrationControls'||key==='approvalMode'||key==='usageAgreementRequired'||key==='usageAgreementVersion')continue;
     const value = (incoming as Record<string, unknown>)[key];
     if (value === null || value === undefined) continue;
     // Imported configuration cannot authorize disclosure of existing local notes.

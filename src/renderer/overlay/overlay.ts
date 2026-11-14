@@ -104,6 +104,14 @@ input.addEventListener('keydown', (e) => {
       break;
     case 'Enter':
       e.preventDefault();
+      if (mode === 'omnibox' && e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const value = input.value.trim();
+        if (value) {
+          const hostname = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(value);
+          window.overlay.run('navigate', hostname ? `https://www.${value}.com` : value);
+        }
+        break;
+      }
       rows[selected]?.run();
       break;
     case 'Escape':

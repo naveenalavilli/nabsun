@@ -4,7 +4,7 @@ Nabsun embeds Chromium through Electron. The main process owns browser state,
 assistant execution, credentials, and integrations. Web pages and the application
 UI run in separate renderers.
 
-This document describes **1.0.1**, including chat-scoped folder access, Office
+This document describes the current source, including chat-scoped folder access, Office
 editing, and hosted CLI task lifetimes. It distinguishes enforced boundaries
 from remaining limitations. See the [README](README.md) for user instructions
 and [Security](SECURITY.md) for the threat model.
@@ -123,6 +123,14 @@ turn does not revoke explicit chat-session tool grants.
 | `dangerous` | Page JavaScript, destructive MCP tools | Ask |
 
 The sidebar and external MCP bridge use the same `ApprovalManager`.
+Approval mode is an explicit persisted choice: Ask, routine actions, or Full
+access. Full access needs UI confirmation, is journaled as `full-access`, and
+can waive tool prompts for chat and external callers. It cannot bypass a host
+policy denial/required prompt, credential guards, or local folder capabilities.
+Changing modes through trusted settings clears earlier task/site/session grants.
+Configuration imports cannot select Full access or accept the first-use agreement.
+Completed approval notes have a separate display preference, off by default;
+pending requests and denied decisions remain visible, and auditing is unchanged.
 Global per-tool grants are revoked during migration. New grants apply once,
 to a task and origin, or to a tool and origin for 24 hours. An explicit,
 unchecked chat-session checkbox can also grant a tool/source pair across sites
@@ -130,8 +138,8 @@ and subsequent turns in that chat. These grants live only in memory and can be
 revoked from the conversation. They end on chat deletion or app shutdown;
 Stop keeps them available for the next turn.
 
-Policy is checked before approval and again before dispatch. Without an
-explicit chat-session grant, uploads, arbitrary page JavaScript, Enter/Return
+Policy is checked before approval and again before dispatch. Without Full
+access or an explicit chat-session grant, uploads, arbitrary page JavaScript, Enter/Return
 key actions and detected cross-origin submissions force individual approval.
 A session grant can cover these tools, but cannot override host policy or
 credential guards. Unbound external clients have no chat-session grant scope.
@@ -274,9 +282,15 @@ path. The default local sink uses a daily hash chain and durable checkpoint,
 redacts values to fingerprints and blocks further actions after recording failure.
 Its viewer/export is available only to trusted application UI.
 
-Windows chat dictation uses an explicitly approved, time-limited desktop speech
-recognizer child process. Text events update only the owning chat draft. Other
-platforms provide OS dictation guidance; no cloud transcription is used.
+Dictation is temporarily hidden and is not initialized by the chat renderer.
+The retained Windows recognizer implementation and its isolated tests remain
+for future reliability work; no cloud transcription is used.
+
+New profiles show a versioned, unchecked usage acknowledgement before onboarding.
+Acceptance is saved durably before the guide opens; save failure leaves it
+retryable. Existing-profile migration marks the new first-use screen as not
+required without claiming acceptance. The workspace prevents Escape/close from
+dismissing an unaccepted first-use screen; exiting the application is available.
 
 Settings, chats, history, bookmarks, and plugins live under the application
 profile. API keys use Electron `safeStorage`; without secure storage they stay

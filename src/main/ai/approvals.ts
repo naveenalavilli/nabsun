@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { ApprovalDecision, ApprovalRequest, SessionToolGrant } from '../../shared/types';
 import type { SettingsStore } from '../store';
 import type { Tool } from './tools/types';
+import { approvalMode } from '../../shared/assistantSettings';
 import {defaultPolicy,integrationPolicy,PolicyDeniedError,type PolicyProvider} from './policy';
 
 type Emit = (req: ApprovalRequest) => void;
-export type ApprovalMode='read-only'|'autopilot'|'task'|'site'|'session'|'user'|'denied';
+export type ApprovalMode='read-only'|'autopilot'|'full-access'|'task'|'site'|'session'|'user'|'denied';
 interface ApprovalMetadata {folderLabel?:string;sessionId?:string;origin?:string;fileName?:string;target?:{role:string;name:string;value?:string;credential?:boolean};crossOriginSubmit?:boolean;onDecision?:(mode:ApprovalMode)=>void}
 
 interface Pending {
@@ -39,6 +40,12 @@ export class ApprovalManager {
   private taskGrants = new WeakMap<AbortSignal, Set<string>>();
   private autopilotOrigin = new WeakMap<AbortSignal, string>();
 
+  resetGrants() {
+    this.sessionGrants.clear();
+    this.taskGrants = new WeakMap();
+    this.autopilotOrigin = new WeakMap();
+  }
+
   constructor(private readonly settings: SettingsStore,private readonly policy:PolicyProvider=defaultPolicy) {}
 
   checkPolicy(tool:Tool,input:Record<string,unknown>,origin?:string){
@@ -61,6 +68,7 @@ export class ApprovalManager {
     let origin:string|undefined;
     try {const url=new URL(metadata.origin??'');if(['http:','https:'].includes(url.protocol))origin=url.origin}catch{/* Originless actions require individual approval. */}
     const policy=this.checkPolicy(tool,input,origin);
+    if (!policy.requirePrompt && approvalMode(settings) === 'full') return allow('full-access');
     const sessionId = metadata.sessionId;
     const sessionKey = this.sessionKey(tool.name, tool.source);
     const allowSession = !!sessionId && !policy.requirePrompt;

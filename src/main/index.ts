@@ -1,4 +1,5 @@
 import {DatasetStore} from './data/datasets';
+import { needsUsageAgreement } from '../shared/assistantSettings';
 import {DataWorkspace} from './data/workspace';
 import {datasetTools} from './ai/tools/datasets';
 import {FileStore,bindOwnedDownloads} from './files';
@@ -427,6 +428,11 @@ async function boot() {
 
   registerIpc(deps);
   buildMenu(deps);
+  // Reserve the first-use workspace before restoring pages. The shell replays
+  // this choice when ready, so a homepage cannot cover the getting-started flow.
+  if (!settings.get().onboardingCompleted || needsUsageAgreement(settings.get())) {
+    win.openWorkspace('onboarding');
+  }
 
   settings.onChange((next) => win.send(CH.settingsChanged, next));
 

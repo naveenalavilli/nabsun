@@ -3,6 +3,7 @@ import { isOnDevice } from '../../shared/types';
 import { modelPicker } from './model-picker';
 import { appearanceSelector } from './appearance';
 import { updatesSection } from './updates';
+import { APPROVAL_MODES, approvalMode, approvalSettings, type AssistantApprovalMode } from '../../shared/assistantSettings';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -60,11 +61,6 @@ export class SettingsView {
     });
   }
 
-  private setAutoApprove(key: keyof Settings['autoApprove'], value: boolean) {
-    // Serialize edits so even rapid toggles merge with the preceding save.
-    this.approvalSave = this.approvalSave.then(() =>
-      this.patch({ autoApprove: { ...this.settings!.autoApprove, [key]: value } }));
-  }
   /**
    * What happened to the last credential save, per provider.
    *
@@ -488,6 +484,7 @@ export class SettingsView {
   private behaviourSection(s: Settings): HTMLElement {
     const set = el('fieldset');
     set.append(el('legend', { textContent: 'Assistant behaviour' }));
+    set.append(this.approvalChoices(s));
 
     set.append(
       checkbox(
@@ -501,6 +498,12 @@ export class SettingsView {
         s.verbose,
         'Shows the reasoning trace and every tool call. Off by default: without it you get a progress line while the assistant works.',
         (v) => void this.patch({ verbose: v }),
+      ),
+      checkbox(
+        'Show approval messages in chat',
+        s.showApprovalMessages === true,
+        'Show confirmations after you approve actions. Pending requests and declined actions stay visible. Activity is still recorded.',
+        (v) => void this.patch({ showApprovalMessages: v }),
       ),
       checkbox(
         'Allow screenshots',
@@ -518,7 +521,7 @@ export class SettingsView {
       field('Maximum steps per task', steps, 'How many tool rounds one request may take before stopping to check in.'),
     );
 
-    set.append(el('legend', { textContent: 'Permissions' }));
+    set.append(el('legend', { textContent: 'Task limits and memory' }));
     const inputBudget = el('input', { type: 'number', value: String(s.inputTokenBudget), min: '8000', max: '128000', step: '1000' });
     inputBudget.addEventListener('change', () => void this.patch({ inputTokenBudget: Math.max(8000, Math.min(128000, Number(inputBudget.value) || 24000)) }));
     set.append(field('Input token budget per request', inputBudget, 'Estimated limit for hosted API requests. Stops oversized requests without silently forgetting your instructions. Native CLI agents manage their own context.'));
@@ -535,20 +538,6 @@ export class SettingsView {
       memoryPath.textContent = `Saved notes: ${paths.userData}${separator}agent-notes.json`;
     }).catch(() => { memoryPath.textContent = 'Saved notes are in agent-notes.json in your profile folder.'; });
 
-    set.append(
-      checkbox(
-        'Run read-only actions automatically',
-        s.autoApprove.safe,
-        'Reading pages, searching, extracting data. Nothing is changed.',
-        (v) => this.setAutoApprove('safe', v),
-      ),
-      checkbox(
-        'Autopilot — run page actions without asking',
-        s.autoApprove.write,
-        'Applies to one site in each task. Changing sites asks again. Uploads and page JavaScript ask unless you explicitly auto-allow that tool for the current chat.',
-        (v) => this.setAutoApprove('write', v),
-      ),
-    );
 
     set.append(this.soulField(s));
     const activity=el('button',{className:'ghost',textContent:'Review assistant activity'});
@@ -575,6 +564,46 @@ export class SettingsView {
     }
 
     return set;
+  }
+
+  private approvalChoices(s: Settings): HTMLElement {
+    const group = el('div', { className: 'approval-modes' });
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'How should Nabsun actions be approved?');
+    group.append(el('h3', { textContent: 'How should Nabsun actions be approved?' }));
+    const options = el('div', { className: 'approval-mode-options' });
+    const warning = el('div', { className: 'full-access-confirmation', hidden: true });
+    const save = (mode: AssistantApprovalMode) => {
+      warning.hidden = true;
+      for (const b of options.querySelectorAll('button')) b.disabled = true;
+      this.approvalSave = this.approvalSave.then(() => this.patch(approvalSettings(mode))).finally(() => {
+        for (const b of options.querySelectorAll<HTMLButtonElement>('button')) {
+          b.disabled = false;
+          b.setAttribute('aria-pressed', String(b.dataset.approvalMode === approvalMode(this.settings!)));
+        }
+      });
+    };
+    for (const mode of ['ask', 'automatic', 'full'] as const) {
+      const choice = el('button', { type: 'button', className: 'approval-mode-choice' });
+      choice.dataset.approvalMode = mode;
+      choice.setAttribute('aria-pressed', String(approvalMode(s) === mode));
+      choice.append(el('span', { className: 'approval-mode-mark', textContent: mode === 'full' ? '!' : '' }),
+        el('span', { className: 'approval-mode-copy' }, [el('strong', { textContent: APPROVAL_MODES[mode].label }), el('span', { textContent: APPROVAL_MODES[mode].description })]));
+      choice.addEventListener('click', () => {
+        if (mode === approvalMode(this.settings!)) { warning.hidden = true; return; }
+        if (mode === 'full') { warning.hidden = false; warning.querySelector<HTMLButtonElement>('[data-confirm-full]')!.focus(); }
+        else save(mode);
+      });
+      options.append(choice);
+    }
+    const confirm = el('button', { type: 'button', className: 'danger', textContent: 'Enable full access' });
+    confirm.dataset.confirmFull = '';
+    confirm.addEventListener('click', () => save('full'));
+    const cancel = el('button', { type: 'button', className: 'ghost', textContent: 'Cancel' });
+    cancel.addEventListener('click', () => { warning.hidden = true; options.querySelector<HTMLButtonElement>('[data-approval-mode="full"]')!.focus(); });
+    warning.append(el('strong', { textContent: 'Allow actions without asking?' }), el('p', { textContent: 'This includes page scripts, uploads, and file changes in folders you approve. Connected external agents also use this mode. Check the results carefully. Folder selection, credential protections, and integration approvals still apply.' }), confirm, cancel);
+    group.append(options, warning, el('p', { className: 'hint', textContent: 'Changing mode clears earlier task, site, and chat auto-allow choices. Folder limits apply to Nabsun file tools; native integrations keep their own access. You can change this at any time.' }));
+    return group;
   }
 
   /* ------------------------------------------------------------- browsing */

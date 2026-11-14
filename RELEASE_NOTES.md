@@ -11,7 +11,21 @@ are marked accordingly, and their behavior may differ from the current product.
 
 ## Unreleased
 
-No additional changes yet.
+- Add Ask, routine-action, and explicitly confirmed Full access approval modes.
+  Folder capabilities, credential guards and host policy still apply. Changing
+  mode clears earlier automatic grants.
+- Hide completed approval messages by default, with an independent Settings
+  toggle. Pending requests, declined decisions and activity journaling remain.
+- Add a first-use acknowledgement before onboarding, with durable acceptance
+  and an exit option. Existing users are not falsely marked as accepting it.
+- Temporarily hide and disable chat dictation pending reliability improvements.
+- Use a calmer "Needs review" label for higher-impact approval requests.
+- Make available updates easier to notice with a prominent toolbar button,
+  download icon and version badge. Hide the button when no update is available.
+- Prioritize first-use agreement/onboarding over restored pages and optional
+  bookmark loading; unfinished setup returns on restart.
+- Complete bare site names with Ctrl+Enter in the address bar (for example,
+  `example` opens `https://www.example.com`), while preserving full URLs and IME input.
 
 ## 1.0.1 - Published November 11, 2026
 

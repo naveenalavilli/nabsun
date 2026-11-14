@@ -1,3 +1,4 @@
+import { APPROVAL_MODES, approvalMode, needsUsageAgreement } from '../../shared/assistantSettings';
 import type { DownloadEntry, ExtensionStatus, Settings, TabState, WindowState } from '../../shared/types';
 import { WorkflowsView } from './workflows';
 import {ActivityView} from './activity';
@@ -426,6 +427,7 @@ type ViewName =
   | 'passwords';
 
 function showView(name: ViewName) {
+  if (!assistantWindow && settings && needsUsageAgreement(settings)) name = 'onboarding';
   if (name === 'settings' || name === 'onboarding') {
     window.nabsun.window.openWorkspace(name);
     return;
@@ -444,6 +446,7 @@ function showView(name: ViewName) {
 }
 
 function closeWorkspace() {
+  if (settings && needsUsageAgreement(settings)) { showView('onboarding'); return; }
   document.documentElement.classList.remove('workspace-open');
   $('#workspace').hidden = true;
   window.nabsun.window.openWorkspace(null);
@@ -612,6 +615,8 @@ window.nabsun.onSettingsChanged((next) => {
   settings = next;
   applyTheme(next.theme);
   applyVerbose(next.verbose);
+  $('#workspace-close').hidden = needsUsageAgreement(next);
+  if (assistantWindow) void chat.refreshSessionGrants();
 });
 
 /**
@@ -641,6 +646,9 @@ function applyTheme(theme: Settings['theme']): void {
  */
 function applyVerbose(verbose: boolean): void {
   document.documentElement.classList.toggle('verbose', verbose);
+  document.documentElement.classList.toggle('show-approval-messages', settings?.showApprovalMessages === true);
+  const button = document.querySelector('#approval-mode-button');
+  if (button && settings) button.textContent = APPROVAL_MODES[approvalMode(settings)].label;
 }
 
 
@@ -648,16 +656,18 @@ window.nabsun.onCommand((command, arg) => {
   switch (command) {
     case 'workspace':
       if (assistantWindow) break;
+      if (settings && needsUsageAgreement(settings) && arg !== 'onboarding') { showView('onboarding'); break; }
       $('#workspace').hidden = arg === null;
       document.documentElement.classList.toggle('workspace-open', arg !== null);
       for (const name of ['settings', 'onboarding', 'workflows', 'activity']) {
         $(`#view-${name}`).classList.toggle('active', name === arg);
       }
       if (arg === 'settings') void settingsView.render();
-      if (arg === 'onboarding') onboarding.render();
+      if (arg === 'onboarding') onboarding.render(settings ?? undefined);
       if (arg === 'workflows') void workflowsView?.render();
       if (arg === 'activity') void activityView?.render();
-      $('#workspace-close').focus();
+      $('#workspace-close').hidden = !!settings && needsUsageAgreement(settings);
+      if (!$('#workspace-close').hidden) $('#workspace-close').focus();
       break;
     case 'prefill-prompt':
       showView('chat');
@@ -736,33 +746,19 @@ async function boot() {
 
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
-  $<HTMLInputElement>('#autopilot').checked = settings.autoApprove.write;
-  $<HTMLInputElement>('#autopilot').addEventListener('change', async (e) => {
-    const checkbox = e.target as HTMLInputElement;
-    const on = checkbox.checked;
-    checkbox.disabled = true;
-    $('#composer').querySelector('.settings-save-error')?.remove();
-    try {
-      settings = await window.nabsun.settings.set({
-        autoApprove: { ...settings!.autoApprove, write: on },
-      });
-    } catch {
-      checkbox.checked = settings!.autoApprove.write;
-      const error = document.createElement('p');
-      error.className = 'settings-save-error';
-      error.setAttribute('role', 'alert');
-      error.textContent = 'Could not save Autopilot. Your previous setting is still active. Please try again.';
-      $('#composer').prepend(error);
-    } finally { checkbox.disabled = false; }
-  });
+  applyVerbose(settings.verbose);
+  $('#approval-mode-button').addEventListener('click', () => showView('settings'));
 
-  await refreshBookmarks();
-  await bookmarksView.refresh();
   if (assistantWindow) await chat.start();
   window.nabsun.ready();
-  if (!assistantWindow && !settings.onboardingCompleted) {
+  if (!assistantWindow && (!settings.onboardingCompleted || needsUsageAgreement(settings))) {
     showView('onboarding');
   }
+  // Optional browser data must not delay or prevent the first-use activities.
+  try {
+    await refreshBookmarks();
+    await bookmarksView.refresh();
+  } catch (error) { console.warn('Bookmarks could not be loaded.', error); }
 }
 
 void boot();
