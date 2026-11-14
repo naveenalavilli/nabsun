@@ -4,7 +4,7 @@
 information, prepare forms, create a Word document, or update an Excel sheet.
 Choose the access, review the work, and use Stop whenever you need to.
 
-The latest stable release is [1.0.1](https://github.com/naveenalavilli/nabsun/releases/tag/v1.0.1),
+Get the [latest stable release](https://github.com/naveenalavilli/nabsun/releases/latest),
 with Windows x64 and Apple-silicon Mac downloads. Free and open source under the
 MIT license. Optional online AI services may require an account and charge fees.
 

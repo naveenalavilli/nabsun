@@ -11,6 +11,12 @@ are marked accordingly, and their behavior may differ from the current product.
 
 ## Unreleased
 
+No additional changes yet.
+
+## 1.0.2 - Prepared for release
+
+Clearer approval controls, quieter chat, first-use guidance, and browser usability improvements.
+
 - Add Ask, routine-action, and explicitly confirmed Full access approval modes.
   Folder capabilities, credential guards and host policy still apply. Changing
   mode clears earlier automatic grants.
