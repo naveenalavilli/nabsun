@@ -13,7 +13,6 @@ import type {
 } from '../../shared/types';
 import { renderMarkdown } from './markdown';
 import {LocalFoldersView} from './localFolders';
-import {VoiceInput} from './voice';
 import type { Batch } from '../../shared/workflows';
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
@@ -42,7 +41,6 @@ export class ChatView {
   private attachPage = $<HTMLInputElement>('#attach-page');
 
   private sessionId: string | null = null;
-  private voice?:VoiceInput;
   private localFolders?:LocalFoldersView;
   private live: LiveTurn | null = null;
   private runningSessionId: string | null = null;
@@ -63,7 +61,6 @@ export class ChatView {
     if (!enabled) return;
     this.wireComposer();
     this.wireFiles();
-    this.voice=new VoiceInput(this.prompt,()=>this.sessionId);
     this.localFolders=new LocalFoldersView(()=>this.sessionId);
     window.nabsun.workflows?.onChanged(batch => {
       if (batch.scope === this.sessionId) this.renderBatch(batch);
@@ -88,7 +85,6 @@ export class ChatView {
   }
 
   private setSession(session: ChatSession) {
-    this.voice?.stop();
     this.flushText();
     this.live = null;
     this.sessionId = session.id;
@@ -184,7 +180,6 @@ export class ChatView {
   private wireComposer() {
     this.sendBtn.addEventListener('click', () => this.submit());
     this.stopBtn.addEventListener('click', () => {
-      this.voice?.stop();
       if (this.runningSessionId || this.sessionId) {
         window.nabsun.agent.abort(this.runningSessionId ?? this.sessionId!);
         this.setActivity('Stopping');
@@ -211,8 +206,6 @@ export class ChatView {
   private submit() {
     const text = this.prompt.value.trim();
     if (!text || !this.sessionId) return;
-    this.voice?.stop();
-
     window.nabsun.agent.send(this.sessionId, text, { attachPage: this.attachPage.checked });
     this.prompt.value = '';
     this.autoGrow();
@@ -523,7 +516,7 @@ export class ChatView {
     this.scrollToEnd();
   }
 
-  private async refreshSessionGrants() {
+  async refreshSessionGrants() {
     const generation = ++this.sessionGrantRefresh;
     const sessionId = this.sessionId;
     const root = $('#session-tool-grants');
@@ -581,7 +574,7 @@ export class ChatView {
     title.textContent = req.title;
     const risk = document.createElement('span');
     risk.className = `risk ${req.risk}`;
-    risk.textContent = req.risk;
+    risk.textContent = req.risk === 'dangerous' ? 'Needs review' : req.risk;
     title.appendChild(risk);
 
     const tool = document.createElement('div');
@@ -603,7 +596,7 @@ export class ChatView {
       window.nabsun.agent.resolveApproval(req.id, decision);
       box.remove();
       const note = document.createElement('div');
-      note.className = 'muted';
+      note.className = decision === 'deny' ? 'muted' : 'muted approval-result';
       note.textContent =
         decision === 'deny' ? `Declined ${req.toolName}` : `Approved ${req.toolName}`;
       this.transcript.appendChild(note);

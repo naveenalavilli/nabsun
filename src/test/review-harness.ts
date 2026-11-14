@@ -42,7 +42,11 @@ async function main() {
   });
   const settings = new SettingsStore();
   check('new profiles show onboarding', () => assert.equal(settings.get().onboardingCompleted, false));
-  settings.set({ onboardingCompleted: true });
+  check('new profiles require explicit first-use acknowledgement', () => {
+    assert.equal(settings.get().usageAgreementRequired, true);
+    assert.equal(settings.get().usageAgreementVersion, 0);
+  });
+  settings.set({ onboardingCompleted: true, usageAgreementVersion: 1 });
   settings.flush();
   check('completed onboarding persists', () => assert.equal(new SettingsStore().get().onboardingCompleted, true));
   const settingsFile = path.join(tmp, 'settings.json');
@@ -51,6 +55,8 @@ async function main() {
   check('existing profiles skip onboarding and retain their model', () => {
     assert.equal(upgraded.get().onboardingCompleted, true);
     assert.equal(upgraded.get().models['codex-cli'], 'custom-model');
+    assert.equal(upgraded.get().usageAgreementRequired, false);
+    assert.equal(upgraded.get().usageAgreementVersion, 0, 'migration must not claim agreement acceptance');
   });
   upgraded.flush();
   settings.set({ onboardingCompleted: false });

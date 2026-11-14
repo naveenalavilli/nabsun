@@ -228,6 +228,12 @@ export interface McpServerConfig {
 
 export interface Settings {
   onboardingCompleted: boolean;
+  usageAgreementRequired?: boolean;
+  usageAgreementVersion?: number;
+  /** Explicit approval profile; legacy autoApprove values remain supported. */
+  approvalMode?: 'ask' | 'automatic' | 'full';
+  /** Completed approval confirmations only; never hides pending decisions or auditing. */
+  showApprovalMessages: boolean;
   provider: ProviderId;
   models: Record<ProviderId, string>;
   baseUrls: { openai: string; ollama: string; anthropic: string };

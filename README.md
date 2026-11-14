@@ -63,7 +63,8 @@ identity or guarantee safety.
 
 ## Use the assistant
 
-1. Choose the built-in assistant in the getting-started guide. No account or
+1. Review the first-use acknowledgement, then choose the built-in assistant
+   in the getting-started guide. No account or
    API key is needed; you can also choose to browse without the assistant.
 2. Open a website, then open the assistant. Choose **Use this page** when you
    want to include page context.
@@ -117,7 +118,21 @@ preferences remain in Settings.
 Chat history, Settings, Extensions, Bookmarks, and Saved passwords are also in
 Assistant options. New chat and Hide remain directly in the compact header.
 
-### Permissions, attachments, and dictation
+### Permissions and attachments
+
+Choose an approval mode under **Settings > Assistant & permissions**:
+
+- **Ask for approval:** read automatically; ask before changing pages or files.
+- **Approve routine actions:** allow routine actions on the first site in a
+  task; ask for other sites, uploads, page scripts, and file changes.
+- **Full access:** after explicit confirmation, run tools without repeat
+  approval prompts. This also applies to connected external agents. Folder
+  selection, read-only limits, credential guards, and host policy still apply.
+
+Changing modes clears earlier task, site, and chat auto-allow choices. The
+composer shows your current mode. **Show approval messages in chat** is off by
+default and independent of Verbose mode; pending requests and declined actions
+remain visible, and the activity journal is still recorded.
 
 Read tools run automatically by default; actions that change a page ask first.
 Approval choices can apply once, to a task on a site, or to a tool/site for 24
@@ -132,10 +147,8 @@ them for later prompts. They do not grant folder access, upgrade a read-only
 folder, or bypass host policy. See [Security](SECURITY.md).
 
 Attach files or images beside the message box. Image understanding requires a
-vision-capable model. The microphone dictates into the draft on Windows using
-installed speech languages; review the words before sending. The microphone
-control or Escape stops dictation. macOS/Linux show system dictation guidance;
-Nabsun does not use cloud transcription.
+vision-capable model. Dictation is temporarily hidden while its reliability is
+improved; its microphone control cannot start the service from chat.
 
 ### Work with files on your computer
 
@@ -219,8 +232,9 @@ For Anthropic, OpenAI, Ollama, or a different local model, choose a provider in
   24 hours. Old global grants are revoked with a migration notice.
 - Chat image and file attachments, with image previews and vision-model support.
   Documents and data support text, CSV, TSV, XLSX and text-based PDF reading.
-- Windows microphone dictation into the chat draft, using installed speech
-  languages. Review the words before sending. macOS/Linux provide OS dictation guidance.
+- A first-use acknowledgement explains AI mistakes, permission choices,
+  shared context, and the early open-source release before the setup guide.
+  Existing profiles are not recorded as having accepted it during migration.
 - A full data workspace for datasets, saved workflows, batch replay and per-row
   reports. Uncertain rows pause for review before another attempt. Tasks that
   modify local files cannot yet be saved as browser-only workflows.

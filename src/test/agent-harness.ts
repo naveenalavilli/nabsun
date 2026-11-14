@@ -1085,6 +1085,8 @@ app.whenReady().then(async () => {
     try { await memoryAgent.runToolForExternalAgent('memory_read', { key: 'travel' }); } catch { externalMemoryDenied = true; }
     check('external agent cannot borrow the local provider identity to read private memory', externalMemoryDenied);
     check('settings import cannot authorize cloud memory disclosure', sanitizeSettings({ memoryLocalOnly: false }).memoryLocalOnly === undefined);
+    const importedConsent = sanitizeSettings({approvalMode:'full',usageAgreementRequired:false,usageAgreementVersion:1});
+    check('settings import cannot enable Full access or manufacture agreement acceptance', !('approvalMode' in importedConsent) && !('usageAgreementRequired' in importedConsent) && !('usageAgreementVersion' in importedConsent));
     settings.set({ provider: 'anthropic', memoryLocalOnly: false });
     const switching: Provider = {
       ...measured,

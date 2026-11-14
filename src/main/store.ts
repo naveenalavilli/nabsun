@@ -115,6 +115,10 @@ export const DEFAULT_SETTINGS: Settings = {
   assistantDetached: false,
   sidebarOpen: true,
   autoApprove: { safe: true, write: false, dangerous: false },
+  approvalMode: 'ask',
+  showApprovalMessages: false,
+  usageAgreementRequired: true,
+  usageAgreementVersion: 0,
   alwaysAllowTools: [],
   approvalVersion:1,
   approvalMigrationNotice:false,
@@ -147,6 +151,9 @@ export class SettingsStore {
     try {
       const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
       if (saved.onboardingCompleted === undefined) this.store.set({ onboardingCompleted: true });
+      // Existing users are not presented as having accepted a new agreement.
+      // Only genuinely new profiles require the first-use acknowledgement.
+      if (saved.usageAgreementRequired === undefined) this.store.set({ usageAgreementRequired: false });
       if (saved.approvalVersion !== 1) this.store.set({approvalVersion:1,alwaysAllowTools:[],siteToolGrants:[],approvalMigrationNotice:Boolean(saved.alwaysAllowTools?.length)});
     } catch { /* A new profile starts with the welcome screen. */ }
   }
