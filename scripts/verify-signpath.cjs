@@ -135,7 +135,8 @@ test('PowerShell SignPath entry point retains its publisher and invokes payload 
     }
     & ${quote(path.join(__dirname,'verify-signpath-installers.ps1'))} -OriginalDir ${quote(original)} -SignedDir ${quote(signed)} -Publisher 'Test Foundation'
   `;
-  const result = spawnSync('powershell.exe', ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],
+  const shell = process.env.NABSUN_TEST_PWSH || (process.env.CI ? 'pwsh' : 'powershell.exe');
+  const result = spawnSync(shell, ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],
     { encoding:'utf8', windowsHide:true, timeout:30000, env:{...process.env,WINDOWS_SIGNING_PUBLISHER:'Different Azure Publisher'} });
   assert.equal(result.status,0,result.stderr || String(result.error));
   assert.equal(JSON.parse(fs.readFileSync(path.join(signed,'SIGNING-REPORT.json'),'utf8')).scope,'installer-envelopes-only');

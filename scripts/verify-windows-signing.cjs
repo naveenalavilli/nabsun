@@ -110,7 +110,8 @@ function run(directory, scenario) {
     `}
     Test-NabsunWindowsRelease ${quote(directory)} 'Example Publisher'
   `;
-  return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+  const shell = process.env.NABSUN_TEST_PWSH || (process.env.CI ? 'pwsh' : 'powershell.exe');
+  return spawnSync(shell, ['-NoProfile', '-NonInteractive', '-EncodedCommand',
     Buffer.from(script, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 30000, windowsHide: true });
 }
 
