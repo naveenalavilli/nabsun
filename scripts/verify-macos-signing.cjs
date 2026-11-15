@@ -19,7 +19,18 @@ test('macOS signed configuration overrides the ad-hoc identity and requires nota
     config=await getConfig(path.resolve(__dirname,'..'),'electron-builder.macos-signed.cjs',null);
   }finally{for(const [name,value] of Object.entries(previous)){if(value===undefined)delete process.env[name];else process.env[name]=value;}}
   await validateConfiguration(config,new DebugLogger(false));
-  assert.equal(config.mac.identity,settings.MAC_SIGNING_IDENTITY);
+  assert.equal(config.mac.identity,'Example LLC (ABC1234567)');
+  // Exercise the installed builder's identity selector: a prefixed name throws
+  // before keychain discovery, while this qualifier is accepted.
+  const signer = require('app-builder-lib/out/codeSign/macCodeSign');
+  const previousIdentities = signer.findIdentityRawResult;
+  try {
+    signer.findIdentityRawResult = Promise.resolve([]);
+    assert.throws(() => signer.findIdentity('Developer ID Application', settings.MAC_SIGNING_IDENTITY), /Please remove prefix/);
+    assert.equal(await signer.findIdentity('Developer ID Application', config.mac.identity), null);
+  } finally {
+    signer.findIdentityRawResult = previousIdentities;
+  }
   assert.equal(config.mac.notarize,true); assert.equal(config.mac.hardenedRuntime,true); assert.equal(config.forceCodeSigning,true);
   assert.equal(config.publish,null);
   const development=await getConfig(path.resolve(__dirname,'..'),'electron-builder.ci.yml',null);

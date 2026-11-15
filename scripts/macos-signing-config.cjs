@@ -11,6 +11,7 @@ function macSigningConfig(env = process.env) {
   }
   for (const name of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER']) required(name);
   return { extends: './electron-builder.ci.yml', forceCodeSigning: true,
-    mac: { identity, hardenedRuntime: true, notarize: true } };
+    // electron-builder chooses the certificate class itself and rejects its prefix.
+    mac: { identity: identity.slice('Developer ID Application: '.length), hardenedRuntime: true, notarize: true } };
 }
 module.exports = { macSigningConfig };
