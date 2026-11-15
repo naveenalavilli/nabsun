@@ -139,7 +139,7 @@ jobs:
       - name: Type check
         run: ./scripts/ci-run.ps1 typecheck
       - name: Verify CI configuration and artifacts
-        run: node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
+        run: node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs scripts/verify-windows-signing.cjs scripts/verify-signpath.cjs
       - name: Verify engine payload validation
         run: npm run verify:payload
       - name: Build

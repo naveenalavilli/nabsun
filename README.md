@@ -1,5 +1,7 @@
 # Nabsun
 
+[Privacy notice](PRIVACY.md) · [Code signing policy](CODE_SIGNING.md)
+
 **An AI browser for getting things done across your tabs and files.** Find
 information, prepare forms, create a Word document, or update an Excel sheet.
 Choose the access, review the work, and use Stop whenever you need to.

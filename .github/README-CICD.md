@@ -36,6 +36,12 @@ seven days. Failed uploads fail the package job.
 
 These artifacts are separate from public GitHub Releases.
 
+The manually dispatched **Windows signed candidate** workflow offers `signpath`
+(installer envelopes only, pending Foundation scope approval) and `azure`
+(Microsoft Artifact Signing) paths. Each requires a protected environment and
+configured credentials. Neither publishes releases or changes normal unsigned
+packaging. See [Windows signing](../docs/windows-signing.md) for setup and release checks.
+
 ## Release behavior
 
 electron-builder runs with `--publish never`; publish destinations are YAML

@@ -13,6 +13,20 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.3-rc.1 - Draft Windows signing candidate
+
+Prepared from the installer-signing branch for Windows testing. Signing approval
+and account configuration are pending; no verified signed installer is available.
+
+- Add a candidate signing workflow with SignPath and Microsoft Artifact Signing paths.
+- Check publisher, timestamps and installer integrity before accepting signed output.
+- Keep SignPath's proposed installer-only scope separate from embedded upstream binaries.
+- Include privacy and code-signing notices in the app and the Windows installer.
+- Preserve the existing browser features and stable release; macOS signing is separate.
+
+Production acceptance still requires an approved real signing run and clean-Windows
+installation, upgrade and uninstallation checks. This draft does not certify a signed app.
+
 ## 1.0.2 - Prepared for release
 
 Clearer approval controls, quieter chat, first-use guidance, and browser usability improvements.

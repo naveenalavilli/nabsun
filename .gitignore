@@ -3,6 +3,7 @@ dist/
 release/
 ci-logs/
 build/icon.png
+build/installer-notice.txt
 *.log
 .DS_Store
 
