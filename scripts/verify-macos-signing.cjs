@@ -40,6 +40,7 @@ test('signed macOS job is manual, protected and distinct from ordinary macOS rel
   assert(verify>=0 && verify<upload);
   assert.match(job.steps[verify].run,/ditto -x -k/);
   assert.match(job.steps[verify].run,/verify-macos-signatures.sh/);
+  assert.match(job.steps[verify].run,/smoke-macos-app.sh/);
   assert.match(job.steps[upload].with.name,/^nabsun-notarized-macos-/);
   assert(!job.steps.some(step=>step.uses?.includes('action-gh-release')));
   assert(job.steps.some(step=>step.if==='always()' && step.run.includes('nabsun-notarization.p8')));

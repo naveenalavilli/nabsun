@@ -57,7 +57,7 @@ must never be committed. The temporary notarization key is removed after the job
 The candidate is built using `electron-builder.macos-signed.cjs`. Before upload,
 CI extracts the distributed ZIP and checks Developer ID/team identity, hardened
 runtime, native inference binaries, stapled notarization ticket, Gatekeeper
-assessment and packaged resources. Its `nabsun-notarized-macos-*` artifact is
+assessment, packaged resources and isolated-profile app/helper startup. Its `nabsun-notarized-macos-*` artifact is
 separate from ordinary ad-hoc archives. It does not publish a release automatically;
 verify the actual artifact and clean-Mac launch before attaching it to a release.
 

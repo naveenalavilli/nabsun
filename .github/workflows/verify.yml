@@ -373,6 +373,7 @@ jobs:
       - run: npm run setup
       - run: node --test scripts/verify-macos-signing.cjs
       - run: bash -n scripts/verify-macos-signatures.sh
+      - run: bash -n scripts/smoke-macos-app.sh
       - uses: actions/cache/restore@v4
         with:
           path: vendor/models/*.gguf
@@ -402,6 +403,7 @@ jobs:
           ditto -x -k "$archive" "$check_dir"
           bash scripts/verify-macos-signatures.sh "$check_dir/Nabsun.app"
           node scripts/check-release-payload.mjs --resources "$check_dir/Nabsun.app/Contents/Resources"
+          bash scripts/smoke-macos-app.sh "$check_dir/Nabsun.app"
           (cd release && shasum -a 256 "Nabsun-$version-arm64.zip" > SHA256SUMS-MACOS.txt)
       - name: Upload verified notarized macOS candidate
         uses: actions/upload-artifact@v4
@@ -416,6 +418,15 @@ jobs:
       - name: Remove temporary notarization key
         if: always()
         run: rm -f "$RUNNER_TEMP/nabsun-notarization.p8"
+      - name: Upload signed-app startup diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: nabsun-macos-signing-diagnostics-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nabsun-signed-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   package:
     if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
