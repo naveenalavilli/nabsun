@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "revision": "43e825a284b6fb182b2cf041d2b6743538fbfba4",
+  "method": "Production character heuristic; synthetic fixtures, not provider billing or model accuracy.",
+  "scope": "Core browser/tab/web/memory catalogue; excludes files, datasets, plugins and MCP.",
+  "catalogue": {
+    "hostedText": {
+      "tools": 28,
+      "systemEstimate": 1318,
+      "toolSpecEstimate": 3488
+    },
+    "hostedVision": {
+      "tools": 29,
+      "systemEstimate": 1318,
+      "toolSpecEstimate": 3581
+    },
+    "local8k": {
+      "tools": 13,
+      "systemEstimate": 309,
+      "toolSpecEstimate": 1807
+    }
+  },
+  "oldToolResultPruning": [
+    {
+      "tool": "browser_snapshot",
+      "beforeChars": 8000,
+      "afterChars": 1302,
+      "beforeEstimate": 2353,
+      "afterEstimate": 383
+    },
+    {
+      "tool": "browser_click",
+      "beforeChars": 8000,
+      "afterChars": 8000,
+      "beforeEstimate": 2353,
+      "afterEstimate": 2353
+    },
+    {
+      "tool": "browser_type",
+      "beforeChars": 8000,
+      "afterChars": 8000,
+      "beforeEstimate": 2353,
+      "afterEstimate": 2353
+    }
+  ]
+}
