@@ -15,6 +15,10 @@ on:
         description: Publish a verified prerelease from this branch without merging
         type: boolean
         default: false
+      mac_signed_candidate:
+        description: Build only a signed and notarized macOS candidate after verification
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
@@ -282,7 +286,7 @@ jobs:
   # Mac sold since 2020, and a zip skips the disk-image mount for a 1.3 GB file.
   # Add `--x64` and a dmg target here if Intel users ask.
   package-macos:
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
+    if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
     runs-on: macos-latest
     needs: [verify-macos, verify-connections]
     timeout-minutes: 60
@@ -344,7 +348,7 @@ jobs:
           retention-days: 7
 
   package-macos-signed:
-    if: github.event_name == 'workflow_dispatch' && !inputs.windows_test_installer && vars.MAC_SIGNING_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.mac_signed_candidate && !inputs.windows_test_installer && vars.MAC_SIGNING_ENABLED == 'true'
     needs: [verify-macos, verify-connections, verify-action-workflows]
     runs-on: macos-latest
     timeout-minutes: 90
@@ -414,7 +418,7 @@ jobs:
         run: rm -f "$RUNNER_TEMP/nabsun-notarization.p8"
 
   package:
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
+    if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
     runs-on: windows-2022
     needs: [verify, verify-macos, package-macos, verify-connections, verify-action-workflows]
     timeout-minutes: 60

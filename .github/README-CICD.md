@@ -44,9 +44,9 @@ packaging. See [Windows signing](../docs/windows-signing.md) for setup and relea
 
 ### macOS signed candidates
 
-Manual runs of `verify.yml` can also build a Developer ID-signed, Apple-notarized
-arm64 ZIP when repository variable `MAC_SIGNING_ENABLED=true`. Windows-only test
-runs skip this job. It requires native verification and the protected `mac-signing`
+Manual runs of `verify.yml` with `mac_signed_candidate=true` build a Developer
+ID-signed, Apple-notarized arm64 ZIP when `MAC_SIGNING_ENABLED=true`. This mode
+skips ordinary unsigned packaging. It requires native verification and the protected `mac-signing`
 environment. The normal ad-hoc macOS package/release path is unchanged.
 
 Environment variables: `APPLE_TEAM_ID`, `MAC_SIGNING_IDENTITY`, `APPLE_API_KEY_ID`,

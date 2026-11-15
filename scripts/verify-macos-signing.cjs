@@ -30,6 +30,9 @@ test('signed macOS job is manual, protected and distinct from ordinary macOS rel
   const workflow = yaml.load(fs.readFileSync(path.join(__dirname,'../.github/workflows/verify.yml'),'utf8'));
   const job = workflow.jobs['package-macos-signed'];
   assert.match(job.if,/workflow_dispatch/); assert.match(job.if,/MAC_SIGNING_ENABLED/);
+  assert.match(job.if,/inputs.mac_signed_candidate/);
+  assert.match(workflow.jobs.package.if,/!inputs.mac_signed_candidate/);
+  assert.match(workflow.jobs['package-macos'].if,/!inputs.mac_signed_candidate/);
   assert.equal(job.environment,'mac-signing');
   assert(job.needs.includes('verify-macos') && job.needs.includes('verify-action-workflows'));
   const verify=job.steps.findIndex(step=>step.name==='Verify distributed notarized archive');
