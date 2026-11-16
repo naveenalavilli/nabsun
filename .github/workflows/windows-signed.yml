@@ -1,0 +1,213 @@
+name: Windows signed candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing_provider:
+        description: Approved signing service for this candidate
+        type: choice
+        options: [signpath, azure]
+        default: signpath
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-signed-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  verify:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - uses: actions/cache/restore@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - run: ./scripts/ci-run.ps1 fetch:model
+      - run: npm run typecheck
+      - run: node --test scripts/verify-windows-signing.cjs scripts/verify-signpath.cjs
+      - run: npm run verify
+
+  sign:
+    if: inputs.signing_provider == 'azure'
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 60
+    # Configure required reviewers and allowed branches before using this environment.
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      WINDOWS_SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+      WINDOWS_SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+      WINDOWS_SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+      WINDOWS_SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate signing settings
+        env:
+          SIGNING_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          SIGNING_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SIGNING_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          foreach ($name in @('SIGNING_CLIENT_ID', 'SIGNING_TENANT_ID', 'SIGNING_SUBSCRIPTION_ID')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing signing identity setting: $name" }
+          }
+          node -e "require('./electron-builder.windows-signed.cjs')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - uses: actions/cache/restore@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - run: ./scripts/ci-run.ps1 fetch:model
+      - run: npm run build
+      - run: npm run icon
+      - name: Sign in to Azure with a short-lived GitHub identity
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build signed setup and portable packages
+        timeout-minutes: 40
+        run: |
+          npx electron-builder --win --config electron-builder.windows-signed.cjs --publish never
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify packaged model and resources
+        run: node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
+      - name: Verify signatures and checksum final packages
+        run: ./scripts/verify-windows-signatures.ps1
+      - name: Upload verified signed candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: nabsun-windows-signed-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            release/Nabsun-*-x64-setup.exe
+            release/Nabsun-*-portable.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  signpath:
+    if: inputs.signing_provider == 'signpath'
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 90
+    environment: signpath
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+      SIGNPATH_PROJECT: ${{ vars.SIGNPATH_PROJECT }}
+      SIGNPATH_POLICY: ${{ vars.SIGNPATH_POLICY }}
+      SIGNPATH_CONFIGURATION: ${{ vars.SIGNPATH_CONFIGURATION }}
+      SIGNPATH_PUBLISHER: ${{ vars.SIGNPATH_PUBLISHER }}
+      SIGNPATH_APPROVED_SCOPE: ${{ vars.SIGNPATH_APPROVED_SCOPE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Require approved SignPath settings
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          foreach ($name in @('SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT', 'SIGNPATH_POLICY', 'SIGNPATH_CONFIGURATION', 'SIGNPATH_PUBLISHER', 'SIGNPATH_API_TOKEN')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing SignPath setting: $name" }
+          }
+          if ($env:SIGNPATH_APPROVED_SCOPE -ne 'installer-envelopes-only') {
+            throw 'This candidate requires explicit SignPath approval of installer-envelope signing scope.'
+          }
+      - run: npm ci --include=dev
+      - run: npm run setup
+      - uses: actions/cache/restore@v4
+        with:
+          path: vendor/models/*.gguf
+          key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
+          restore-keys: |
+            model-${{ runner.os }}-${{ runner.arch }}-v1-
+      - run: ./scripts/ci-run.ps1 fetch:model
+      - name: Build unsigned candidate inputs
+        run: ./scripts/ci-run.ps1 dist:win:ci
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify original packaged resources
+        run: node scripts/check-release-payload.mjs --resources release/win-unpacked/resources
+      - name: Identify exact installer inputs
+        id: version
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          foreach ($name in @("Nabsun-$version-x64-setup.exe", "Nabsun-$version-portable.exe")) {
+            if (-not (Test-Path -LiteralPath (Join-Path release $name) -PathType Leaf)) { throw "Missing installer: $name" }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Upload source-linked unsigned signing input
+        id: signpath-input
+        uses: actions/upload-artifact@v4
+        with:
+          name: nabsun-signpath-input-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            release/Nabsun-${{ steps.version.outputs.version }}-x64-setup.exe
+            release/Nabsun-${{ steps.version.outputs.version }}-portable.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Request manually approved installer-envelope signatures
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_CONFIGURATION }}
+          github-artifact-id: ${{ steps.signpath-input.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: release/signpath-signed
+      - name: Verify signed envelopes and unchanged installer payloads
+        run: ./scripts/verify-signpath-installers.ps1
+      - name: Upload verified envelope-only candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: nabsun-signpath-envelopes-only-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            release/signpath-signed/Nabsun-${{ steps.version.outputs.version }}-x64-setup.exe
+            release/signpath-signed/Nabsun-${{ steps.version.outputs.version }}-portable.exe
+            release/signpath-signed/SHA256SUMS.txt
+            release/signpath-signed/SIGNING-REPORT.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Describe candidate scope
+        run: |
+          '## Windows installer-envelope candidate' >> $env:GITHUB_STEP_SUMMARY
+          'Only the downloadable setup and portable files are signed. This does not certify embedded application or uninstaller signatures. No release was published.' >> $env:GITHUB_STEP_SUMMARY

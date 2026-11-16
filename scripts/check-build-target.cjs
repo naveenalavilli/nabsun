@@ -8,4 +8,5 @@ module.exports = async ({ packager, electronPlatformName, arch }) => {
   if (manifest.target !== target) {
     throw new Error(`Bundled engine is ${manifest.target}, but app target is ${target}. Run fetch:model and dist on the matching host architecture.`);
   }
+  require('./installer-notice.cjs').writeInstallerNotice(packager.info.appDir);
 };

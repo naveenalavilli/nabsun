@@ -17,6 +17,8 @@ files:
   # the notice their licence requires.
   - LICENSE
   - THIRD-PARTY-NOTICES.md
+  - PRIVACY.md
+  - CODE_SIGNING.md
   - '!node_modules/**/*'
 
 # The embedded model engine and weights. Shipped as plain resources rather
@@ -61,6 +63,7 @@ win:
   artifactName: Nabsun-${version}-${arch}-setup.${ext}
 
 nsis:
+  license: build/installer-notice.txt
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

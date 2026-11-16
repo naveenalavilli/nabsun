@@ -36,6 +36,31 @@ seven days. Failed uploads fail the package job.
 
 These artifacts are separate from public GitHub Releases.
 
+The manually dispatched **Windows signed candidate** workflow offers `signpath`
+(installer envelopes only, pending Foundation scope approval) and `azure`
+(Microsoft Artifact Signing) paths. Each requires a protected environment and
+configured credentials. Neither publishes releases or changes normal unsigned
+packaging. See [Windows signing](../docs/windows-signing.md) for setup and release checks.
+
+### macOS signed candidates
+
+Manual runs of `verify.yml` with `mac_signed_candidate=true` build a Developer
+ID-signed, Apple-notarized arm64 ZIP when `MAC_SIGNING_ENABLED=true`. This mode
+skips ordinary unsigned packaging. It requires native verification and the protected `mac-signing`
+environment. The normal ad-hoc macOS package/release path is unchanged.
+
+Environment variables: `APPLE_TEAM_ID`, `MAC_SIGNING_IDENTITY`, `APPLE_API_KEY_ID`,
+`APPLE_API_ISSUER`. Environment secrets: `CSC_LINK` (base64 encrypted P12),
+`CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8` (dedicated team API key). Tokens/private keys
+must never be committed. The temporary notarization key is removed after the job.
+
+The candidate is built using `electron-builder.macos-signed.cjs`. Before upload,
+CI extracts the distributed ZIP and checks Developer ID/team identity, hardened
+runtime, native inference binaries, stapled notarization ticket, Gatekeeper
+assessment, packaged resources and isolated-profile app/helper startup. Its `nabsun-notarized-macos-*` artifact is
+separate from ordinary ad-hoc archives. It does not publish a release automatically;
+verify the actual artifact and clean-Mac launch before attaching it to a release.
+
 ## Release behavior
 
 electron-builder runs with `--publish never`; publish destinations are YAML

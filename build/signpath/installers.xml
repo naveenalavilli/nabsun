@@ -1,0 +1,14 @@
+<!-- Proposed envelope-only scope: requires Foundation approval before use. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="Nabsun-${version}-x64-setup.exe" product-name="Nabsun" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="Nabsun-${version}-portable.exe" product-name="Nabsun" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
