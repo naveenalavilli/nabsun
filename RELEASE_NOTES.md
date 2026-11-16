@@ -13,21 +13,23 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
-## 1.0.3-rc.1 - Draft Windows signing candidate
+## 1.0.3 - Prepared for release
 
-Prepared from the installer-signing branch for Windows testing. Signing approval
-and account configuration are pending; no verified signed installer is available.
+Adds protected Windows and macOS signing-candidate paths. The Developer ID-signed,
+notarized macOS candidate has passed CI verification; Windows signing still requires
+an approved provider run and clean-machine acceptance before its artifact is promoted.
 
 - Add a candidate signing workflow with SignPath and Microsoft Artifact Signing paths.
 - Check publisher, timestamps and installer integrity before accepting signed output.
 - Keep SignPath's proposed installer-only scope separate from embedded upstream binaries.
 - Include privacy and code-signing notices in the app and the Windows installer.
 - Prepare a separate Developer ID-signed, notarized macOS candidate build with
-  archive, native-binary and Gatekeeper verification; actual CI validation is pending.
+  archive, native-binary, Gatekeeper and isolated-profile startup verification.
 - Preserve the existing browser features and stable release; macOS signing is separate.
 
 Production acceptance still requires an approved real signing run and clean-Windows
-installation, upgrade and uninstallation checks. This draft does not certify a signed app.
+installation, upgrade and uninstallation checks. The normal release workflow remains
+separate from the protected signed-candidate workflows.
 
 ## 1.0.2 - Prepared for release
 
