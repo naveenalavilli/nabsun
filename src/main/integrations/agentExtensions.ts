@@ -7,13 +7,12 @@ import { launcherEnv, type Launcher } from '../ai/providers/cli';
 import type { SecretStore } from '../store';
 
 /**
- * The catalogue behind the Extensions panel.
+ * The catalogue behind the Assistants panel.
  *
- * AI backends are presented as things you *add*, not settings you configure,
- * because that is how they actually behave: Codex and Claude Code are separate
- * programs you install and sign into once, after which the browser drives them.
- * Adding one here makes it the assistant's backend; the browser hands it the
- * page tools over MCP and never sees its credentials.
+ * Codex and Claude Code are separate programs you connect and sign into once,
+ * after which the browser drives them. Choosing one here makes it the active
+ * assistant backend; Nabsun hands it page tools over MCP and never sees its
+ * account credentials.
  */
 const CATALOG: Omit<AgentExtension, 'installed' | 'active' | 'detail'>[] = [
   {

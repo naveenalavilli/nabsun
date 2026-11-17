@@ -228,6 +228,8 @@ export interface McpServerConfig {
 
 export interface Settings {
   onboardingCompleted: boolean;
+  /** Version of the latest optional setup choice the user explicitly confirmed. */
+  setupConfirmationVersion?: number;
   usageAgreementRequired?: boolean;
   usageAgreementVersion?: number;
   /** Explicit approval profile; legacy autoApprove values remain supported. */

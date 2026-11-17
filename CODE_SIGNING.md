@@ -5,7 +5,7 @@ Updated November 16, 2026.
 ## Current status
 
 Nabsun's SignPath Foundation application was not approved. Existing public
-Windows releases are unsigned. Version 1.0.5 is being prepared with a Microsoft
+Windows releases are unsigned. Version 1.0.6 is being prepared with a Microsoft
 Artifact Signing Public Trust profile. The protected macOS candidate workflow
 uses Developer ID signing and Apple notarization. A configured workflow, cloud
 account, draft release, or version number is not evidence that a download was

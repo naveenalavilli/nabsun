@@ -13,6 +13,25 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.6 - Prepared for release
+
+Makes first use and everyday browser activity easier to understand without
+changing established assistant or browsing behavior.
+
+- Consolidate assistant selection, account connections, model settings, and
+  repair actions in Settings instead of a duplicate sidebar page.
+- Give new users one calm setup choice while keeping the optional three-step
+  tour available on demand.
+- Ask existing users to confirm the new Local AI choice once while preserving
+  their assistant, tabs, chats, accounts, permissions, and browser data.
+- Open the product site alongside setup on a fresh install or update without
+  replacing restored tabs or creating duplicate landing tabs.
+- Restore long conversations at their newest message and add select-all and
+  multi-select deletion for chat history.
+- Deep-link approval prompts to the relevant Settings controls.
+- Show live download progress in the browser toolbar and retain a visible new-
+  download state until Downloads is opened.
+
 ## 1.0.5 - Prepared for release
 
 Ships the optional Local AI experience and installer improvements prepared

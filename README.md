@@ -208,7 +208,7 @@ and panel availability depends on the Electron/Chromium version.
 
 To connect **Codex** or **Claude Code**:
 
-1. Open **Extensions → Assistants**.
+1. Open **Assistant options → Choose assistant**.
 2. Click **Connect Codex** or **Connect Claude Code**.
 3. Complete provider sign-in and wait for **Connected** or **Active**.
 

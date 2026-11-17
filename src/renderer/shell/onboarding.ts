@@ -1,5 +1,10 @@
 import type { Settings } from '../../shared/types';
-import { needsUsageAgreement, USAGE_AGREEMENT_VERSION } from '../../shared/assistantSettings';
+import {
+  needsSetupConfirmation,
+  needsUsageAgreement,
+  SETUP_CONFIRMATION_VERSION,
+  USAGE_AGREEMENT_VERSION,
+} from '../../shared/assistantSettings';
 import type { LocalModelStatus } from '../../shared/localModel';
 
 const examples = [
@@ -17,10 +22,11 @@ export class OnboardingView {
   private selectedExample = 0;
   private step = 0;
   private modelStatus: LocalModelStatus | null = null;
+  private reconfirming = false;
 
   constructor(
     private root: HTMLElement,
-    private finish: (next: Settings, destination: 'chat' | 'extensions' | 'browse', prompt?: string) => void,
+    private finish: (next: Settings, destination: 'chat' | 'settings' | 'browse' | 'resume', prompt?: string) => void,
   ) {
     void window.nabsun.localModel.status().then(status => {
       this.modelStatus = status;
@@ -37,15 +43,20 @@ export class OnboardingView {
 
   render(settings?: Settings) {
     if (settings && needsUsageAgreement(settings)) { this.renderAgreement(); return; }
+    this.reconfirming = Boolean(settings && needsSetupConfirmation(settings));
+    if (settings && this.reconfirming) { this.renderConfirmation(settings); return; }
     this.selectedExample = 0;
     this.step = 0;
     this.root.classList.remove('guide-progressed');
+    this.root.classList.remove('guide-open');
     this.root.innerHTML = `
-      <div class="guide-heading"><span class="welcome-eyebrow">GETTING STARTED</span><span class="guide-duration">A quick tour. Come back any time.</span></div>
-      <h1>Your browser. Ready to act.</h1>
-      <p class="welcome-intro">Ask Nabsun to find a page, compare options, or fill a form. It works in your browser; you review the results and control the actions.</p>
+      <div class="guide-heading"><span class="welcome-eyebrow">WELCOME TO NABSUN</span><span class="guide-duration">This takes less than a minute.</span></div>
+      <h1>Choose how you want to start</h1>
+      <p class="welcome-intro">Use private AI on this computer, connect an assistant you already use, or simply browse. You can switch anytime in Settings.</p>
       <div id="local-model-offer" class="local-model-offer" aria-live="polite"></div>
-      <details class="welcome-optional"><summary>Need help with a longer task? Connect another assistant</summary><p>Connect an eligible Codex or Claude account, or configure another provider in Settings. Online assistants receive your messages and the page context you share; provider charges and limits apply.</p><button class="welcome-choice" data-action="connect"><strong>Open assistant connections</strong><span>Keep your current choice until you select a different assistant.</span></button></details>
+      <details class="guide-tour">
+      <summary><span class="guide-tour-label">See how Nabsun works</span><span class="guide-tour-meta">Optional &middot; 3 short steps</span></summary>
+      <div class="guide-tour-body">
       <div class="guide-tabs" role="tablist" aria-label="Getting started sections">
         <button id="guide-tab-0" role="tab" aria-controls="guide-panel-0" aria-selected="true" tabindex="0" data-guide-step="0"><span>1</span> Find your way</button>
         <button id="guide-tab-1" role="tab" aria-controls="guide-panel-1" aria-selected="false" tabindex="-1" data-guide-step="1"><span>2</span> Try a task</button>
@@ -78,6 +89,8 @@ export class OnboardingView {
       </section>
       <div class="guide-navigation"><button data-guide-back hidden>Back</button><span class="guide-progress" aria-live="polite">Section 1 of 3</span><button data-guide-next>Next: Try a task &rarr;</button></div>
       <p class="guide-return hint">Reopen this guide from the assistant or Settings &rarr; Getting started. Change assistants in Settings &rarr; Assistant choice.</p>
+      </div>
+      </details>
       <p class="welcome-status" role="status"></p>`;
     this.updateExample();
     this.renderModelOffer();
@@ -97,8 +110,42 @@ export class OnboardingView {
         event.preventDefault(); this.showStep(next, true);
       });
     }
+    const tour = this.root.querySelector<HTMLDetailsElement>('.guide-tour')!;
+    tour.addEventListener('toggle', () => {
+      this.root.classList.toggle('guide-open', tour.open);
+      this.root.querySelector('.guide-tour-label')!.textContent = tour.open ? '\u2190 Back to setup' : 'See how Nabsun works';
+      this.root.scrollTop = 0;
+    });
     this.root.querySelector('[data-guide-back]')!.addEventListener('click', () => this.showStep(this.step - 1, true));
     this.root.querySelector('[data-guide-next]')!.addEventListener('click', () => this.showStep(this.step === 2 ? 1 : this.step + 1, true));
+  }
+
+  openGuide() {
+    const tour = this.root.querySelector<HTMLDetailsElement>('.guide-tour');
+    if (!tour) return;
+    this.showStep(0);
+    tour.open = true;
+  }
+
+  private renderConfirmation(settings: Settings) {
+    const names: Partial<Record<Settings['provider'], string>> = {
+      local: 'Local AI',
+      'codex-cli': 'Codex',
+      'claude-cli': 'Claude Code',
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      ollama: 'Ollama',
+    };
+    const current = names[settings.provider] ?? 'your current assistant';
+    this.root.classList.remove('guide-progressed');
+    this.root.innerHTML = `
+      <div class="guide-heading"><span class="welcome-eyebrow">ONE QUICK CONFIRMATION</span><span class="guide-duration">Your existing setup is preserved.</span></div>
+      <h1>Keep what works. Choose what fits.</h1>
+      <p class="welcome-intro">You are currently using ${escapeHtml(current)}. Keep it exactly as it is, or choose the optional private model now that Nabsun downloads it only when you ask.</p>
+      <div id="local-model-offer" class="local-model-offer" aria-live="polite"></div>
+      <p class="setup-confirmation-note">Nothing else changes: your tabs, chats, permissions, connected accounts, and browser data stay in place.</p>
+      <p class="welcome-status" role="status"></p>`;
+    this.renderModelOffer();
   }
 
   private renderModelOffer() {
@@ -107,26 +154,29 @@ export class OnboardingView {
     const status = this.modelStatus;
     const size = status ? `${(status.totalBytes / 1_000_000_000).toFixed(1)} GB` : '1.3 GB';
     const sun = '<span class="local-model-sun" aria-hidden="true"><span></span></span>';
+    const keepAction = this.reconfirming ? 'keep' : 'skip';
+    const keepLabel = this.reconfirming ? 'Keep current setup' : 'Just browse';
+    const progressKeepLabel = this.reconfirming ? 'Keep current setup' : 'Browse while it finishes';
     if (!status) {
       root.innerHTML = `<div class="local-model-card is-checking">${sun}<div><span class="local-model-kicker">LOCAL AI</span><h2>Checking what is ready…</h2><p>Your browser is ready while Nabsun checks for an existing model.</p></div></div>
-        <div class="local-model-actions"><button class="welcome-skip" data-model-action="skip">Just browse</button></div>`;
+        <div class="local-model-actions"><button class="welcome-skip" data-model-action="${keepAction}">${keepLabel}</button></div>`;
     } else if (status.state === 'ready') {
       const source = status.source === 'custom' ? 'Your selected model is ready.' : status.source === 'bundled' ? 'Your included model is ready.' : 'Your private model is downloaded and ready.';
       root.innerHTML = `<div class="local-model-card is-ready">${sun}<div><span class="local-model-kicker">READY ON THIS COMPUTER</span><h2>Start with private, local AI</h2><p>${source} No account or per-message charge.</p></div><span class="local-model-check" aria-label="Ready">✓</span></div>
-        <div class="local-model-actions"><button class="primary" data-model-action="local">Start with local AI</button><button class="welcome-skip" data-model-action="skip">Just browse</button></div>
+        <div class="local-model-actions"><button class="primary" data-model-action="local">Start with local AI</button><button class="ghost" data-model-action="connect">Use another assistant</button><button class="welcome-skip" data-model-action="${keepAction}">${keepLabel}</button></div>
         <p class="local-model-note">Best for short, simple tasks. Your prompts stay on this computer; websites still use the internet.</p>`;
     } else if (status.state === 'downloading' || status.state === 'verifying') {
       const percent = Math.min(100, Math.floor(status.downloadedBytes / status.totalBytes * 100));
       const verifying = status.state === 'verifying';
       root.innerHTML = `<div class="local-model-card is-progress">${sun}<div class="local-model-progress-copy"><span class="local-model-kicker">${verifying ? 'ONE QUICK CHECK' : 'DOWNLOADING PRIVATE AI'}</span><h2>${verifying ? 'Making sure every byte is right' : `Bringing local AI to this computer`}</h2><p>${verifying ? 'Nabsun is verifying the pinned model before it can run.' : `${percent}% of ${size} · You can keep browsing.`}</p><progress max="100" value="${verifying ? 100 : percent}">${percent}%</progress></div></div>
-        <div class="local-model-actions"><button class="ghost" data-model-action="cancel">Cancel download</button><button class="welcome-skip" data-model-action="skip">Browse while it finishes</button></div>`;
+        <div class="local-model-actions"><button class="ghost" data-model-action="cancel">Cancel download</button><button class="welcome-skip" data-model-action="${keepAction}">${progressKeepLabel}</button></div>`;
     } else {
       const partial = status.downloadedBytes > 0;
       const failed = status.state === 'failed';
-      root.innerHTML = `<div class="local-model-card is-offer">${sun}<div><span class="local-model-kicker">OPTIONAL · ${size} ONCE</span><h2>A private assistant, when you want one</h2><p>Download the tested local model now, or add an online assistant later. Nothing is chosen for you.</p><div class="local-model-benefits"><span>No account</span><span>Prompts stay local</span><span>Remove anytime</span></div></div></div>
+      root.innerHTML = `<div class="local-model-card is-offer">${sun}<div><span class="local-model-kicker">OPTIONAL · ${size} ONCE</span><h2>A private assistant, when you want one</h2><p>Runs on this computer with no account. Download it now, or choose another assistant.</p></div></div>
         ${failed ? `<p class="welcome-status" role="alert">${escapeHtml(status.error ?? 'The download did not finish. Please try again.')}</p>` : ''}
-        <div class="local-model-actions"><button class="primary" data-model-action="download">${failed ? 'Try download again' : partial ? 'Resume local AI download' : 'Download local AI'}</button><button class="ghost" data-model-action="connect">Use another assistant</button><button class="welcome-skip" data-model-action="skip">Just browse</button></div>
-        <p class="local-model-note">Pinned Qwen3 1.7B model · SHA-256 verified before use · Change this anytime in Settings</p>`;
+        <div class="local-model-actions"><button class="primary" data-model-action="download">${failed ? 'Try download again' : partial ? 'Resume local AI download' : 'Download local AI'}</button><button class="ghost" data-model-action="connect">Use another assistant</button><button class="welcome-skip" data-model-action="${keepAction}">${keepLabel}</button></div>
+        <p class="local-model-note">Verified before use. You can remove it or switch assistants anytime in Settings.</p>`;
     }
     for (const button of root.querySelectorAll<HTMLButtonElement>('[data-model-action]')) {
       button.addEventListener('click', () => {
@@ -211,9 +261,10 @@ export class OnboardingView {
     try {
       const next = await window.nabsun.settings.set({
         onboardingCompleted: true,
+        setupConfirmationVersion: SETUP_CONFIRMATION_VERSION,
         ...(action === 'local' ? { provider: 'local' as const } : {}),
       });
-      this.finish(next, action === 'connect' ? 'extensions' : action === 'skip' ? 'browse' : 'chat',
+      this.finish(next, action === 'connect' ? 'settings' : action === 'keep' ? 'resume' : action === 'skip' ? 'browse' : 'chat',
         action === 'local' ? 'What can you help me do in this browser?' : action === 'example' ? examples[this.selectedExample].prompt : undefined);
     } catch {
       this.root.querySelector('.welcome-status')!.textContent = 'Could not save setup. Please try again.';

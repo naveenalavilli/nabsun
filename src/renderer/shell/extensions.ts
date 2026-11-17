@@ -11,23 +11,17 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return node;
 };
 
-/**
- * The Extensions panel.
- *
- * Two lists, because there are genuinely two kinds. Assistants are backends you
- * add and switch between — Codex and Claude Code among them. Browser extensions
- * are Chrome-compatible packages loaded unpacked from a folder.
- */
-export class ExtensionsView {
-  private root = document.querySelector<HTMLElement>('#extensions-body')!;
+/** Account connections embedded in Settings > Assistant choice. */
+export class AssistantsView {
+  private root: HTMLElement | null;
   private agents: AgentExtension[] = [];
-  private browserExts: ExtensionStatus[] = [];
   private accounts = new Map<ProviderId, AccountStatus>();
   private accountErrors = new Map<ProviderId, string>();
   private connections = new Map<ProviderId, { busy: boolean; signingOut?: boolean; message: string; url?: string; code?: string; error?: string }>();
   private generation = 0;
 
-  constructor(private readonly onProviderChanged: () => void) {
+  constructor(private readonly onProviderChanged: () => void, root?: HTMLElement | null) {
+    this.root = root ?? document.querySelector<HTMLElement>('#assistants-body');
     // Subscribe once: repainting must not open duplicate sign-in tabs.
     window.nabsun.accounts.onEvent(event => {
       const state = this.connections.get(event.provider) ?? { busy: true, message: '' };
@@ -53,22 +47,27 @@ export class ExtensionsView {
       this.connections.set(event.provider, state);
       this.paint();
     });
-    window.nabsun.extensions.onChanged((items) => {
-      this.browserExts = items;
-      if (this.root.offsetParent !== null) this.paint();
-    });
+  }
+
+  /** Moves the persistent connection controller into the latest Settings tree. */
+  mount(root: HTMLElement): Promise<void> {
+    if (this.root === root && this.agents.length) {
+      this.paint();
+      return Promise.resolve();
+    }
+    this.root = root;
+    return this.render();
   }
 
   async render(): Promise<void> {
     const generation = ++this.generation;
-    let agents: AgentExtension[], extensions: ExtensionStatus[];
+    let agents: AgentExtension[];
     try {
-      [agents, extensions] = await Promise.all([
-        window.nabsun.agentExtensions.list(), window.nabsun.extensions.list(),
-      ]);
+      agents = await window.nabsun.agentExtensions.list();
     } catch {
       if (generation !== this.generation) return;
-      this.root.textContent = 'Could not load extensions. ';
+      if (!this.root) return;
+      this.root.textContent = 'Could not load assistants. ';
       const retry = el('button', { textContent: 'Try again' });
       retry.addEventListener('click', () => void this.render());
       this.root.append(retry);
@@ -76,7 +75,6 @@ export class ExtensionsView {
     }
     if (generation !== this.generation) return;
     this.agents = agents;
-    this.browserExts = extensions;
     this.paint();
     // A slow or broken CLI must not hide the other assistant or the whole panel.
     await Promise.all((['codex-cli', 'claude-cli'] as const).map(async id => {
@@ -113,33 +111,34 @@ export class ExtensionsView {
   }
 
   private paint() {
+    if (!this.root) return;
     this.root.textContent = '';
-    this.root.append(this.assistantsSection(), this.browserSection());
+    this.root.append(this.assistantsSection());
   }
 
   /* ------------------------------------------------------ AI assistants -- */
 
   private assistantsSection(): HTMLElement {
-    const set = el('fieldset');
-    set.append(el('legend', { textContent: 'Assistants' }));
+    const set = el('fieldset', { className: 'assistant-connections' });
+    set.append(el('legend', { textContent: 'Account connections' }));
     set.append(
       el('div', {
-        className: 'hint',
+        className: 'hint assistant-connections-intro',
         textContent:
-          'Choose an assistant and connect your account. Nabsun handles Codex and Claude setup for you.',
+          'Connect Codex or Claude Code here. Connecting an account never changes your approval mode.',
       }),
     );
 
-    for (const agent of this.agents) {
-      set.append(this.agentCard(agent));
-    }
+    const cards = el('div', { className: 'assistant-connection-grid' });
+    for (const agent of this.agents.filter(agent => agent.kind === 'cli')) cards.append(this.agentCard(agent));
+    set.append(cards);
     return set;
   }
 
   private agentCard(agent: AgentExtension): HTMLElement {
     const connected = this.accounts.get(agent.id)?.connected ?? false;
     const active = agent.active && (agent.kind !== 'cli' || connected);
-    const card = el('div', { className: `ext-card${active ? ' active' : ''}` });
+    const card = el('article', { className: `ext-card assistant-connection-card${active ? ' active' : ''}` });
 
     const head = el('div', { className: 'ext-head' });
     const icon = el('div', { className: 'ext-icon', textContent: agent.name.charAt(0) });
@@ -151,67 +150,12 @@ export class ExtensionsView {
     head.append(icon, titles);
 
     if (active) {
-      head.append(el('span', { className: 'ext-badge on', textContent: 'Active' }));
-    } else if (connected) {
-      head.append(el('span', { className: 'ext-badge on', textContent: 'Connected' }));
-    } else if (agent.installed) {
-      head.append(el('span', { className: 'ext-badge', textContent: 'Installed' }));
+      head.append(el('span', { className: 'ext-badge on', textContent: 'In use' }));
     }
     card.append(head);
 
     card.append(el('div', { className: 'ext-summary', textContent: agent.summary }));
-
-    const caps = el('ul', { className: 'ext-caps' });
-    for (const c of agent.capabilities) caps.append(el('li', { textContent: c }));
-    card.append(caps);
-
-    const status = el('div', { className: 'status-line' }, [
-      el('span', { className: `dot ${agent.installed ? 'on' : 'off'}` }),
-      el('span', { className: 'muted', textContent: agent.detail ?? '' }),
-    ]);
-    card.append(status);
-
-    // Account connect/disconnect, for CLI backends that expose it.
-    if (agent.kind === 'cli') card.append(this.accountBlock(agent));
-
-    const actions = el('div', { className: 'inline' });
-
-    if (agent.installed && agent.kind !== 'cli') {
-      if (!agent.active) {
-        const use = el('button', { className: 'primary', textContent: 'Use this assistant' });
-        use.addEventListener('click', async () => {
-          this.agents = await window.nabsun.agentExtensions.activate(agent.id);
-          this.onProviderChanged();
-          this.paint();
-        });
-        actions.append(use);
-      }
-    } else if (agent.installCommand) {
-      // Not installed: show the command, because we cannot install it for them.
-      const cmd = el('code', { className: 'ext-cmd', textContent: agent.installCommand });
-      const copy = el('button', { className: 'ghost', textContent: 'Copy command' });
-      copy.addEventListener('click', () => void navigator.clipboard.writeText(agent.installCommand!));
-      const recheck = el('button', { className: 'ghost', textContent: 'Check again' });
-      recheck.addEventListener('click', () => void this.render());
-      card.append(el('div', { className: 'ext-install' }, [cmd]));
-      actions.append(copy, recheck);
-    }
-
-    if (agent.kind === 'api' && !agent.installed) {
-      const openSettings = el('button', { className: 'ghost', textContent: 'Add API key' });
-      openSettings.addEventListener('click', () => {
-        document.querySelector<HTMLElement>('#settings-btn')?.click();
-      });
-      actions.append(openSettings);
-    }
-
-    if (agent.docsUrl) {
-      const docs = el('button', { className: 'ghost', textContent: 'Docs' });
-      docs.addEventListener('click', () => void window.nabsun.tabs.create(agent.docsUrl!));
-      actions.append(docs);
-    }
-
-    if (actions.childElementCount) card.append(actions);
+    card.append(this.accountBlock(agent));
     return card;
   }
 
@@ -222,8 +166,11 @@ export class ExtensionsView {
     const state = this.connections.get(agent.id);
     const connected = this.accounts.get(agent.id)?.connected ?? false;
     const busy = state?.busy ?? false;
-    const text = state?.error || this.accountErrors.get(agent.id) || (busy ? state?.message : connected ? 'Connected' : state?.message)
-      || this.accounts.get(agent.id)?.detail || 'Connect to get started';
+    const accountText = state?.error || this.accountErrors.get(agent.id) || (busy ? state?.message : undefined)
+      || this.accounts.get(agent.id)?.detail || (connected ? 'Connected' : 'Ready to connect');
+    const text = busy || state?.error || this.accountErrors.get(agent.id)
+      ? accountText
+      : [connected ? 'Connected' : accountText, agent.detail].filter(Boolean).join(' · ');
     box.append(el('div', { className: 'status-line', role: 'status', ariaLive: 'polite' }, [
       el('span', { className: 'dot ' + (connected ? 'on' : 'off') }), el('span', { textContent: text }),
     ]));
@@ -240,19 +187,18 @@ export class ExtensionsView {
       }
       if (state?.code) box.append(el('div', { className: 'signin-code', textContent: 'Enter this code: ' + state.code }));
     } else {
-      const repair = el('button', { className: 'ghost', textContent: 'Repair / update', title: 'Install the latest official CLI and use it for this assistant.' });
-      repair.addEventListener('click', () => {
-        ++this.generation;
-        this.accountErrors.delete(agent.id);
-        this.connections.set(agent.id, { busy: true, message: 'Updating your assistant...' });
-        this.paint();
-        window.nabsun.accounts.connect(agent.id, 'repair');
-      });
-      actions.append(repair);
-      if (!connected || !agent.active) {
+      if (connected && !agent.active) {
+        const use = el('button', { className: 'primary', textContent: 'Use ' + agent.name });
+        use.addEventListener('click', async () => {
+          this.agents = await window.nabsun.agentExtensions.activate(agent.id);
+          this.onProviderChanged();
+          this.paint();
+        });
+        actions.append(use);
+      } else if (!connected) {
         const connect = el('button', {
           className: 'primary',
-          textContent: connected ? 'Use ' + agent.name : state?.error ? 'Retry connection' : 'Connect ' + agent.name,
+          textContent: state?.error ? 'Retry connection' : 'Connect ' + agent.name,
         });
         connect.addEventListener('click', () => {
           ++this.generation;
@@ -263,6 +209,15 @@ export class ExtensionsView {
         });
         actions.append(connect);
       }
+      const repair = el('button', { className: 'ghost', textContent: 'Repair or update', title: 'Install the latest official CLI and use it for this assistant.' });
+      repair.addEventListener('click', () => {
+        ++this.generation;
+        this.accountErrors.delete(agent.id);
+        this.connections.set(agent.id, { busy: true, message: 'Updating your assistant...' });
+        this.paint();
+        window.nabsun.accounts.connect(agent.id, 'repair');
+      });
+      actions.append(repair);
       if (connected) {
         const disconnect = el('button', { className: 'ghost', textContent: 'Sign out', title: 'Signs the CLI out on this device, including other apps that use it.' });
         disconnect.addEventListener('click', async () => {
@@ -277,12 +232,52 @@ export class ExtensionsView {
         });
         actions.append(disconnect);
       }
+      if (agent.docsUrl) {
+        const docs = el('button', { className: 'link assistant-docs', textContent: 'Documentation' });
+        docs.addEventListener('click', () => void window.nabsun.tabs.create(agent.docsUrl!));
+        actions.append(docs);
+      }
     }
     box.append(actions);
     if (!connected && !busy) box.append(el('div', {
       className: 'hint', textContent: 'Downloads the official native CLI if needed. Your account must include access to this assistant.',
     }));
     return box;
+  }
+
+}
+
+/** Chrome-compatible packages loaded into the persistent browser session. */
+export class ExtensionsView {
+  private root = document.querySelector<HTMLElement>('#extensions-body')!;
+  private browserExts: ExtensionStatus[] = [];
+  private generation = 0;
+
+  constructor() {
+    window.nabsun.extensions.onChanged((items) => {
+      this.browserExts = items;
+      if (this.root.offsetParent !== null) this.paint();
+    });
+  }
+
+  async render(): Promise<void> {
+    const generation = ++this.generation;
+    try {
+      this.browserExts = await window.nabsun.extensions.list();
+    } catch {
+      if (generation !== this.generation) return;
+      this.root.textContent = 'Could not load browser extensions. ';
+      const retry = el('button', { textContent: 'Try again' });
+      retry.addEventListener('click', () => void this.render());
+      this.root.append(retry);
+      return;
+    }
+    if (generation === this.generation) this.paint();
+  }
+
+  private paint() {
+    this.root.textContent = '';
+    this.root.append(this.browserSection());
   }
 
   /* -------------------------------------------------- browser extensions -- */

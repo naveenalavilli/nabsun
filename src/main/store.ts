@@ -81,6 +81,7 @@ export class JsonStore<T extends object> {
 
 export const DEFAULT_SETTINGS: Settings = {
   onboardingCompleted: false,
+  setupConfirmationVersion: 0,
   // Local AI remains the default choice, but its weights are an explicit
   // first-run download. Existing bundled/custom models remain compatible.
   provider: 'local',
@@ -147,7 +148,8 @@ export class SettingsStore {
 
   constructor() {
     this.store = new JsonStore<Settings>('settings.json', DEFAULT_SETTINGS);
-    // Existing profiles predate onboarding; do not interrupt them on upgrade.
+    // Existing profiles remain onboarded. A separate versioned confirmation
+    // lets the UI ask once about materially new choices without resetting them.
     try {
       const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
       if (saved.onboardingCompleted === undefined) this.store.set({ onboardingCompleted: true });

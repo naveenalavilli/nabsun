@@ -288,7 +288,7 @@ export interface ShellApi {
     toggleSidebar(open?: boolean): void;
     resizeSidebar(width: number): void;
     prefillAssistant(prompt: string): void;
-    openWorkspace(name: 'settings' | 'onboarding' | 'workflows' | 'activity' | null): void;
+    openWorkspace(name: 'settings' | 'onboarding' | 'workflows' | 'activity' | null, target?: 'approvals' | 'assistant-choice'): void;
     openAssistantView(name: string): void;
     zoomAssistant(delta: number | null): void;
     detachAssistant(detached: boolean): void;
