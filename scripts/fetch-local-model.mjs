@@ -1,11 +1,11 @@
 /**
- * Fetches the embedded inference engine and model into `vendor/`.
+ * Fetches the local inference engine and test model into `vendor/`.
  *
  * These are not in git: together they are over a gigabyte, and a repository is
- * the wrong place for binary weights. The packaged installer picks `vendor/` up
- * through electron-builder's extraResources, so the shipped app needs no
- * download and no separate runtime — which is the whole point of embedding a
- * model rather than asking users to install Ollama.
+ * the wrong place for binary weights. Release packaging picks up the native
+ * engine and notices but deliberately excludes GGUF files; the app offers the
+ * same pinned model as an explicit first-run download. Source verification uses
+ * this copy to exercise real local inference before packaging.
  *
  *   node scripts/fetch-local-model.mjs [--force]
  *
@@ -25,6 +25,7 @@ import { buildEngineManifest, verifyEngineManifest, assertEngineStarts, prepareP
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const vendor = path.join(root, 'vendor');
+const modelPin = JSON.parse(await fs.readFile(new URL('../src/shared/localModel.json', import.meta.url), 'utf8'));
 
 /**
  * The CPU build, deliberately: the target machine is assumed to have no GPU,
@@ -57,15 +58,7 @@ const ENGINE = {
  * here despite being the obvious-sounding choice.
  */
 const MODEL = {
-  repo: 'ggml-org/Qwen3-1.7B-GGUF',
-  file: 'Qwen3-1.7B-Q4_K_M.gguf',
-  license: 'apache-2.0',
-  // A commit, not `main`. `resolve/main` is a moving target: the same command
-  // would fetch different weights after any upstream push, with nothing to
-  // notice it by.
-  revision: 'daeb8e2d528a760970442092f6bf1e55c3b659eb',
-  sha256: 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5',
-  bytes: 1282439264,
+  ...modelPin,
   dir: path.join(vendor, 'models'),
 };
 MODEL.url = `https://huggingface.co/${MODEL.repo}/resolve/${MODEL.revision}/${MODEL.file}`;

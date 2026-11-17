@@ -21,18 +21,16 @@ files:
   - CODE_SIGNING.md
   - '!node_modules/**/*'
 
-# The embedded model engine and weights. Shipped as plain resources rather
-# than inside the asar: llama-server is spawned as a child process and
-# memory maps the .gguf, neither of which works from within an archive.
-#
-# `npm run dist` runs check-release-payload first, which refuses to build
-# without these. A build that silently omitted them produced an installer whose
-# advertised default backend was simply absent.
+# The native engine and model notices ship with the app. The 1.28 GB weights
+# are deliberately omitted: first-run setup downloads the pinned, verified
+# model only when the user chooses local AI. Keeping the exclusion here makes
+# every platform artifact small without changing source/dev model validation.
 extraResources:
   - from: vendor
     to: vendor
     filter:
       - '**/*'
+      - '!models/*.gguf'
 
 # Destinations use null to disable publishing; "never" is only a CLI policy.
 publish: null

@@ -16,10 +16,12 @@
 
 The native connection checks run official installers but do not initiate OAuth
 or sign out. They do not prove account consent or a live cloud model response.
-Local inference must run with the bundled model; missing resources fail the CI step.
+Local inference must run with the pinned model in the source workspace; missing
+test resources fail the CI step.
 
 Model weights are cached and verified after restoration. Native engines use
-pinned downloads. Packaging checks the shipped engine, weights, and licenses.
+pinned downloads. Packaging checks the shipped engine and licenses, and fails if
+optional GGUF weights accidentally enter an installer.
 Linux connection checks do not imply Linux release support.
 
 The separate [task-benchmark workflow](workflows/benchmark.yml) requires all 111

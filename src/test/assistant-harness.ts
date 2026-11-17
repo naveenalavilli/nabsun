@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, session } from 'electron';
 import { AppWindow } from '../main/appWindow';
 import { SettingsStore, SecretStore } from '../main/store';
 import { HistoryStore } from '../main/history';
@@ -27,6 +27,7 @@ import { CliAccountManager } from '../main/integrations/cliAccounts';
 import { CH } from '../shared/ipc';
 import {VoiceManager} from '../main/voice';
 import type {VoiceEvent} from '../shared/voice';
+import { LocalModelDownload } from '../main/localModelDownload';
 
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-assistant-test-'));
@@ -96,10 +97,13 @@ async function main() {
   const localStore=new LocalFolderStore([tmp]);
   let folderChoice:string|null=localFixture;
   const folderAccess=new FolderAccessController(localStore,{choose:async()=>folderChoice,confirm:async()=> 'read',exists:scope=>!!sessions.load(scope),changed:scope=>win.send(CH.localFolderChanged,{sessionId:scope})});
+  const existingLocalModel = path.join(tmp, 'existing-model.gguf');
+  fs.writeFileSync(existingLocalModel, 'compatibility fixture');
   registerIpc({
     folderAccess,
     voice:fixtureVoice,
     dataWorkspace, win, settings, sessions, history, providers, approvals, questions, agent, mcp,
+    localModelDownload: new LocalModelDownload(tmp, session.fromPartition('persist:nabsun'), () => ({ path: existingLocalModel, source: 'custom' })),
     secrets: new SecretStore(), downloads: new DownloadManager(), passwords: new PasswordStore(),
     plugins: new PluginManager(path.join(tmp, 'plugins')),
     extensions: new ChromeExtensionManager(() => []),
@@ -153,7 +157,7 @@ async function main() {
     assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#workspace").hidden'), false);
     await win.shell.webContents.executeJavaScript('document.querySelector("#usage-agreement-check").click();document.querySelector("#usage-agreement-continue").click()');
     await until(()=>settings.get().usageAgreementVersion===1);
-    await until(()=>win.shell.webContents.executeJavaScript('!!document.querySelector("[data-action=skip]") && !document.querySelector("#workspace-close").hidden'));
+    await until(()=>win.shell.webContents.executeJavaScript('!!document.querySelector("[data-model-action=skip]") && !document.querySelector("#workspace-close").hidden'));
     await win.shell.webContents.executeJavaScript('document.querySelector("#workspace-close").click()');
     await until(()=>win.shell.webContents.executeJavaScript('document.querySelector("#workspace").hidden'));
     settings.set({onboardingCompleted:true});
@@ -317,7 +321,7 @@ async function main() {
     win.window.setContentSize(900, 600);
     await delay(100);
     assert.equal(await settingsUI().executeJavaScript(`(() => {
-      const skip = document.querySelector('[data-action=skip]').getBoundingClientRect();
+      const skip = document.querySelector('[data-model-action=skip]').getBoundingClientRect();
       return skip.top >= 0 && skip.bottom <= innerHeight;
     })()`), true, 'first-use choices are visible without scrolling on a small browser window');
     win.window.setContentSize(1680, 950);
@@ -330,7 +334,7 @@ async function main() {
     }
     await settingsUI().executeJavaScript('document.querySelector("#guide-tab-0").click()');
 
-    await settingsUI().executeJavaScript('document.querySelector("[data-action=local]").click()');
+    await settingsUI().executeJavaScript('document.querySelector("[data-model-action=local]").click()');
     await until(() => browserTab.view.getVisible());
     await until(() => win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value === "What can you help me do in this browser?"'));
     assert.equal(provider.requests.length, 0, 'setup prefills a prompt without sending it');
@@ -424,7 +428,7 @@ async function main() {
     console.log('PASS compact assistant header keeps zoom and tools in a keyboard-dismissible overflow menu');
     await win.assistant.webContents.executeJavaScript('document.querySelector(".starter-tour").click()');
     await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#view-onboarding").classList.contains("active")'));
-    await win.shell.webContents.executeJavaScript('document.querySelector("[data-action=skip]").click()');
+    await win.shell.webContents.executeJavaScript('document.querySelector("[data-model-action=skip]").click()');
     await until(() => !win.state.sidebarOpen);
     assert.equal(await win.shell.webContents.executeJavaScript('document.querySelector("#workspace").hidden'), true);
     assert.equal(settings.get().provider, 'anthropic', 'browsing without the assistant preserves the selected provider');

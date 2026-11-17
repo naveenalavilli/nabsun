@@ -44,6 +44,7 @@ import {NetworkAuth} from './networkAuth';
 import {applyBrowserNetwork,defaultNetwork} from './browserNetwork';
 import { DEFAULT_SETTINGS, SecretStore, SettingsStore } from './store';
 import { SoulStore, soulPath } from './soul';
+import { LocalModelDownload } from './localModelDownload';
 
 /**
  * Electron's development security warnings are wrong for a browser.
@@ -178,21 +179,36 @@ async function boot() {
   };
 
   /**
-   * The bundled engine and weights, overridable per setting.
+   * The included engine and legacy bundled-model location, overridable per setting.
    *
    * Packaged, these live in `resources/vendor` (unpacked from the asar — a
-   * child process cannot be spawned from inside an archive, and llama.cpp
-   * memory maps the weights). In the dev tree they are in `vendor/`.
+   * child process cannot be spawned from inside an archive). Optional weights
+   * live under user data; source and earlier builds can still have them here.
    */
+  const bundled = bundledPaths(
+    app.isPackaged ? process.resourcesPath : null,
+    path.join(__dirname, '..', '..'),
+  );
+  const regularFile = (file: string) => {
+    try { return fs.statSync(file).isFile(); } catch { return false; }
+  };
+  const localModelDownload = new LocalModelDownload(
+    userDataPath,
+    session.fromPartition('persist:nabsun'),
+    () => {
+      const custom = settings.get().localModel.modelPath.trim();
+      if (custom && regularFile(custom)) return { path: custom, source: 'custom' };
+      if (regularFile(bundled.modelPath)) return { path: bundled.modelPath, source: 'bundled' };
+      return null;
+    },
+  );
+
   const localPaths = () => {
     const configured = settings.get().localModel;
-    const bundled = bundledPaths(
-      app.isPackaged ? process.resourcesPath : null,
-      path.join(__dirname, '..', '..'),
-    );
     return {
       serverPath: configured.serverPath.trim() || bundled.serverPath,
-      modelPath: configured.modelPath.trim() || bundled.modelPath,
+      modelPath: configured.modelPath.trim() ||
+        (regularFile(bundled.modelPath) ? bundled.modelPath : localModelDownload.providerModelPath()),
     };
   };
 
@@ -235,6 +251,7 @@ async function boot() {
 
   approvals.setEmitter((req) => win.send(CH.agentApprovalRequest, req));
   questions.setEmitter((q) => win.send(CH.agentQuestion, q));
+  localModelDownload.on('status', status => win.send(CH.localModelChanged, status));
 
   // The built-in tool set is fixed; plugin and MCP tools are re-read on every
   // turn so reloading an integration takes effect without a restart.
@@ -320,6 +337,7 @@ async function boot() {
     mcp,
     plugins,
     providers,
+    localModelDownload,
     downloads,
     dataWorkspace,
     extensions,

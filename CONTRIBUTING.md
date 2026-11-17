@@ -14,8 +14,9 @@ npm run dev
 ```
 
 Run `npm run setup` if Electron was not downloaded during installation.
-The model setup verifies pinned downloads. Windows and macOS have bundled engines;
-Linux requires manual engine setup.
+Development model setup verifies pinned downloads so inference tests can run.
+Windows and macOS release builds include the engine but download weights only
+after a user opts into Local AI; Linux requires manual engine setup.
 
 Use the npm launch scripts. They clear an inherited `ELECTRON_RUN_AS_NODE`,
 which can otherwise make Electron exit without opening a window.

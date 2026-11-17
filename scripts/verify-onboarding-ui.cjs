@@ -20,10 +20,17 @@ async function main() {
       const check = (name, ok) => { if (!ok) throw Error(name); results.push(name); };
       const tick = () => new Promise(r => setTimeout(r, 20));
       let settings = { provider: 'codex-cli', models: { 'codex-cli': '', 'claude-cli': 'opus', local: 'local-model' }, onboardingCompleted: false };
-      let fail = false, finished;
+      let fail = false, finished, modelChanged = () => {}, downloadCalls = 0, cancelCalls = 0;
+      let modelStatus = { state:'ready', source:'bundled', downloadedBytes:1282439264, totalBytes:1282439264, displayName:'Qwen3 1.7B' };
       window.nabsun = { settings: {
         get: async () => structuredClone(settings),
         set: async patch => { if (fail) throw Error('Fixture'); settings = { ...settings, ...patch }; return structuredClone(settings); }
+      }, localModel: {
+        status: async () => structuredClone(modelStatus),
+        onStatus: callback => { modelChanged = callback; return () => {}; },
+        download: async () => { downloadCalls++; modelStatus = {...modelStatus,state:'downloading',source:undefined,downloadedBytes:320000000}; modelChanged(structuredClone(modelStatus)); return structuredClone(modelStatus); },
+        cancel: () => { cancelCalls++; },
+        remove: async () => modelStatus,
       }};
       const main = document.querySelector('main');
       const mount = () => main.replaceChildren(Models.modelPicker(structuredClone(settings), () => {}));
@@ -47,9 +54,9 @@ async function main() {
       main.querySelector('form').dispatchEvent(new Event('submit', {cancelable:true})); await tick();
       check('invalid custom ID does not change model', settings.models['claude-cli'] === 'sonnet');
       const welcome = new Welcome.OnboardingView(main, (...args) => { finished = args; });
-      welcome.render();
+      welcome.render(); await tick();
       check('account connection is optional and collapsed on first visit', !main.querySelector('.welcome-optional').open);
-      check('browse-only choice appears before the illustration', !!(main.querySelector('[data-action=skip]').compareDocumentPosition(main.querySelector('.welcome-illustration')) & Node.DOCUMENT_POSITION_FOLLOWING));
+      check('browse-only choice appears before the illustration', !!(main.querySelector('[data-model-action=skip]').compareDocumentPosition(main.querySelector('.welcome-illustration')) & Node.DOCUMENT_POSITION_FOLLOWING));
       const beforeTour = JSON.stringify(settings);
       main.querySelector('[data-guide-next]').click();
       check('Next opens one task panel with matching accessible tab state', !main.querySelector('#guide-panel-1').hidden && main.querySelector('#guide-panel-0').hidden && main.querySelector('#guide-tab-1').getAttribute('aria-selected') === 'true');
@@ -62,13 +69,13 @@ async function main() {
       main.querySelector('#guide-tab-2').dispatchEvent(new KeyboardEvent('keydown', { key:'ArrowRight', bubbles:true }));
       check('keyboard arrows wrap between guide sections', !main.querySelector('#guide-panel-0').hidden && document.activeElement.id === 'guide-tab-0');
       check('exploring the guide does not save settings or start a task', beforeTour === JSON.stringify(settings) && !finished);
-      fail = true; main.querySelector('[data-action=local]').click(); await tick();
+      fail = true; main.querySelector('[data-model-action=local]').click(); await tick();
       check('setup failure remains retryable', !finished && !main.querySelector('button').disabled && main.textContent.includes('Could not save'));
-      fail = false; main.querySelector('[data-action=local]').click(); await tick();
+      fail = false; main.querySelector('[data-model-action=local]').click(); await tick();
       check('local setup completes and prefills without sending', settings.onboardingCompleted && settings.provider === 'local' && finished[1] === 'chat' && !!finished[2]);
       welcome.render(); main.querySelector('.welcome-optional').open = true; main.querySelector('[data-action=connect]').click(); await tick();
       check('connect opens existing connection manager without changing provider', finished[1] === 'extensions' && settings.provider === 'local');
-      settings.provider = 'claude-cli'; welcome.render(); main.querySelector('[data-action=skip]').click(); await tick();
+      settings.provider = 'claude-cli'; welcome.render(); main.querySelector('[data-model-action=skip]').click(); await tick();
       check('browse-only choice preserves the assistant choice without opening chat', finished[1] === 'browse' && settings.provider === 'claude-cli');
       welcome.render(); main.querySelector('#guide-tab-1').click();
       main.querySelector('[data-guide-example="1"]').click();
@@ -77,11 +84,26 @@ async function main() {
       check('trying an example preserves the assistant and passes only an editable draft', settings.provider === 'claude-cli' && finished[1] === 'chat' && finished[2] === examplePrompt);
       welcome.render(); check('reopening resets the tour without resetting settings', !main.querySelector('#guide-panel-0').hidden && settings.provider === 'claude-cli');
 
+      finished = undefined; settings.onboardingCompleted = false;
+      modelStatus = { state:'available', downloadedBytes:0, totalBytes:1282439264, displayName:'Qwen3 1.7B' };
+      modelChanged(structuredClone(modelStatus)); welcome.render(settings);
+      check('slim first run offers one clear optional local download', main.textContent.includes('A private assistant, when you want one') && main.querySelector('[data-model-action=download]').textContent === 'Download local AI' && main.querySelectorAll('.local-model-benefits span').length === 3);
+      main.querySelector('[data-model-action=download]').click(); await tick();
+      check('local download shows calm progress without completing onboarding', downloadCalls === 1 && main.querySelector('progress').value === 24 && !finished);
+      main.querySelector('[data-model-action=cancel]').click();
+      check('model download can be cancelled without changing settings', cancelCalls === 1 && !settings.onboardingCompleted);
+      modelStatus = { state:'failed', downloadedBytes:320000000, totalBytes:1282439264, displayName:'Qwen3 1.7B', error:'The local AI model could not be downloaded. Check your connection and try again.' };
+      modelChanged(structuredClone(modelStatus));
+      check('failed model download is retryable and preserves its partial progress', main.textContent.includes('Try download again') && main.textContent.includes('could not be downloaded'));
+      modelStatus = { state:'ready', source:'managed', downloadedBytes:1282439264, totalBytes:1282439264, displayName:'Qwen3 1.7B' };
+      modelChanged(structuredClone(modelStatus));
+      check('verified managed model becomes the existing start flow', main.textContent.includes('Start with local AI') && main.textContent.includes('downloaded and ready'));
+
       settings = {...settings, onboardingCompleted:false, usageAgreementRequired:true, usageAgreementVersion:0};
       let exited = 0;
       window.nabsun.window = {close:()=>exited++};
       welcome.render(settings);
-      check('new users receive an unchecked agreement before the tour', !!main.querySelector('#usage-agreement-heading') && !main.querySelector('#usage-agreement-check').checked && main.querySelector('#usage-agreement-continue').disabled && !main.querySelector('[data-action=local]'));
+      check('new users receive an unchecked agreement before the tour', !!main.querySelector('#usage-agreement-heading') && !main.querySelector('#usage-agreement-check').checked && main.querySelector('#usage-agreement-continue').disabled && !main.querySelector('[data-model-action=local]'));
       main.querySelector('#usage-agreement-exit').click();
       check('agreement offers an exit without accepting', exited === 1 && settings.usageAgreementVersion === 0);
       const acknowledgement = main.querySelector('#usage-agreement-check');
@@ -89,7 +111,7 @@ async function main() {
       fail = true; main.querySelector('#usage-agreement-continue').click(); await tick();
       check('failed agreement save leaves the agreement visible and retryable', !!main.querySelector('#usage-agreement-heading') && !main.querySelector('#usage-agreement-continue').disabled && settings.usageAgreementVersion === 0);
       fail = false; main.querySelector('#usage-agreement-continue').click(); await tick();
-      check('explicit acceptance saves its version and opens onboarding without completing setup', settings.usageAgreementVersion === 1 && settings.onboardingCompleted === false && !!main.querySelector('[data-action=local]'));
+      check('explicit acceptance saves its version and opens onboarding without completing setup', settings.usageAgreementVersion === 1 && settings.onboardingCompleted === false && !!main.querySelector('[data-model-action=local]'));
       welcome.render(settings);
       check('accepted agreement does not repeat when the guide is reopened', !main.querySelector('#usage-agreement-heading'));
       return results;
@@ -104,8 +126,8 @@ async function main() {
         const fits = await win.webContents.executeJavaScript(`(() => {
           document.querySelector('#guide-tab-0').click();
           const root = document.querySelector('main');
-          root.querySelector('[data-action=skip]').scrollIntoView({ block: 'center' });
-          const skip = root.querySelector('[data-action=skip]').getBoundingClientRect();
+          root.querySelector('[data-model-action=skip]').scrollIntoView({ block: 'center' });
+          const skip = root.querySelector('[data-model-action=skip]').getBoundingClientRect();
           return root.scrollWidth <= root.clientWidth && skip.bottom <= innerHeight && skip.top >= 0;
         })()`);
         if (!fits) throw Error('Welcome layout overflow: ' + width + ' ' + theme);

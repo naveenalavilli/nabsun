@@ -1,22 +1,39 @@
 import type { Settings } from '../../shared/types';
 import { needsUsageAgreement, USAGE_AGREEMENT_VERSION } from '../../shared/assistantSettings';
+import type { LocalModelStatus } from '../../shared/localModel';
 
 const examples = [
   { label: 'Fill a form', prompt: 'Fill this form using the details I provide. Ask me for anything missing and let me review it before submitting.', steps: ['Find the right fields', 'Enter the details you provide', 'Leave the form ready for your review'], note: 'Open the form first. Add your details to the draft before sending.' },
   { label: 'Compare options', prompt: 'Find three options on this website that match my needs. Open them in separate tabs and compare the main differences. Ask me for my requirements first.', steps: ['Ask what matters to you', 'Search and open matching options', 'Compare them so you can decide'], note: 'Open a store or listings website. A more capable assistant works best for multi-step tasks.' },
   { label: 'Find a page', prompt: 'Find the returns policy on this website and open it for me.', steps: ['Look for the help or support area', 'Follow the relevant links', 'Bring the policy page into view'], note: 'Open a store website first. Navigation may ask for your approval.' },
-  { label: 'Understand a page', prompt: 'Explain this page in three short points, then suggest a useful next step.', steps: ['Read the page you include', 'Pick out the important details', 'Suggest what to do next'], note: 'A good first task for the included local assistant. Keep Use this page checked.' },
+  { label: 'Understand a page', prompt: 'Explain this page in three short points, then suggest a useful next step.', steps: ['Read the page you include', 'Pick out the important details', 'Suggest what to do next'], note: 'A good first task for Local AI. Keep Use this page checked.' },
 ] as const;
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character]!));
 const panelIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2"/><path d="M11.5 3v14M14.5 7v6"/></svg>';
 
 export class OnboardingView {
   private selectedExample = 0;
   private step = 0;
+  private modelStatus: LocalModelStatus | null = null;
 
   constructor(
     private root: HTMLElement,
     private finish: (next: Settings, destination: 'chat' | 'extensions' | 'browse', prompt?: string) => void,
-  ) {}
+  ) {
+    void window.nabsun.localModel.status().then(status => {
+      this.modelStatus = status;
+      this.renderModelOffer();
+    }).catch(() => {
+      this.modelStatus = { state: 'failed', downloadedBytes: 0, totalBytes: 1_282_439_264, displayName: 'Qwen3 1.7B', error: 'Could not check the local model.' };
+      this.renderModelOffer();
+    });
+    window.nabsun.localModel.onStatus(status => {
+      this.modelStatus = status;
+      this.renderModelOffer();
+    });
+  }
 
   render(settings?: Settings) {
     if (settings && needsUsageAgreement(settings)) { this.renderAgreement(); return; }
@@ -27,7 +44,7 @@ export class OnboardingView {
       <div class="guide-heading"><span class="welcome-eyebrow">GETTING STARTED</span><span class="guide-duration">A quick tour. Come back any time.</span></div>
       <h1>Your browser. Ready to act.</h1>
       <p class="welcome-intro">Ask Nabsun to find a page, compare options, or fill a form. It works in your browser; you review the results and control the actions.</p>
-      <div class="guide-start"><button class="primary" data-action="local">Start with the included assistant</button><button class="welcome-skip" data-action="skip">Just browse</button><p>No account needed for the local assistant. Best for simple tasks; its first reply can take a little time.</p></div>
+      <div id="local-model-offer" class="local-model-offer" aria-live="polite"></div>
       <details class="welcome-optional"><summary>Need help with a longer task? Connect another assistant</summary><p>Connect an eligible Codex or Claude account, or configure another provider in Settings. Online assistants receive your messages and the page context you share; provider charges and limits apply.</p><button class="welcome-choice" data-action="connect"><strong>Open assistant connections</strong><span>Keep your current choice until you select a different assistant.</span></button></details>
       <div class="guide-tabs" role="tablist" aria-label="Getting started sections">
         <button id="guide-tab-0" role="tab" aria-controls="guide-panel-0" aria-selected="true" tabindex="0" data-guide-step="0"><span>1</span> Find your way</button>
@@ -63,7 +80,9 @@ export class OnboardingView {
       <p class="guide-return hint">Reopen this guide from the assistant or Settings &rarr; Getting started. Change assistants in Settings &rarr; Assistant choice.</p>
       <p class="welcome-status" role="status"></p>`;
     this.updateExample();
+    this.renderModelOffer();
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-action]')) {
+      if (button.closest('#local-model-offer')) continue;
       button.addEventListener('click', () => void this.complete(button.dataset.action!));
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-guide-example]')) {
@@ -80,6 +99,48 @@ export class OnboardingView {
     }
     this.root.querySelector('[data-guide-back]')!.addEventListener('click', () => this.showStep(this.step - 1, true));
     this.root.querySelector('[data-guide-next]')!.addEventListener('click', () => this.showStep(this.step === 2 ? 1 : this.step + 1, true));
+  }
+
+  private renderModelOffer() {
+    const root = this.root.querySelector<HTMLElement>('#local-model-offer');
+    if (!root) return;
+    const status = this.modelStatus;
+    const size = status ? `${(status.totalBytes / 1_000_000_000).toFixed(1)} GB` : '1.3 GB';
+    const sun = '<span class="local-model-sun" aria-hidden="true"><span></span></span>';
+    if (!status) {
+      root.innerHTML = `<div class="local-model-card is-checking">${sun}<div><span class="local-model-kicker">LOCAL AI</span><h2>Checking what is ready…</h2><p>Your browser is ready while Nabsun checks for an existing model.</p></div></div>
+        <div class="local-model-actions"><button class="welcome-skip" data-model-action="skip">Just browse</button></div>`;
+    } else if (status.state === 'ready') {
+      const source = status.source === 'custom' ? 'Your selected model is ready.' : status.source === 'bundled' ? 'Your included model is ready.' : 'Your private model is downloaded and ready.';
+      root.innerHTML = `<div class="local-model-card is-ready">${sun}<div><span class="local-model-kicker">READY ON THIS COMPUTER</span><h2>Start with private, local AI</h2><p>${source} No account or per-message charge.</p></div><span class="local-model-check" aria-label="Ready">✓</span></div>
+        <div class="local-model-actions"><button class="primary" data-model-action="local">Start with local AI</button><button class="welcome-skip" data-model-action="skip">Just browse</button></div>
+        <p class="local-model-note">Best for short, simple tasks. Your prompts stay on this computer; websites still use the internet.</p>`;
+    } else if (status.state === 'downloading' || status.state === 'verifying') {
+      const percent = Math.min(100, Math.floor(status.downloadedBytes / status.totalBytes * 100));
+      const verifying = status.state === 'verifying';
+      root.innerHTML = `<div class="local-model-card is-progress">${sun}<div class="local-model-progress-copy"><span class="local-model-kicker">${verifying ? 'ONE QUICK CHECK' : 'DOWNLOADING PRIVATE AI'}</span><h2>${verifying ? 'Making sure every byte is right' : `Bringing local AI to this computer`}</h2><p>${verifying ? 'Nabsun is verifying the pinned model before it can run.' : `${percent}% of ${size} · You can keep browsing.`}</p><progress max="100" value="${verifying ? 100 : percent}">${percent}%</progress></div></div>
+        <div class="local-model-actions"><button class="ghost" data-model-action="cancel">Cancel download</button><button class="welcome-skip" data-model-action="skip">Browse while it finishes</button></div>`;
+    } else {
+      const partial = status.downloadedBytes > 0;
+      const failed = status.state === 'failed';
+      root.innerHTML = `<div class="local-model-card is-offer">${sun}<div><span class="local-model-kicker">OPTIONAL · ${size} ONCE</span><h2>A private assistant, when you want one</h2><p>Download the tested local model now, or add an online assistant later. Nothing is chosen for you.</p><div class="local-model-benefits"><span>No account</span><span>Prompts stay local</span><span>Remove anytime</span></div></div></div>
+        ${failed ? `<p class="welcome-status" role="alert">${escapeHtml(status.error ?? 'The download did not finish. Please try again.')}</p>` : ''}
+        <div class="local-model-actions"><button class="primary" data-model-action="download">${failed ? 'Try download again' : partial ? 'Resume local AI download' : 'Download local AI'}</button><button class="ghost" data-model-action="connect">Use another assistant</button><button class="welcome-skip" data-model-action="skip">Just browse</button></div>
+        <p class="local-model-note">Pinned Qwen3 1.7B model · SHA-256 verified before use · Change this anytime in Settings</p>`;
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-model-action]')) {
+      button.addEventListener('click', () => {
+        const action = button.dataset.modelAction!;
+        if (action === 'download') {
+          button.disabled = true;
+          void window.nabsun.localModel.download().catch(() => undefined);
+        } else if (action === 'cancel') {
+          window.nabsun.localModel.cancel();
+        } else {
+          void this.complete(action);
+        }
+      });
+    }
   }
 
   private showStep(step: number, focus = false) {
@@ -109,8 +170,8 @@ export class OnboardingView {
         <div class="agreement-points">
           <article><h2>You choose the access</h2><p>Start with Ask for approval. Other approval modes can allow actions without asking again. Full access includes page scripts and uploads. Nabsun file tools only use folders you explicitly connect; extra integrations can have their own access.</p></article>
           <article><h2>Review important work</h2><p>AI can make mistakes or follow misleading instructions on websites. Check messages, forms, and edited documents. Stop cancels pending work; it cannot undo completed actions.</p></article>
-          <article><h2>Know what you share</h2><p>The included model runs locally. Online assistants receive the messages, page context, images, and file contents you share. Provider accounts may have their own terms, fees, and limits.</p></article>
-          <article><h2>An early open-source product</h2><p>Nabsun is provided under the MIT license without warranty. Publisher signing and Apple notarization are not yet available. Only use integrations and downloads you trust.</p></article>
+          <article><h2>Know what you share</h2><p>The optional local model runs on this computer once installed. Online assistants receive the messages, page context, images, and file contents you share. Provider accounts may have their own terms, fees, and limits.</p></article>
+          <article><h2>An early open-source product</h2><p>Nabsun is provided under the MIT license without warranty. Publisher signatures vary by release; check the release notes and download checks before installing. Only use integrations and downloads you trust.</p></article>
         </div>
         <label class="agreement-accept"><input id="usage-agreement-check" type="checkbox"> <span>I understand how Nabsun uses AI and the access I choose.</span></label>
         <div class="actions"><button class="primary" id="usage-agreement-continue" disabled>Agree and continue</button><button class="ghost" id="usage-agreement-exit">Exit Nabsun</button></div>

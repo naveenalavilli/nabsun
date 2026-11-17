@@ -130,6 +130,13 @@ const api: ShellApi = {
     setCredential: (provider, key) => ipcRenderer.invoke(CH.credsSet, provider, key),
     clearCredential: (provider) => ipcRenderer.invoke(CH.credsClear, provider),
   },
+  localModel: {
+    status: () => ipcRenderer.invoke(CH.localModelStatus),
+    download: () => ipcRenderer.invoke(CH.localModelDownload),
+    cancel: () => ipcRenderer.send(CH.localModelCancel),
+    remove: () => ipcRenderer.invoke(CH.localModelRemove),
+    onStatus: callback => on(CH.localModelChanged, callback),
+  },
 
   config: {
     export: () => ipcRenderer.invoke(CH.configExport),

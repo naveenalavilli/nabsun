@@ -1,12 +1,11 @@
 /**
  * Refuses to package a release that is missing what it claims to ship.
  *
- * The README says the browser works out of the box with no account and no
- * network. That is only true if the engine, the weights, and their licences are
- * actually in the payload — and nothing enforced it: `npm run dist` would
- * happily build an installer whose advertised default backend was absent, and
- * CI would publish it, because the local harness *skips* when weights are
- * missing rather than failing.
+ * Source verification still requires the pinned model so local inference is
+ * exercised in CI. Packaged verification deliberately requires the native
+ * engine and notices but rejects model weights: releases offer those weights as
+ * an explicit, resumable first-run download instead of adding 1.28 GB to every
+ * installer.
  *
  * A skip is not a pass. This turns the claim into a build gate.
  *
@@ -20,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { verifyEngineManifest, assertEngineStarts } from './engine-payload.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const modelPin = JSON.parse(fs.readFileSync(path.join(root, 'src/shared/localModel.json'), 'utf8'));
 const allowMissing = process.argv.includes('--allow-missing-model');
 const resourcesArg = process.argv.indexOf('--resources');
 if (resourcesArg !== -1 && (!process.argv[resourcesArg + 1] || process.argv[resourcesArg + 1].startsWith('--'))) {
@@ -56,11 +56,11 @@ const REQUIRED = [
     { file: 'vendor/llama/libllama-server-impl.dylib', why: 'the native server implementation', minBytes: 1_000_000 },
     { file: 'vendor/llama/libggml-base.dylib', why: 'the native ggml runtime', minBytes: 100_000 },
   ]),
-  {
-    file: 'vendor/models/Qwen3-1.7B-Q4_K_M.gguf',
+  ...(!resources ? [{
+    file: `vendor/models/${modelPin.file}`,
     why: 'the default model weights',
     minBytes: 1_000_000_000,
-  },
+  }] : []),
   {
     file: 'vendor/models/LICENSE-Apache-2.0.txt',
     why: 'the licence the weights are redistributed under (Apache-2.0 §4 requires the text)',
@@ -84,6 +84,15 @@ const REQUIRED = [
 ];
 
 const problems = [];
+if (resources) {
+  const modelDirectory = path.join(resources, 'vendor/models');
+  const packagedWeights = fs.existsSync(modelDirectory)
+    ? fs.readdirSync(modelDirectory).filter(file => file.toLowerCase().endsWith('.gguf'))
+    : [];
+  if (packagedWeights.length) {
+    problems.push(`packaged release contains optional model weights (${packagedWeights.join(', ')}); keep the distributable slim and use first-run download`);
+  }
+}
 try {
   const manifest = JSON.parse(fs.readFileSync(path.join(resources ?? root, 'vendor/llama/.manifest.json'), 'utf8'));
   const engineDir = path.join(resources ?? root, 'vendor/llama');
@@ -122,7 +131,9 @@ if (!problems.length) {
 }
 
 if (!problems.length) {
-  console.log(`${resources ? 'packaged' : 'release'} payload: engine, weights and licences all present`);
+  console.log(resources
+    ? 'packaged payload: engine and licences present; optional model weights excluded'
+    : 'release source payload: engine, model weights and licences all present');
   process.exit(0);
 }
 

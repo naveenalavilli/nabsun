@@ -63,7 +63,10 @@ async function main() {
       const tick = () => new Promise(r => setTimeout(r, 0));
       let reply = { state: 'current', currentVersion: '0.1.8' }, opened = 0, failOpen = false, settingsOpened = false;
       let manualCheck = false;
-      window.nabsun = { updates: { check: async manual => { manualCheck = manual; return reply; }, open: async () => { if (failOpen) throw Error('offline'); opened++; } } };
+      window.nabsun = {
+        updates: { check: async manual => { manualCheck = manual; return reply; }, open: async () => { if (failOpen) throw Error('offline'); opened++; } },
+        localModel: { onStatus: () => () => {} },
+      };
       document.querySelector('#settings-btn').onclick = () => { settingsOpened = true; };
       document.querySelector('main').append(Updates.updatesSection());
       Updates.startUpdateChecks(); await tick();

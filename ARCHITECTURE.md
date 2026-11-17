@@ -153,12 +153,14 @@ are write. Trust the server before enabling it.
 ## Providers and account connections
 
 Providers normalize streaming text, reasoning, tool calls, usage, and stop events.
-Adapters support Anthropic, OpenAI, Ollama, the bundled local model, and delegated
+Adapters support Anthropic, OpenAI, Ollama, optional local AI, and delegated
 Codex/Claude Code agents.
 
-The local adapter starts a bundled `llama-server` lazily, reuses it across turns,
-and stops it on shutdown. It serves the bundled Qwen3 1.7B GGUF model over loopback.
-Model and engine paths are configurable.
+The local adapter starts the included `llama-server` lazily, reuses it across
+turns, and stops it on shutdown. It serves a verified, app-managed Qwen3 1.7B
+GGUF model over authenticated loopback. A first-run manager downloads, resumes,
+verifies, and removes those optional weights. Legacy bundled and custom model
+paths retain priority for compatibility; model and engine paths remain configurable.
 
 CLI providers delegate their internal loop and expose Nabsun through MCP.
 Prompts travel over stdin. Launcher resolution supports native binaries, npm
@@ -321,8 +323,8 @@ by default. See [Security](SECURITY.md) for details.
 ## Build and verification
 
 esbuild produces main/preload bundles, renderer assets, an injected page bridge,
-and the standalone MCP server. electron-builder packages the app with the model,
-native engine, and licenses. Engine manifests record platform, architecture,
+and the standalone MCP server. electron-builder packages the app with the native
+engine and licenses while excluding optional GGUF weights. Engine manifests record platform, architecture,
 file hashes, and library links; packaging also probes native startup.
 
 Use the [contributor guide](CONTRIBUTING.md) for local commands and the

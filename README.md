@@ -48,9 +48,12 @@ as an ordinary publisher warning. See the [illustrated installation steps](https
 
 ### Local AI and download checks
 
-The bundled Qwen3 1.7B model runs on your CPU without an account or API key.
-Downloads are about 1.4 GB because they include the model. Local inference
-works offline; accessing websites and cloud assistants requires internet access.
+Nabsun includes the local inference engine, then calmly offers the optional
+Qwen3 1.7B model on first launch. The one-time model download is about 1.3 GB,
+can be cancelled or resumed, and is checked against its pinned SHA-256 before
+use. Existing bundled and custom model files continue to work. After the model
+is installed, local inference works offline; downloading it, accessing websites,
+and using cloud assistants require internet access.
 
 Windows builds are unsigned; Mac builds use ad-hoc signing without notarization.
 Compare your download with the release's `SHA256SUMS.txt`, for example:
@@ -65,9 +68,9 @@ identity or guarantee safety.
 
 ## Use the assistant
 
-1. Review the first-use acknowledgement, then choose the built-in assistant
-   in the getting-started guide. No account or
-   API key is needed; you can also choose to browse without the assistant.
+1. Review the first-use acknowledgement, then download or choose Local AI in
+   the getting-started guide. No account or API key is needed. You can also
+   connect another assistant or browse without downloading a model.
 2. Open a website, then open the assistant. Choose **Use this page** when you
    want to include page context.
 3. Type a task or choose an editable example, review it, and press **Send**.
@@ -81,8 +84,9 @@ Nabsun checks for new releases at startup and every 24 hours. Click **Update
 available** in the toolbar to download one, or use **Settings > App updates** to
 check manually. Updates require downloading and running the new installer.
 
-The first-run guide lets you try the built-in assistant, connect Codex or Claude,
-or start browsing without opening the assistant. Reopen it from **Settings → Getting started**.
+The first-run guide lets you download Local AI, use an existing local model,
+connect Codex or Claude, or start browsing without choosing an assistant.
+Reopen it from **Settings → Getting started**.
 
 Open **Settings** with the browser toolbar gear or from **Assistant options**. Settings
 and the visual getting-started guide use the full browser content area. Choose
@@ -113,7 +117,7 @@ switch chats or hide the assistant, and last until the app closes. **Use this pa
 uses the page open when that queued prompt starts.
 For a first try, choose an example question in the empty chat. It fills the
 message box without sending it; edit it and press Send when ready. Use the
-Getting started guide link whenever you need a refresher. The built-in assistant
+Getting started guide link whenever you need a refresher. The local assistant
 is best for short, simple tasks. Optional account connections and advanced
 preferences remain in Settings.
 
@@ -279,7 +283,7 @@ On Linux, it downloads the weights but exits with manual engine setup instructio
 ```bash
 npm run dev        # Watch source files and launch
 npm run typecheck
-npm run verify     # Automated checks, including bundled local inference
+npm run verify     # Automated checks, including pinned local inference
 ```
 
 ## Build installers
@@ -291,8 +295,9 @@ npm run dist:win   # Windows x64 installer and portable executable
 npm run dist:mac   # DMG and ZIP for the current Mac architecture
 ```
 
-Output goes to `release/`. Packaging verifies the bundled engine, model, and
-licenses. macOS packaging requires a Mac; public signed distribution also requires
+Output goes to `release/`. Packaging verifies the included engine and licenses,
+and rejects accidentally bundled GGUF weights so installers stay compact. Source
+verification still tests the pinned model. macOS packaging requires a Mac; public signed distribution also requires
 a Developer ID certificate and notarization.
 
 Current public Mac downloads are Apple silicon ZIPs; building a DMG locally
