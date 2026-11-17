@@ -75,7 +75,7 @@ class FixtureCli extends CliProvider {
 async function main() {
   await app.whenReady();
   const settings = new SettingsStore();
-  settings.save({ onboardingCompleted: true, usageAgreementVersion: 1, sidebarOpen: true, provider: 'anthropic', personalContext: false, memoryEnabled: false });
+  settings.save({ onboardingCompleted: true, setupConfirmationVersion: 1, usageAgreementVersion: 1, sidebarOpen: true, provider: 'anthropic', personalContext: false, memoryEnabled: false });
   const history = new HistoryStore();
   const sessions = new SessionStore(tmp);
   const win = new AppWindow(settings, history);
@@ -200,6 +200,18 @@ async function main() {
     fs.mkdirSync(chromeArtifacts, { recursive:true });
     fs.writeFileSync(path.join(chromeArtifacts, 'browser-toolbar.png'), (await win.shell.webContents.capturePage({x:0,y:0,width:win.window.getContentSize()[0],height:130})).toPNG());
     console.log('PASS desktop toolbar alignment at 900/1280px, native page bounds, vector icons, and assistant toggle');
+    const downloadFixture = { id:'toolbar-download', filename:'report.pdf', url:'https://example.com/report.pdf', savePath:path.join(tmp,'report.pdf'), state:'progressing', receivedBytes:25, totalBytes:100, startedAt:Date.now(), paused:false };
+    win.send(CH.downloadsChanged, [downloadFixture]);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#downloads-btn").dataset.state === "active"'));
+    assert.equal(await win.shell.webContents.executeJavaScript(`(() => { const button=document.querySelector('#downloads-btn'); return button.getAttribute('aria-label').includes('25%') && button.style.getPropertyValue('--download-progress') === '25%'; })()`), true);
+    fs.writeFileSync(path.join(chromeArtifacts, 'download-toolbar-active.png'), (await win.shell.webContents.capturePage({x:0,y:0,width:win.window.getContentSize()[0],height:130})).toPNG());
+    win.send(CH.downloadsChanged, [{...downloadFixture,state:'completed',receivedBytes:100,completedAt:Date.now()}]);
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#downloads-btn").dataset.state === "new"'));
+    assert.equal(await win.shell.webContents.executeJavaScript(`(() => { const button=document.querySelector('#downloads-btn'); return button.getAttribute('aria-label').includes('New download') && !document.querySelector('#dl-badge').hidden && getComputedStyle(document.querySelector('.download-icon-new')).display !== 'none'; })()`), true);
+    fs.writeFileSync(path.join(chromeArtifacts, 'download-toolbar-new.png'), (await win.shell.webContents.capturePage({x:0,y:0,width:win.window.getContentSize()[0],height:130})).toPNG());
+    await win.shell.webContents.executeJavaScript('document.querySelector("#downloads-btn").click()');
+    await until(() => win.shell.webContents.executeJavaScript('document.querySelector("#downloads-btn").dataset.state === "idle"'));
+    console.log('PASS download toolbar shows live progress, announces a new result, and clears it when Downloads opens');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#workflows-btn").click()');
     await until(()=>win.shell.webContents.executeJavaScript('document.querySelector("#view-workflows").classList.contains("active") && !!document.querySelector("#data-paste")'));
     const literal='<img src=x onerror="window.__dataXss=true">';
@@ -263,7 +275,7 @@ async function main() {
     })()`);
     assert.equal(layout.width, layout.window, 'settings uses the full browser content width');
     assert.equal(layout.categories, 8);
-    assert.equal(layout.cards, 6);
+    assert.equal(layout.cards, 2, 'getting started keeps only the two essential choices');
     win.send(CH.overlayCommand, { command: 'open-clear-data' });
     await until(() => settingsUI().executeJavaScript('!document.querySelector("#settings-browsing")?.hidden'));
     assert.equal(win.assistant.view.getVisible(), false, 'clear-data command stays in the browser workspace');
@@ -344,6 +356,17 @@ async function main() {
     assert.equal(win.assistant.view.getVisible(), true, 'return restores attached assistant');
     assert.equal(win.tabs.activeTabId, browserTab.id, 'settings preserves the active tab');
     console.log('PASS full settings workspace, category search, visual setup, and return preserve browser state');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#assistants-btn").click()');
+    await until(() => settingsUI().executeJavaScript(`(() => {
+      const panel=document.querySelector('#settings-model');
+      return !document.querySelector('#workspace').hidden && panel && !panel.hidden && document.activeElement?.id==='assistant-provider';
+    })()`));
+    await until(() => settingsUI().executeJavaScript('document.querySelector(".assistant-connections")?.textContent.includes("Account connections")'));
+    assert.equal(await settingsUI().executeJavaScript('document.querySelector("#view-assistants") === null'), true, 'assistant management has no duplicate sidebar page');
+    fs.writeFileSync(path.join(artifacts, 'settings-assistant-choice.png'), (await settingsUI().capturePage()).toPNG());
+    win.openWorkspace(null); win.toggleSidebar(true);
+    await until(() => win.assistant.view.getVisible());
+    console.log('PASS Choose assistant opens the focused full Settings category with account connections');
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value="Existing draft";document.querySelector("#voice-toggle").click()');
     await delay(80);
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#voice-toggle").hidden && document.querySelector("#voice-toggle").disabled && document.querySelector("#voice-controls").hidden'), true);
@@ -572,7 +595,19 @@ async function main() {
     assert.equal(settings.get().autoApprove.dangerous, false);
     assert.equal(approvals.grantsForSession(permissionSession).length, 0);
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#approval-mode-button").textContent'), 'Ask for approval');
-    console.log('PASS session permission checkbox defaults off, Allow once, repeat tool approval suppression, visible revocation and Deny');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#approval-mode-button").click()');
+    await until(()=>win.shell.webContents.executeJavaScript(`(() => {
+      const panel=document.querySelector('#settings-assistant');
+      const selected=document.querySelector('#approval-mode-settings [aria-pressed="true"]');
+      return !document.querySelector('#workspace').hidden && panel && !panel.hidden && selected;
+    })()`));
+    const approvalRoute = await win.shell.webContents.executeJavaScript(`(() => {
+      const selected=document.querySelector('#approval-mode-settings [aria-pressed="true"]');
+      return {mode:selected.dataset.approvalMode, focused:document.activeElement===selected};
+    })()`);
+    assert.deepEqual(approvalRoute, {mode:'ask',focused:true});
+    win.openWorkspace(null); win.toggleSidebar(true);
+    console.log('PASS session permissions work and the approval chip opens the focused Assistant & permissions setting');
 
     const submitPrompt = (text: string) => win.assistant.webContents.executeJavaScript(`document.querySelector('#prompt').value = ${JSON.stringify(text)}; document.querySelector('#attach-page').checked = false; document.querySelector('#send').click()`);
     await submitPrompt('First queued test');
@@ -618,10 +653,17 @@ async function main() {
     await agent.send(queuedSessionId,'Deadline explanation fixture.',{attachPage:false,budget:{steps:2,tokens:128000,timeMs:1000}});
     await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'));
     assert.equal(sessions.load(queuedSessionId)!.messages.at(-1)!.stopReason,'time_limit');
-    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-item").click()');
+    sessions.append(queuedSessionId, {
+      id:'long-restored-history', role:'assistant', createdAt:Date.now(),
+      blocks:[{type:'text',text:Array.from({length:60},(_,i)=>`Restored history line ${i + 1}: enough content to require scrolling.`).join('\n\n')}],
+    });
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#history-btn").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript(`!!document.querySelector('[data-session-id="${queuedSessionId}"] .session-open')`));
+    await win.assistant.webContents.executeJavaScript(`document.querySelector('[data-session-id="${queuedSessionId}"] .session-open').click()`);
     await until(()=>win.assistant.webContents.executeJavaScript('document.querySelector("#transcript .notice")?.textContent.includes("pressed Stop")'));
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#transcript").textContent.includes("time limit (1 second)")'),true,'deadline explanation survives reopening the conversation');
-    console.log('PASS live Stop/time-limit notices explain their cause and persist when reopening chat');
+    await until(()=>win.assistant.webContents.executeJavaScript(`(() => { const transcript=document.querySelector('#transcript'); return transcript.scrollHeight > transcript.clientHeight && transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 2; })()`));
+    console.log('PASS live Stop/time-limit notices persist and a restored long chat opens at its newest message');
 
 
     await win.assistant.webContents.executeJavaScript('document.querySelector("#prompt").value = "Switching chat test"');
@@ -635,6 +677,34 @@ async function main() {
     assert.equal(JSON.stringify(sessions.load(runningId)).includes('SHOULD NOT APPEAR'), false);
     assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector("#stop").hidden'), true);
     console.log('PASS Stop cancels the running chat after switching sessions and drops late output');
+
+    const disposableSessions = ['Bulk delete fixture one', 'Bulk delete fixture two'].map((text, index) => {
+      const disposable = sessions.create();
+      sessions.append(disposable.id, {id:`bulk-delete-${index}`,role:'user',createdAt:Date.now(),blocks:[{type:'text',text}]});
+      return disposable.id;
+    });
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#history-btn").click()');
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelectorAll(".session-select").length >= 3'));
+    const selectAllState = await win.assistant.webContents.executeJavaScript(`(() => {
+      const selectAll=document.querySelector('.session-select-all input');
+      selectAll.click();
+      const result={checked:selectAll.checked,selected:document.querySelectorAll('.session-select:checked').length,total:document.querySelectorAll('.session-select').length};
+      selectAll.click();
+      return result;
+    })()`);
+    assert.deepEqual(selectAllState, {checked:true,selected:3,total:3}, 'Select all includes every visible chat');
+    await win.assistant.webContents.executeJavaScript(`(() => {
+      for (const id of ${JSON.stringify(disposableSessions)}) document.querySelector('[data-session-id="'+id+'"] .session-select').click();
+      document.querySelector('.session-delete-selected').click();
+    })()`);
+    assert.equal(await win.assistant.webContents.executeJavaScript('document.querySelector(".session-delete-selected").textContent'), 'Delete 2 chats?');
+    assert.equal(disposableSessions.every(id=>sessions.load(id)!==null),true,'first bulk-delete click is a confirmation step');
+    await win.assistant.webContents.executeJavaScript('document.querySelector(".session-delete-selected").click()');
+    await until(()=>disposableSessions.every(id=>sessions.load(id)===null));
+    await until(()=>win.assistant.webContents.executeJavaScript('document.querySelectorAll(".session-item").length === 1'));
+    assert.notEqual(sessions.load(queuedSessionId),null,'unselected chat remains after bulk deletion');
+    await win.assistant.webContents.executeJavaScript('document.querySelector("#view-history .back-to-chat").click()');
+    console.log('PASS chat history supports per-chat selection, Select all, confirmation, and bulk deletion');
 
     provider.finish=null;
     await submitPrompt('Delete this running chat');

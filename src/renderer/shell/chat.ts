@@ -81,10 +81,10 @@ export class ChatView {
 
   async open(id: string): Promise<void> {
     const session = await window.nabsun.sessions.load(id);
-    if (session) this.setSession(session);
+    if (session) this.setSession(session, true);
   }
 
-  private setSession(session: ChatSession) {
+  private setSession(session: ChatSession, restored = false) {
     this.flushText();
     this.live = null;
     this.sessionId = session.id;
@@ -103,7 +103,8 @@ export class ChatView {
     }
     void this.localFolders?.refresh();
     void this.refreshSessionGrants();
-    this.scrollToEnd();
+    if (restored) this.restoreToEnd(session.id);
+    else this.scrollToEnd();
     this.renderQueue();
     void this.refreshFiles().catch(()=>{ $('#attachment-status').textContent='Could not load attachments. Reopen this chat to try again.'; });
     void window.nabsun.workflows?.batches(session.id).then(batches => {
@@ -810,7 +811,7 @@ export class ChatView {
     tour.type = 'button';
     tour.className = 'starter-tour';
     tour.innerHTML = 'A quick tour <span aria-hidden="true">&#8594;</span>';
-    tour.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
+    tour.addEventListener('click', () => window.dispatchEvent(new CustomEvent('nabsun:welcome', { detail: { guide: true } })));
     footer.append(hint, tour);
     el.append(examples, footer);
     this.transcript.appendChild(el);
@@ -821,6 +822,23 @@ export class ChatView {
     const nearBottom =
       this.transcript.scrollHeight - this.transcript.scrollTop - this.transcript.clientHeight < 120;
     if (nearBottom) this.transcript.scrollTop = this.transcript.scrollHeight;
+  }
+
+  /**
+   * A restored conversation should open where it left off: at its newest
+   * message. This is intentionally separate from scrollToEnd(), whose
+   * near-bottom guard protects someone reading older messages during a live
+   * response. A newly rebuilt transcript starts at zero, so that guard would
+   * otherwise mistake every long restored chat for an intentional scroll-up.
+   */
+  private restoreToEnd(sessionId: string) {
+    const scroll = () => {
+      if (this.sessionId === sessionId) this.transcript.scrollTop = this.transcript.scrollHeight;
+    };
+    scroll();
+    // Let layout and markdown settle without allowing a slower, superseded
+    // session load to move the conversation the user switched to afterward.
+    requestAnimationFrame(() => requestAnimationFrame(scroll));
   }
 }
 

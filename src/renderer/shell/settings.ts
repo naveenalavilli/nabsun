@@ -3,6 +3,7 @@ import { isOnDevice } from '../../shared/types';
 import { modelPicker } from './model-picker';
 import { appearanceSelector } from './appearance';
 import { updatesSection } from './updates';
+import { AssistantsView } from './extensions';
 import { APPROVAL_MODES, approvalMode, approvalSettings, type AssistantApprovalMode } from '../../shared/assistantSettings';
 import type { LocalModelStatus } from '../../shared/localModel';
 
@@ -56,6 +57,8 @@ export class SettingsView {
   private paintGeneration = 0;
   private approvalSave: Promise<void> = Promise.resolve();
   private integrationSave:Promise<void>=Promise.resolve();
+  private assistantsView: AssistantsView | null = null;
+  private assistantsRoot: HTMLElement | null = null;
   private setIntegrationControl(key:'plugins'|'mcp'|'extensions',value:boolean){
     this.integrationSave=this.integrationSave.then(async()=>{
       const current=this.settings;if(!current)return;
@@ -130,7 +133,7 @@ export class SettingsView {
     content.tabIndex = -1;
     const categories: [string, string, string, string][] = [
       ['overview', 'Getting started', 'A good place to begin', 'start welcome setup'],
-      ['model', 'Assistant choice', 'Choose the helper you want to use', 'provider api key local ollama codex claude token engine'],
+      ['model', 'Assistant choice', 'Choose an assistant, account, and model', 'provider account connection api key local ollama codex claude token engine'],
       ['appearance', 'Appearance', 'Make Nabsun feel like home', 'theme color light dark style'],
       ['assistant', 'Assistant & permissions', 'Decide how your assistant works', 'approval autopilot privacy memory soul reasoning steps screenshots'],
       ['browsing', 'Browsing & data', 'Your everyday browser preferences', 'homepage search downloads passwords clear history cookies cache'],
@@ -141,11 +144,11 @@ export class SettingsView {
     const panels = new Map<string, HTMLElement>();
     const buttons = new Map<string, HTMLButtonElement>();
     const overview = el('div', { className: 'settings-overview' });
-    overview.append(el('p', { className: 'settings-eyebrow', textContent: 'YOUR BROWSER, YOUR WAY' }),
-      el('h2', { textContent: 'A little setup. A lot of possibility.' }),
-      el('p', { className: 'settings-lead', textContent: 'Start with the essentials, then make this space your own. Changes save as you go.' }));
-    const welcome = el('button', { className: 'setup-banner', textContent: 'New here? Take the visual getting-started tour \u2192' });
-    welcome.addEventListener('click', () => window.dispatchEvent(new Event('nabsun:welcome')));
+    overview.append(el('p', { className: 'settings-eyebrow', textContent: 'GETTING STARTED' }),
+      el('h2', { textContent: 'Start with the essentials' }),
+      el('p', { className: 'settings-lead', textContent: 'Choose your assistant and how much it can do. Everything saves automatically.' }));
+    const welcome = el('button', { className: 'setup-banner', textContent: 'Take the 3-step tour \u2192' });
+    welcome.addEventListener('click', () => window.dispatchEvent(new CustomEvent('nabsun:welcome', { detail: { guide: true } })));
     overview.append(welcome);
     const cards = el('div', { className: 'settings-cards' });
     const select = (id: string, focus = false) => {
@@ -154,6 +157,7 @@ export class SettingsView {
       for (const [key, button] of buttons) button.setAttribute('aria-current', key === id ? 'page' : 'false');
       content.scrollTop = 0;
       if (focus) content.focus();
+      if (id === 'model') this.mountAssistantConnections();
     };
     const mount = (id: string, node: HTMLElement) => {
       const info = categories.find(c => c[0] === id)!;
@@ -170,8 +174,8 @@ export class SettingsView {
       button.setAttribute('aria-controls', `settings-${id}`);
       button.addEventListener('click', () => select(id, true));
       buttons.set(id, button); rail.append(button);
-      if (id !== 'overview' && id !== 'advanced') {
-        const card = el('button', { className: 'settings-card' }, [el('span', { className: 'settings-card-mark', textContent: String(cards.childElementCount + 1).padStart(2, '0') }), el('strong', { textContent: title }), el('span', { textContent: description }), el('span', { className: 'settings-card-link', textContent: 'Explore \u2192' })]);
+      if (id === 'model' || id === 'assistant') {
+        const card = el('button', { className: 'settings-card' }, [el('strong', { textContent: title }), el('span', { textContent: description }), el('span', { className: 'settings-card-link', textContent: 'Open \u2192' })]);
         card.addEventListener('click', () => select(id, true)); cards.append(card);
       }
     }
@@ -218,11 +222,26 @@ export class SettingsView {
 
   /* ---------------------------------------------------------------- model */
 
-  private modelSection(s: Settings): HTMLElement {
-    const set = el('fieldset');
-    set.append(el('legend', { textContent: 'Model' }));
+  private mountAssistantConnections() {
+    const root = this.assistantsRoot;
+    if (!root) return;
+    this.assistantsView ??= new AssistantsView(() => void this.render());
+    void this.assistantsView.mount(root);
+  }
 
-    const providerSelect = el('select');
+  private modelSection(s: Settings): HTMLElement {
+    const section = el('div', { id: 'assistant-choice-settings' });
+    const set = el('fieldset');
+    set.append(el('legend', { textContent: 'Current assistant' }));
+    section.append(set);
+    const connections = el('div', { className: 'assistant-connections-settings' });
+    this.assistantsRoot = connections;
+    const finish = () => {
+      section.append(connections);
+      return section;
+    };
+
+    const providerSelect = el('select', { id: 'assistant-provider' });
     for (const p of this.credentials) {
       providerSelect.append(el('option', { value: p.id, textContent: p.label, selected: s.provider === p.id }));
     }
@@ -230,7 +249,7 @@ export class SettingsView {
       await this.patch({ provider: providerSelect.value as ProviderId });
       this.paint();
     });
-    set.append(field('Assistant', providerSelect));
+    set.append(field('Active assistant', providerSelect, 'Used for your next message. Connected accounts and model settings are kept when you switch.'));
 
     const current = this.credentials.find((c) => c.id === s.provider);
 
@@ -265,17 +284,14 @@ export class SettingsView {
         field(
           'Status',
           status,
-          'Connect in Extensions. Nabsun handles setup and account sign-in for you.',
+          'Manage this assistant below. Nabsun handles setup and account sign-in for you.',
         ),
-        field('Executable path', pathInput, 'Only needed when the CLI is not on your PATH.'),
         field('Model', modelInput),
       );
-
-      const connect = el('button', { className: 'primary', textContent: 'Manage connection' });
-      connect.addEventListener('click', () => document.querySelector<HTMLElement>('#extensions-btn')?.click());
-      set.append(connect);
-
-      set.append(
+      const advanced = el('details', { className: 'settings-advanced' });
+      advanced.append(el('summary', { textContent: `Advanced settings for ${current.label}` }));
+      advanced.append(
+        field('Executable path', pathInput, 'Only needed when the CLI is not on your PATH.'),
         field(
           'Browser tools',
           el('div', {
@@ -285,7 +301,8 @@ export class SettingsView {
           }),
         ),
       );
-      return set;
+      set.append(advanced);
+      return finish();
     }
     // Local AI needs no key and no model list; its optional weights can be
     // missing, while the advanced controls still affect RAM and startup.
@@ -407,7 +424,7 @@ export class SettingsView {
         ),
       );
       set.append(advanced);
-      return set;
+      return finish();
     }
 
     const modelInput = el('input', { type: 'text', value: s.models[s.provider] ?? '' });
@@ -428,10 +445,12 @@ export class SettingsView {
       ),
     );
 
-    // Credentials, one row per provider.
-    for (const provider of this.credentials) {
-      // Ollama needs no key; CLI backends carry their own login.
-      if (provider.id === 'ollama' || provider.kind === 'cli') continue;
+    // Only the selected provider belongs on this page. Showing every API key
+    // beside an unrelated assistant made this feel like a second integrations
+    // console instead of a clear choice.
+    for (const provider of current ? [current] : []) {
+      // Ollama needs no key; CLI and Local AI are handled above.
+      if (provider.id === 'ollama' || provider.kind === 'cli' || provider.kind === 'local') continue;
       const row = el('div', { className: 'inline' });
       const input = el('input', {
         type: 'password',
@@ -507,21 +526,25 @@ export class SettingsView {
       );
     }
 
-    const ollamaUrl = el('input', { type: 'text', value: s.baseUrls.ollama });
-    ollamaUrl.addEventListener('change', () => {
-      void this.patch({ baseUrls: { ...s.baseUrls, ollama: ollamaUrl.value.trim() } });
-    });
-    set.append(field('Ollama endpoint', ollamaUrl, 'For running local models. No key needed.'));
+    if (s.provider === 'ollama') {
+      const ollamaUrl = el('input', { type: 'text', value: s.baseUrls.ollama });
+      ollamaUrl.addEventListener('change', () => {
+        void this.patch({ baseUrls: { ...s.baseUrls, ollama: ollamaUrl.value.trim() } });
+      });
+      set.append(field('Ollama endpoint', ollamaUrl, 'For running local models. No key needed.'));
+    }
 
-    const openaiUrl = el('input', { type: 'text', value: s.baseUrls.openai });
-    openaiUrl.addEventListener('change', () => {
-      void this.patch({ baseUrls: { ...s.baseUrls, openai: openaiUrl.value.trim() } });
-    });
-    set.append(
-      field('OpenAI-compatible endpoint', openaiUrl, 'Change this to point at any OpenAI-compatible API.'),
-    );
+    if (s.provider === 'openai') {
+      const openaiUrl = el('input', { type: 'text', value: s.baseUrls.openai });
+      openaiUrl.addEventListener('change', () => {
+        void this.patch({ baseUrls: { ...s.baseUrls, openai: openaiUrl.value.trim() } });
+      });
+      set.append(
+        field('OpenAI-compatible endpoint', openaiUrl, 'Change this to point at any OpenAI-compatible API.'),
+      );
+    }
 
-    return set;
+    return finish();
   }
 
   /* ------------------------------------------------------------ behaviour */
@@ -612,7 +635,7 @@ export class SettingsView {
   }
 
   private approvalChoices(s: Settings): HTMLElement {
-    const group = el('div', { className: 'approval-modes' });
+    const group = el('div', { className: 'approval-modes', id: 'approval-mode-settings' });
     group.setAttribute('role', 'group');
     group.setAttribute('aria-label', 'How should Nabsun actions be approved?');
     group.append(el('h3', { textContent: 'How should Nabsun actions be approved?' }));

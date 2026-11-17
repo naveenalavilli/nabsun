@@ -16,6 +16,8 @@ import { SessionStore } from '../main/ai/sessions';
 import type { Tool } from '../main/ai/tools/types';
 import { SettingsStore } from '../main/store';
 import { lockUiNavigation, uiIpc } from '../main/uiSecurity';
+import { needsSetupConfirmation, SETUP_CONFIRMATION_VERSION } from '../shared/assistantSettings';
+import { SETUP_LANDING_URL, showSetupLanding } from '../main/setupLanding';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nabsun-review-'));
 app.setPath('userData', tmp);
@@ -28,6 +30,26 @@ function check(name: string, test: () => void) {
 
 async function main() {
   await app.whenReady();
+  check('setup landing preserves restored tabs and creates the product site once', () => {
+    const all = [{ id: 'mail', url: 'https://mail.example/' }];
+    const activated: string[] = [];
+    const created: string[] = [];
+    const tabs = {
+      all,
+      activate: (id: string) => { activated.push(id); },
+      create: (url: string) => {
+        created.push(url);
+        const tab = { id: 'nabsun', url };
+        all.push(tab);
+        return tab;
+      },
+    };
+    showSetupLanding(tabs);
+    showSetupLanding(tabs);
+    assert.deepEqual(created, [SETUP_LANDING_URL]);
+    assert.deepEqual(activated, ['nabsun']);
+    assert.equal(all[0].url, 'https://mail.example/');
+  });
   check('search reuse accepts supported results pages', () => {
     for (const url of ['https://duckduckgo.com/?q=test', 'https://www.google.com/search?q=test', 'https://www.bing.com/search?q=test']) {
       assert.equal(isSearchResultsUrl(url), true, url);
@@ -42,21 +64,27 @@ async function main() {
   });
   const settings = new SettingsStore();
   check('new profiles show onboarding', () => assert.equal(settings.get().onboardingCompleted, false));
+  check('new profiles do not receive the returning-user confirmation', () => assert.equal(needsSetupConfirmation(settings.get()), false));
   check('new profiles require explicit first-use acknowledgement', () => {
     assert.equal(settings.get().usageAgreementRequired, true);
     assert.equal(settings.get().usageAgreementVersion, 0);
   });
-  settings.set({ onboardingCompleted: true, usageAgreementVersion: 1 });
+  settings.set({ onboardingCompleted: true, setupConfirmationVersion: SETUP_CONFIRMATION_VERSION, usageAgreementVersion: 1 });
   settings.flush();
-  check('completed onboarding persists', () => assert.equal(new SettingsStore().get().onboardingCompleted, true));
+  check('completed onboarding and its setup confirmation persist', () => {
+    const completed = new SettingsStore().get();
+    assert.equal(completed.onboardingCompleted, true);
+    assert.equal(needsSetupConfirmation(completed), false);
+  });
   const settingsFile = path.join(tmp, 'settings.json');
   fs.writeFileSync(settingsFile, JSON.stringify({ provider: 'codex-cli', models: { 'codex-cli': 'custom-model' } }));
   const upgraded = new SettingsStore();
-  check('existing profiles skip onboarding and retain their model', () => {
+  check('existing profiles retain onboarding and their model but confirm the new choice once', () => {
     assert.equal(upgraded.get().onboardingCompleted, true);
     assert.equal(upgraded.get().models['codex-cli'], 'custom-model');
     assert.equal(upgraded.get().usageAgreementRequired, false);
     assert.equal(upgraded.get().usageAgreementVersion, 0, 'migration must not claim agreement acceptance');
+    assert.equal(needsSetupConfirmation(upgraded.get()), true);
   });
   upgraded.flush();
   settings.set({ onboardingCompleted: false });

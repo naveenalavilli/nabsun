@@ -20,7 +20,7 @@ export interface CliBridgeInfo {
  *
  * Cached, because this spawns a process and is asked on every turn. A hit is
  * kept only while the file is still there, so uninstalling is noticed; a miss
- * is kept briefly, so installing a CLI and coming back to the Extensions panel
+ * is kept briefly, so installing a CLI and coming back to the Assistants panel
  * finds it without a restart.
  */
 export function resolveBin(name: string): string | null {
@@ -630,8 +630,8 @@ export abstract class CliProvider implements Provider {
     if (!launcher) {
       throw new Error(
         this.binaryPath
-          ? `${this.label} was found at ${this.binaryPath} but could not be launched. Set an explicit path in Extensions → ${this.label}.`
-          : `${this.label} is not installed, or not on PATH. Add it from the Extensions panel.`,
+          ? `${this.label} was found at ${this.binaryPath} but could not be launched. Set an explicit path in Settings → Assistant choice.`
+          : `${this.label} is not installed, or not on PATH. Connect it from the Assistants panel.`,
       );
     }
     const bridge = req.browserBridge??this.bridge();
@@ -676,7 +676,7 @@ export abstract class CliProvider implements Provider {
       throw new Error(
         `Could not start ${this.label} (${reason}).\n` +
           `Tried: ${launcher.command}\n` +
-          'Set an explicit path in Extensions, or reinstall the CLI.',
+          'Set an explicit path in Settings → Assistant choice, or reinstall the CLI.',
       );
     }
 
@@ -1102,7 +1102,7 @@ export class CodexProvider extends CliProvider {
   protected override failureHint(): string | null {
     if (!this.lastError) return null;
     const upgrade = /requires a newer version|upgrade to the latest/i.test(this.lastError)
-      ? '\n\nOpen Extensions and choose Repair / update for Codex.'
+      ? '\n\nOpen Assistants and choose Repair / update for Codex.'
       : '';
     // The id points at the CLI's own session log, which holds the detail.
     const session = this.threadId ? `\n\nCodex session: ${this.threadId}` : '';

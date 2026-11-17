@@ -20,3 +20,22 @@ export const USAGE_AGREEMENT_VERSION = 1;
 export function needsUsageAgreement(settings: Pick<Settings, 'usageAgreementRequired' | 'usageAgreementVersion'>): boolean {
   return settings.usageAgreementRequired === true && settings.usageAgreementVersion !== USAGE_AGREEMENT_VERSION;
 }
+
+/**
+ * Existing profiles keep their settings, but see each materially new setup
+ * choice once. This is deliberately separate from `onboardingCompleted`: an
+ * upgrade must not turn an established profile back into a new one.
+ */
+export const SETUP_CONFIRMATION_VERSION = 1;
+export function needsSetupConfirmation(
+  settings: Pick<Settings, 'onboardingCompleted' | 'setupConfirmationVersion'>,
+): boolean {
+  return settings.onboardingCompleted === true
+    && settings.setupConfirmationVersion !== SETUP_CONFIRMATION_VERSION;
+}
+
+export function needsSetupPrompt(
+  settings: Pick<Settings, 'onboardingCompleted' | 'setupConfirmationVersion' | 'usageAgreementRequired' | 'usageAgreementVersion'>,
+): boolean {
+  return !settings.onboardingCompleted || needsUsageAgreement(settings) || needsSetupConfirmation(settings);
+}

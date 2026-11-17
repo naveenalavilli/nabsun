@@ -171,9 +171,14 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.on(CH.starterPrompt, (_e, prompt: unknown) => {
     if (typeof prompt === 'string' && prompt.length <= 2000) win.showAssistantCommand({ command: 'prefill-prompt', arg: prompt });
   });
-  ipcMain.on(CH.workspace, (_e, name: unknown) => {
+  ipcMain.on(CH.workspace, (_e, name: unknown, target?: unknown) => {
     voice.stop();
-    if (name === null || name === 'settings' || name === 'onboarding' || name === 'workflows' || name === 'activity') win.openWorkspace(name);
+    if (name === null || name === 'settings' || name === 'onboarding' || name === 'workflows' || name === 'activity') {
+      win.openWorkspace(name);
+      if (name === 'settings' && (target === 'approvals' || target === 'assistant-choice')) {
+        win.send(CH.overlayCommand, { command: 'reveal-settings', arg: target });
+      }
+    }
   });
   ipcMain.on(CH.pageDevTools, (_e, action: unknown) => {
     if (action === 'toggle' || action === 'detach') {
@@ -182,7 +187,10 @@ export function registerIpc(deps: IpcDeps): void {
     }
   });
   ipcMain.on(CH.assistantView, (_e, name: string) => {
-    if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
+    if (name === 'assistants') {
+      win.openWorkspace('settings');
+      win.send(CH.overlayCommand, { command: 'reveal-settings', arg: 'assistant-choice' });
+    } else if (['chat', 'history', 'settings', 'extensions', 'bookmarks', 'passwords', 'downloads', 'onboarding'].includes(name)) {
       win.showAssistantCommand({ command: 'show-view', arg: name });
     }
   });

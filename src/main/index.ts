@@ -1,5 +1,6 @@
 import {DatasetStore} from './data/datasets';
-import { needsUsageAgreement } from '../shared/assistantSettings';
+import { needsSetupPrompt } from '../shared/assistantSettings';
+import { SETUP_LANDING_URL, showSetupLanding } from './setupLanding';
 import {DataWorkspace} from './data/workspace';
 import {datasetTools} from './ai/tools/datasets';
 import {FileStore,bindOwnedDownloads} from './files';
@@ -448,7 +449,8 @@ async function boot() {
   buildMenu(deps);
   // Reserve the first-use workspace before restoring pages. The shell replays
   // this choice when ready, so a homepage cannot cover the getting-started flow.
-  if (!settings.get().onboardingCompleted || needsUsageAgreement(settings.get())) {
+  const setupPrompt = needsSetupPrompt(settings.get());
+  if (setupPrompt) {
     win.openWorkspace('onboarding');
   }
 
@@ -467,7 +469,8 @@ async function boot() {
   } catch (err) {
     console.error('[session] could not restore tabs:', err);
   }
-  if (!restored) win.tabs.create(settings.get().homepage);
+  if (!restored) win.tabs.create(setupPrompt ? SETUP_LANDING_URL : settings.get().homepage);
+  else if (setupPrompt) showSetupLanding(win.tabs);
 
   // Written on a debounce as tabs change, so a hard kill still leaves a
   // recent snapshot behind.

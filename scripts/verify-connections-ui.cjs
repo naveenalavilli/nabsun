@@ -14,7 +14,7 @@ async function main() {
   await app.whenReady();
   const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
   try {
-    await win.loadURL('data:text/html,<div id="extensions-body"></div>');
+    await win.loadURL('data:text/html,<div id="assistants-body"></div><div id="extensions-body"></div>');
     const results = await win.webContents.executeJavaScript(`(async () => {
       ${bundle.outputFiles[0].text}
       const results = [];
@@ -36,9 +36,21 @@ async function main() {
         extensions: { onChanged: () => {}, list: async () => [] },
         tabs: { create: async url => tabs.push(url) },
       };
-      const view = new ConnectionUI.ExtensionsView(() => changed++);
-      await view.render(); await view.render();
-      const button = text => [...document.querySelectorAll('button')].find(b => b.textContent === text);
+      const view = new ConnectionUI.AssistantsView(() => changed++);
+      const browserView = new ConnectionUI.ExtensionsView();
+      await view.render(); await view.render(); await browserView.render();
+      const assistantsBody = document.querySelector('#assistants-body');
+      const extensionsBody = document.querySelector('#extensions-body');
+      const button = text => [...assistantsBody.querySelectorAll('button')].find(b => b.textContent === text);
+      const browserButton = text => [...extensionsBody.querySelectorAll('button')].find(b => b.textContent === text);
+      check('browser extensions are a separate surface with no assistant catalogue', extensionsBody.textContent.includes('Load unpacked extension') && !extensionsBody.textContent.includes('Codex') && !extensionsBody.textContent.includes('Claude'));
+      const normalExtensionList = window.nabsun.extensions.list;
+      window.nabsun.extensions.list = async () => { throw Error('Fixture extension failure'); };
+      await browserView.render();
+      check('browser extension load failure is local and retryable', !!browserButton('Try again') && !!button('Connect Codex'));
+      window.nabsun.extensions.list = normalExtensionList;
+      browserButton('Try again').click(); await new Promise(r => setTimeout(r, 20));
+      check('browser extension retry restores its own controls', !!browserButton('Load unpacked extension…'));
       check('missing CLIs have Connect buttons', button('Connect Codex') && button('Connect Claude Code'));
       check('setup does not show npm commands', !document.body.textContent.includes('npm'));
       check('repaint registers only one account listener', listeners.length === 1);
@@ -71,10 +83,10 @@ async function main() {
       let releaseStatus;
       window.nabsun.accounts.status = id => id === 'codex-cli'
         ? new Promise(resolve => { releaseStatus = resolve; }) : normalStatus(id);
-      document.querySelector('#extensions-body').textContent = '';
+      assistantsBody.textContent = '';
       const slow = view.render();
       await new Promise(r => setTimeout(r, 20));
-      check('slow Codex status does not hide Claude or browser extensions', button('Connect Claude Code') && button('Load unpacked extension…'));
+      check('slow Codex status does not hide the other assistant', !!button('Connect Claude Code'));
       releaseStatus({ provider:'codex-cli', supported:true, connected:false, detail:'Not connected' });
       await slow;
       window.nabsun.accounts.status = async () => { throw Error('Fixture status failure'); };
@@ -100,13 +112,13 @@ async function main() {
       button('Try again').click(); await new Promise(r => setTimeout(r, 20));
       check('catalogue retry restores assistant cards', !!button('Connect Claude Code'));
       const repair = [...document.querySelectorAll('.ext-card')].find(card => card.textContent.includes('Claude Code'));
-      const repairButton = [...repair.querySelectorAll('button')].find(b => b.textContent === 'Repair / update');
+      const repairButton = [...repair.querySelectorAll('button')].find(b => b.textContent === 'Repair or update');
       check('native repair is available without a terminal command', !!repairButton);
       repairButton.click();
       check('repair uses the dedicated update flow and disables duplicate clicks', calls.at(-1).mode === 'repair' && button('Connecting...').disabled);
       listeners.forEach(cb => cb({provider:'claude-cli',done:true,ok:false,error:'Fixture update failure'}));
       await new Promise(r => setTimeout(r, 20));
-      check('failed repair remains retryable', button('Retry connection') && button('Repair / update'));
+      check('failed repair remains retryable', button('Retry connection') && button('Repair or update'));
       return results;
     })()`);
     for (const result of results) console.log('PASS ' + result);

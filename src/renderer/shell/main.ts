@@ -1,4 +1,4 @@
-import { APPROVAL_MODES, approvalMode, needsUsageAgreement } from '../../shared/assistantSettings';
+import { APPROVAL_MODES, approvalMode, needsSetupPrompt, needsUsageAgreement } from '../../shared/assistantSettings';
 import type { DownloadEntry, ExtensionStatus, Settings, TabState, WindowState } from '../../shared/types';
 import { WorkflowsView } from './workflows';
 import {ActivityView} from './activity';
@@ -287,12 +287,52 @@ function formatBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+let latestDownloads: DownloadEntry[] = [];
+let downloadStates = new Map<string, DownloadEntry['state']>();
+let downloadsObserved = false;
+let hasNewDownload = false;
+
+function updateDownloadIndicator(items: DownloadEntry[]) {
+  const button = $('#downloads-btn') as HTMLButtonElement;
+  const badge = $('#dl-badge');
+  const active = items.filter(item => item.state === 'progressing');
+  if (active.length) {
+    const totalsKnown = active.every(item => item.totalBytes > 0);
+    const total = active.reduce((sum, item) => sum + item.totalBytes, 0);
+    const received = active.reduce((sum, item) => sum + item.receivedBytes, 0);
+    const percent = totalsKnown && total > 0 ? Math.min(100, Math.round(received / total * 100)) : null;
+    button.dataset.state = 'active';
+    button.classList.toggle('download-indeterminate', percent === null);
+    button.style.setProperty('--download-progress', `${Math.max(4, percent ?? 22)}%`);
+    const status = percent === null ? `${active.length} download${active.length === 1 ? '' : 's'} in progress` : `${active.length === 1 ? 'Downloading' : `${active.length} downloads`}, ${percent}%`;
+    button.setAttribute('aria-label', status);
+    button.title = `${status} (Ctrl+J)`;
+    badge.hidden = true;
+    return;
+  }
+
+  button.classList.remove('download-indeterminate');
+  button.style.removeProperty('--download-progress');
+  button.dataset.state = hasNewDownload ? 'new' : 'idle';
+  button.setAttribute('aria-label', hasNewDownload ? 'New download ready. Open Downloads' : 'Downloads');
+  button.title = hasNewDownload ? 'New download ready (Ctrl+J)' : 'Downloads (Ctrl+J)';
+  badge.hidden = !hasNewDownload;
+}
+
 function renderDownloads(items: DownloadEntry[]) {
+  if (downloadsObserved) {
+    for (const item of items) {
+      const before = downloadStates.get(item.id);
+      if (item.state !== 'progressing' && before !== item.state) hasNewDownload = true;
+    }
+  }
+  downloadsObserved = true;
+  latestDownloads = items;
+  downloadStates = new Map(items.map(item => [item.id, item.state]));
+  updateDownloadIndicator(items);
+
   const list = $('#download-list');
   list.textContent = '';
-
-  const active = items.filter((d) => d.state === 'progressing').length;
-  $('#dl-badge').hidden = active === 0;
 
   if (!items.length) {
     const empty = document.createElement('div');
@@ -364,8 +404,14 @@ function renderDownloads(items: DownloadEntry[]) {
   }
 }
 
+function acknowledgeDownloads() {
+  hasNewDownload = false;
+  updateDownloadIndicator(latestDownloads);
+}
+
 function wireDownloads() {
   $('#downloads-btn').addEventListener('click', async () => {
+    acknowledgeDownloads();
     window.nabsun.window.toggleSidebar(true);
     showView('downloads');
     renderDownloads(await window.nabsun.downloads.list());
@@ -374,9 +420,10 @@ function wireDownloads() {
   $('#dl-folder').addEventListener('click', () => window.nabsun.downloads.openFolder());
 
   window.nabsun.downloads.onChanged((items) => {
-    // Keep the badge live even when the panel is not the visible view.
+    // Keep progress and new-download state live even when the panel is hidden.
     renderDownloads(items);
   });
+  void window.nabsun.downloads.list().then(renderDownloads);
 }
 
 /* ------------------------------------------------- extension action bar -- */
@@ -426,7 +473,14 @@ type ViewName =
   | 'bookmarks'
   | 'passwords';
 
+const selectedSessionIds = new Set<string>();
+let bulkDeleteArmed = false;
+
 function showView(name: ViewName) {
+  if (name !== 'history') {
+    selectedSessionIds.clear();
+    bulkDeleteArmed = false;
+  }
   if (!assistantWindow && settings && needsUsageAgreement(settings)) name = 'onboarding';
   if (name === 'settings' || name === 'onboarding') {
     window.nabsun.window.openWorkspace(name);
@@ -456,7 +510,18 @@ async function renderSessions() {
   const list = await window.nabsun.sessions.list();
   const container = $('#session-list');
   container.textContent = '';
+  const availableIds = new Set(list.map((item) => item.id));
+  let selectionPruned = false;
+  for (const id of selectedSessionIds) {
+    if (!availableIds.has(id)) {
+      selectedSessionIds.delete(id);
+      selectionPruned = true;
+    }
+  }
+  if (selectionPruned) bulkDeleteArmed = false;
   if (!list.length) {
+    selectedSessionIds.clear();
+    bulkDeleteArmed = false;
     container.append(
       Object.assign(document.createElement('div'), {
         className: 'muted',
@@ -465,9 +530,106 @@ async function renderSessions() {
     );
     return;
   }
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'session-selection-toolbar';
+
+  const selectAllLabel = document.createElement('label');
+  selectAllLabel.className = 'session-select-all';
+  const selectAll = document.createElement('input');
+  selectAll.type = 'checkbox';
+  selectAll.setAttribute('aria-label', 'Select all chats');
+  selectAllLabel.append(
+    selectAll,
+    Object.assign(document.createElement('span'), { textContent: 'Select all' }),
+  );
+
+  const selectionStatus = document.createElement('span');
+  selectionStatus.className = 'session-selection-status';
+  selectionStatus.setAttribute('role', 'status');
+  selectionStatus.setAttribute('aria-live', 'polite');
+
+  const deleteSelected = document.createElement('button');
+  deleteSelected.type = 'button';
+  deleteSelected.className = 'ghost session-delete-selected';
+
+  const checkboxes = new Map<string, HTMLInputElement>();
+  const updateSelection = (selectionChanged = false) => {
+    if (selectionChanged) bulkDeleteArmed = false;
+    const count = selectedSessionIds.size;
+    selectAll.checked = count === list.length;
+    selectAll.indeterminate = count > 0 && count < list.length;
+    selectionStatus.textContent = count ? `${count} selected` : 'Select chats to delete';
+    deleteSelected.disabled = count === 0;
+    deleteSelected.classList.toggle('danger', bulkDeleteArmed);
+    deleteSelected.classList.toggle('ghost', !bulkDeleteArmed);
+    deleteSelected.textContent = bulkDeleteArmed
+      ? `Delete ${count} chat${count === 1 ? '' : 's'}?`
+      : `Delete selected${count ? ` (${count})` : ''}`;
+    for (const [id, checkbox] of checkboxes) checkbox.checked = selectedSessionIds.has(id);
+  };
+
+  selectAll.addEventListener('change', () => {
+    selectedSessionIds.clear();
+    if (selectAll.checked) for (const item of list) selectedSessionIds.add(item.id);
+    updateSelection(true);
+  });
+  deleteSelected.addEventListener('click', async () => {
+    if (!selectedSessionIds.size) return;
+    if (!bulkDeleteArmed) {
+      bulkDeleteArmed = true;
+      updateSelection();
+      deleteSelected.focus();
+      return;
+    }
+    const ids = [...selectedSessionIds];
+    deleteSelected.disabled = true;
+    deleteSelected.textContent = `Deleting ${ids.length}…`;
+    let failures = 0;
+    for (const id of ids) {
+      try {
+        await window.nabsun.sessions.remove(id);
+      } catch {
+        failures++;
+      }
+    }
+    if (!failures) selectedSessionIds.clear();
+    bulkDeleteArmed = false;
+    await renderSessions();
+    if (failures) {
+      const status = container.querySelector<HTMLElement>('.session-selection-status');
+      if (status) status.textContent = `Could not delete ${failures} chat${failures === 1 ? '' : 's'}. Try again.`;
+    }
+  });
+
+  toolbar.append(selectAllLabel, selectionStatus, deleteSelected);
+  container.append(toolbar);
+
+  const items = document.createElement('div');
+  items.className = 'session-items';
+  container.append(items);
+
   for (const item of list) {
     const row = document.createElement('div');
     row.className = `session-item${item.id === chat.currentSessionId ? ' active' : ''}`;
+    row.dataset.sessionId = item.id;
+
+    const select = document.createElement('input');
+    select.type = 'checkbox';
+    select.className = 'session-select';
+    select.checked = selectedSessionIds.has(item.id);
+    select.setAttribute('aria-label', `Select chat ${item.title}`);
+    select.addEventListener('change', () => {
+      if (select.checked) selectedSessionIds.add(item.id);
+      else selectedSessionIds.delete(item.id);
+      updateSelection(true);
+    });
+    checkboxes.set(item.id, select);
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'session-open';
+    open.setAttribute('aria-label', `Open chat ${item.title}`);
 
     const title = document.createElement('span');
     title.className = 't';
@@ -487,13 +649,15 @@ async function renderSessions() {
       await renderSessions();
     });
 
-    row.append(title, when, del);
-    row.addEventListener('click', async () => {
+    open.append(title, when);
+    open.addEventListener('click', async () => {
       await chat.open(item.id);
       showView('chat');
     });
-    container.append(row);
+    row.append(select, open, del);
+    items.append(row);
   }
+  updateSelection();
 }
 
 /* ------------------------------------------------------------------ boot -- */
@@ -501,16 +665,23 @@ async function renderSessions() {
 const chat = new ChatView(() => void renderSessions(), assistantWindow);
 const bookmarksView = new BookmarksView(() => showView('bookmarks'));
 const passwordsView = new PasswordsView();
-const extensionsView = new ExtensionsView(() => void refreshSettings());
+const extensionsView = new ExtensionsView();
 const workflowsView = assistantWindow ? null : new WorkflowsView($('#workflows-body'));
 const activityView = assistantWindow ? null : new ActivityView($('#activity-body'));
 const settingsView = new SettingsView((next) => {
   settings = next;
   applyTheme(next.theme);
 });
+let settingsRender: Promise<void> = Promise.resolve();
+let openOnboardingGuide = false;
 const onboarding = new OnboardingView($('#onboarding-body'), (next, destination, prompt) => {
   settings = next;
   closeWorkspace();
+  if (destination === 'resume') return;
+  if (destination === 'settings') {
+    window.nabsun.window.openWorkspace('settings', 'assistant-choice');
+    return;
+  }
   if (destination === 'browse') {
     window.nabsun.window.toggleSidebar(false);
     return;
@@ -519,15 +690,9 @@ const onboarding = new OnboardingView($('#onboarding-body'), (next, destination,
   if (prompt) window.nabsun.window.prefillAssistant(prompt);
 });
 
-async function refreshSettings() {
-  settings = await window.nabsun.settings.get();
-  applyTheme(settings.theme);
-  applyVerbose(settings.verbose);
-}
-
 function wireExtensions() {
   // The action bar mirrors whatever is loaded, including changes made while
-  // the Extensions panel is closed.
+  // the Browser extensions panel is closed.
   window.nabsun.extensions.onChanged(renderExtensionActions);
   void window.nabsun.extensions.list().then(renderExtensionActions);
 }
@@ -552,8 +717,10 @@ function wireSidebarButtons() {
   });
   $('#assistant-detach').addEventListener('click', () => window.nabsun.window.detachAssistant(!state?.assistantDetached));
   $('#assistant-hide').addEventListener('click', () => window.nabsun.window.toggleSidebar(false));
+  $('#assistants-btn').addEventListener('click', () => window.nabsun.window.openWorkspace('settings', 'assistant-choice'));
   $('#assistant-extensions').addEventListener('click', () => showView('extensions'));
-  window.addEventListener('nabsun:welcome', () => {
+  window.addEventListener('nabsun:welcome', event => {
+    openOnboardingGuide = Boolean((event as CustomEvent<{ guide?: boolean }>).detail?.guide);
     showView('onboarding');
   });
   $('#new-chat').addEventListener('click', async () => {
@@ -662,8 +829,12 @@ window.nabsun.onCommand((command, arg) => {
       for (const name of ['settings', 'onboarding', 'workflows', 'activity']) {
         $(`#view-${name}`).classList.toggle('active', name === arg);
       }
-      if (arg === 'settings') void settingsView.render();
-      if (arg === 'onboarding') onboarding.render(settings ?? undefined);
+      if (arg === 'settings') settingsRender = settingsView.render();
+      if (arg === 'onboarding') {
+        onboarding.render(settings ?? undefined);
+        if (openOnboardingGuide) onboarding.openGuide();
+        openOnboardingGuide = false;
+      }
       if (arg === 'workflows') void workflowsView?.render();
       if (arg === 'activity') void activityView?.render();
       $('#workspace-close').hidden = !!settings && needsUsageAgreement(settings);
@@ -697,6 +868,7 @@ window.nabsun.onCommand((command, arg) => {
       chat.ask(String(arg ?? ''));
       break;
     case 'open-downloads':
+      acknowledgeDownloads();
       showView('downloads');
       void window.nabsun.downloads.list().then(renderDownloads);
       break;
@@ -704,10 +876,17 @@ window.nabsun.onCommand((command, arg) => {
       // Ctrl+Shift+Delete. The controls live in Settings, so go there and put
       // them on screen rather than dropping the user at the top of the page.
       showView('settings');
-      void revealWhenReady('clear-data-block');
+      void revealSettingsWhenReady('browsing', 'clear-data-block');
       break;
     case 'reveal-clear-data':
-      void revealWhenReady('clear-data-block');
+      void revealSettingsWhenReady('browsing', 'clear-data-block');
+      break;
+    case 'reveal-settings':
+      if (arg === 'approvals') {
+        void revealSettingsWhenReady('assistant', 'approval-mode-settings', '[aria-pressed="true"]');
+      } else if (arg === 'assistant-choice') {
+        void revealSettingsWhenReady('model', 'assistant-choice-settings', '#assistant-provider');
+      }
       break;
   }
 });
@@ -718,13 +897,18 @@ window.nabsun.onCommand((command, arg) => {
  * Settings renders asynchronously, so the target does not exist on the tick the
  * command arrives; a single rAF would miss it about half the time.
  */
-async function revealWhenReady(id: string, timeoutMs = 2000): Promise<void> {
+async function revealSettingsWhenReady(category: string, id: string, focusSelector?: string, timeoutMs = 2000): Promise<void> {
+  // A previously rendered Settings tree can still be in the DOM while the
+  // fresh settings read is in flight. Wait for that repaint so the element we
+  // focus is not immediately replaced by the new tree.
+  await settingsRender;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const target = document.getElementById(id);
     if (target) {
-      $('#settings-body').dispatchEvent(new CustomEvent('settings:reveal', { detail: 'browsing' }));
+      $('#settings-body').dispatchEvent(new CustomEvent('settings:reveal', { detail: category }));
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (focusSelector) target.querySelector<HTMLElement>(focusSelector)?.focus({ preventScroll: true });
       return;
     }
     await new Promise((r) => setTimeout(r, 50));
@@ -747,11 +931,11 @@ async function boot() {
   settings = await window.nabsun.settings.get();
   applyTheme(settings.theme);
   applyVerbose(settings.verbose);
-  $('#approval-mode-button').addEventListener('click', () => showView('settings'));
+  $('#approval-mode-button').addEventListener('click', () => window.nabsun.window.openWorkspace('settings', 'approvals'));
 
   if (assistantWindow) await chat.start();
   window.nabsun.ready();
-  if (!assistantWindow && (!settings.onboardingCompleted || needsUsageAgreement(settings))) {
+  if (!assistantWindow && needsSetupPrompt(settings)) {
     showView('onboarding');
   }
   // Optional browser data must not delay or prevent the first-use activities.
