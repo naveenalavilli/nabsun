@@ -5,14 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import OpenAI from 'openai';
 import type { ProviderId } from '../../../shared/types';
+import { LOCAL_MODEL } from '../../../shared/localModel';
 import type { Provider, StreamEvent, StreamRequest } from '../provider';
 import { streamChatCompletions } from './openai';
 
-/** Where the bundled engine and weights live, dev tree and packaged app alike. */
+/** Where the local engine and weights live, whether bundled, managed, or custom. */
 export interface LocalPaths {
   /** `llama-server` executable, or '' to fall back to the bundled location. */
   serverPath: string;
-  /** `.gguf` weights, or '' for the bundled model. */
+  /** `.gguf` weights; the caller resolves bundled or managed defaults. */
   modelPath: string;
 }
 
@@ -25,16 +26,17 @@ export interface LocalOptions {
 
 export const DEFAULT_LOCAL_OPTIONS: LocalOptions = { contextSize: 8192, threads: 0 };
 
-/** The model shipped with the app; a user-set path overrides it. */
-export const BUNDLED_MODEL_FILE = 'Qwen3-1.7B-Q4_K_M.gguf';
+/** The pinned default model filename; legacy builds may already bundle it. */
+export const BUNDLED_MODEL_FILE = LOCAL_MODEL.file;
 
 /**
- * Resolves the vendored engine and model.
+ * Resolves the vendored engine and legacy bundled-model location.
  *
  * Packaged, they sit in `resources/vendor`, unpacked from the asar because a
  * child process cannot be spawned from inside an archive and llama.cpp memory
- * maps the weights. In the dev tree they are in `vendor/`, fetched by
- * `npm run fetch:model` and never committed.
+ * maps weights. Release builds now omit weights, but keeping this location
+ * preserves older installations and source trees fetched with `npm run
+ * fetch:model`.
  */
 export function bundledPaths(resourcesPath: string | null, appRoot: string): LocalPaths {
   const vendor = resourcesPath
@@ -48,7 +50,7 @@ export function bundledPaths(resourcesPath: string | null, appRoot: string): Loc
 }
 
 /**
- * The embedded model: llama.cpp running in-process-adjacent, no network at all.
+ * Local AI: llama.cpp running in-process-adjacent, with no inference network.
  *
  * This is the default backend, and the reason is cost rather than capability.
  * Routing every trivial navigation step through a frontier model bills tokens
@@ -66,7 +68,7 @@ export function bundledPaths(resourcesPath: string | null, appRoot: string): Loc
  */
 export class LocalProvider implements Provider {
   readonly id: ProviderId = 'local';
-  readonly label = 'Built-in (local)';
+  readonly label = 'Local AI (on-device)';
 
   private server: ChildProcess | null = null;
   private port = 0;
@@ -211,7 +213,8 @@ export class LocalProvider implements Provider {
     if (!modelPath || !isFile(modelPath)) {
       throw new Error(
         `The local model file is missing (looked for ${modelPath || BUNDLED_MODEL_FILE}).\n\n` +
-          'Run `npm run fetch:model`, or point Settings → Models at a .gguf file you already have.',
+          'Download Local AI in Settings → Models, or point it at a .gguf file you already have. ' +
+          'Source builds can also run `npm run fetch:model`.',
       );
     }
 

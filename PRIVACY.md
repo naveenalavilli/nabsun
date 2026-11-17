@@ -13,7 +13,7 @@ file edits can create local backups. Some credentials use operating-system
 protection; the profile and chat files are not a separately encrypted vault.
 Private browsing does not make online requests anonymous to websites or services.
 
-The bundled local model performs inference on your computer. The desktop browser
+The optional local model performs inference on your computer once installed. The desktop browser
 has no product analytics or automatic crash-report upload. This does not mean
 the whole browser is offline or that every configured integration runs locally.
 
@@ -28,6 +28,8 @@ every 24 hours). This request exposes ordinary connection information to GitHub;
 the update checker does not include chat text or local file content. Update
 downloads open in your default browser and installation is manual. Development
 setup downloads the engine/model and dependencies from their respective sources.
+Choosing the in-app Local AI download contacts Hugging Face and its approved
+content-delivery hosts. Nabsun verifies the pinned file before making it available.
 
 ## Optional online assistants
 
@@ -40,7 +42,7 @@ that their contents stay on-device when a remote assistant uses them.
 
 The provider's terms govern retention, processing and possible training use.
 Nabsun does not promise that remote requests have zero retention, zero training,
-or complete automatic redaction. To keep model inference local, use the bundled
+or complete automatic redaction. To keep model inference local, use the downloaded
 local model or an independently verified local endpoint and avoid remote tools.
 Changing providers or disconnecting a folder does not recall data already sent.
 

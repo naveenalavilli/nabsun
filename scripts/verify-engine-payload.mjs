@@ -88,6 +88,8 @@ test('the startup probe catches a missing native macOS dependency', { skip: proc
   for (const name of ['check-release-payload.mjs', 'engine-payload.mjs']) {
     await fs.copyFile(new URL(name, import.meta.url), path.join(root, 'scripts', name));
   }
+  await fs.mkdir(path.join(root, 'src/shared'), { recursive: true });
+  await fs.copyFile(new URL('../src/shared/localModel.json', import.meta.url), path.join(root, 'src/shared/localModel.json'));
   const files = {
     'vendor/llama/libllama-server-impl.dylib': 1_000_000,
     'vendor/llama/libggml-base.dylib': 100_000,

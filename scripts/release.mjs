@@ -8,9 +8,9 @@
  * itself, and attaches them to a draft release. So the only thing that ships
  * anything is a version bump arriving on main, and there is no tag to remember.
  *
- * That is also why nothing here builds, tags or uploads. The installers are
- * ~1.3 GB each; they are produced and uploaded by the runner that built them,
- * never from a developer's working tree.
+ * That is also why nothing here builds, tags or uploads. Installers are
+ * produced and uploaded by the runner that built them, never from a developer's
+ * working tree.
  *
  * What is left is a bump, a commit, and the checks that make it safe: a dirty
  * tree means the released commit would not be what was tested, a stale branch

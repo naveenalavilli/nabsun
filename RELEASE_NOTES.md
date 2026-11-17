@@ -13,6 +13,29 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.4 - Prepared for release
+
+Makes Local AI an explicit choice while keeping existing installations and
+custom models working as before.
+
+- Keep the native local-inference engine in each app, but omit the optional
+  1.28 GB model weights from Windows and macOS installers.
+- Offer a calm first-launch choice to download Local AI, connect another
+  assistant, or simply browse without choosing either.
+- Pin the Qwen3 1.7B revision and verify its exact size and SHA-256 before use.
+  Downloads can be cancelled, resumed, retried, and removed from Settings.
+- Preserve custom model paths and model files included by earlier releases,
+  giving them priority over the new app-managed download.
+- Keep inference local after installation, never silently switch to an online
+  assistant, and document the one-time Hugging Face download connection.
+- Add packaging gates that retain the engine and notices while rejecting any
+  accidentally bundled GGUF weights.
+
+The release is not considered signed or ready to publish until the exact merged
+commit passes the protected Windows and macOS signing workflows and the final
+installer signatures, notarization, checksums, and clean-machine behavior are
+verified.
+
 ## 1.0.3 - Prepared for release
 
 Adds protected Windows and macOS signing-candidate paths. The Developer ID-signed,

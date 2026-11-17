@@ -45,6 +45,7 @@ import type { ChromeExtensionManager } from './integrations/extensions';
 import type { PluginManager } from './integrations/plugins';
 import type { PasswordStore } from './passwords';
 import type { SecretStore, SettingsStore } from './store';
+import type { LocalModelDownload } from './localModelDownload';
 
 export interface IpcDeps {
   folderAccess?:import('./localFiles').FolderAccessController;
@@ -66,13 +67,14 @@ export interface IpcDeps {
   accounts: CliAccountManager;
   passwords: PasswordStore;
   providers: Map<ProviderId, Provider>;
+  localModelDownload: LocalModelDownload;
   reloadIntegrations: () => Promise<void>;
   /** Connection details for external agents; see BrowserBridgeServer. */
   bridgeInfo: () => { running: boolean; url: string; token: string; serverScript: string };
 }
 
 export function registerIpc(deps: IpcDeps): void {
-  const { win, settings, secrets, history, sessions, agent, approvals, questions, mcp, plugins, providers, downloads, extensions, accounts, passwords } =
+  const { win, settings, secrets, history, sessions, agent, approvals, questions, mcp, plugins, providers, localModelDownload, downloads, extensions, accounts, passwords } =
     deps;
   const ipcMain = uiIpc([
     {
@@ -334,6 +336,10 @@ export function registerIpc(deps: IpcDeps): void {
   /* ------------------------------------------------------------ settings */
 
   ipcMain.handle(CH.settingsGet, () => settings.get());
+  ipcMain.handle(CH.localModelStatus, () => localModelDownload.status());
+  ipcMain.handle(CH.localModelDownload, () => localModelDownload.download());
+  ipcMain.on(CH.localModelCancel, () => localModelDownload.cancel());
+  ipcMain.handle(CH.localModelRemove, () => localModelDownload.remove());
   ipcMain.handle(CH.settingsSet, async (_e, patch: Partial<Settings>) => {
     if(patch.integrationControls&&(['plugins','mcp','extensions'].some(key=>typeof (patch.integrationControls as unknown as Record<string,unknown>)[key]!=='boolean')||Object.keys(patch.integrationControls).some(key=>!['plugins','mcp','extensions'].includes(key))))throw Error('Invalid integration controls.');
     if(patch.auditRetentionDays!==undefined&&(!Number.isInteger(patch.auditRetentionDays)||patch.auditRetentionDays<7||patch.auditRetentionDays>365))throw Error('Choose 7 to 365 activity retention days.');
@@ -394,7 +400,7 @@ export function registerIpc(deps: IpcDeps): void {
           hasCredentials: ready,
           models: ready ? await provider.listModels().catch(() => []) : [],
           detail: !ready
-            ? 'Model not downloaded — run `npm run fetch:model`'
+            ? 'Local AI is optional — download the verified model in Settings or choose another assistant.'
             : pending.length
               ? `Running. ${pending.join(', ')} changed — restart Nabsun to apply.`
               : (local.modelPath ?? 'Ready'),

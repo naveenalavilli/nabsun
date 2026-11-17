@@ -4,6 +4,7 @@ import { modelPicker } from './model-picker';
 import { appearanceSelector } from './appearance';
 import { updatesSection } from './updates';
 import { APPROVAL_MODES, approvalMode, approvalSettings, type AssistantApprovalMode } from '../../shared/assistantSettings';
+import type { LocalModelStatus } from '../../shared/localModel';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -47,6 +48,7 @@ export class SettingsView {
   private root = document.querySelector<HTMLElement>('#settings-body')!;
   private settings: Settings | null = null;
   private credentials: ProviderStatus[] = [];
+  private localModelStatus: LocalModelStatus | null = null;
   private paintAbort = new AbortController();
   private activeCategory = 'overview';
   private searchQuery = '';
@@ -69,12 +71,20 @@ export class SettingsView {
    */
   private saveOutcomes = new Map<string, { message: string; sessionOnly: boolean }>();
 
-  constructor(private readonly onChanged: (s: Settings) => void) {}
+  constructor(private readonly onChanged: (s: Settings) => void) {
+    window.nabsun.localModel.onStatus(status => {
+      this.localModelStatus = status;
+      if (this.settings) this.paint();
+    });
+  }
 
   async render(): Promise<void> {
     try {
-      this.settings = await window.nabsun.settings.get();
-      this.credentials = await window.nabsun.settings.credentialStatus();
+      [this.settings, this.credentials, this.localModelStatus] = await Promise.all([
+        window.nabsun.settings.get(),
+        window.nabsun.settings.credentialStatus(),
+        window.nabsun.localModel.status(),
+      ]);
       this.paint();
     } catch {
       const error = el('p', { className: 'settings-save-error', textContent: 'Could not load settings. Please try again.' });
@@ -277,14 +287,48 @@ export class SettingsView {
       );
       return set;
     }
-    // The built-in model needs no key and no model list; what it does have is
-    // a file on disk that can be missing, and knobs that cost RAM.
+    // Local AI needs no key and no model list; its optional weights can be
+    // missing, while the advanced controls still affect RAM and startup.
     if (current?.kind === 'local') {
+      const modelStatus = this.localModelStatus;
+      const ready = modelStatus?.state === 'ready' || current.hasCredentials;
       const status = el('div', { className: 'status-line' }, [
-        el('span', { className: `dot ${current.hasCredentials ? 'on' : 'off'}` }),
-        el('span', { textContent: current.hasCredentials ? 'Ready' : 'Model missing' }),
-        el('span', { className: 'muted', textContent: current.detail ?? '' }),
+        el('span', { className: `dot ${ready ? 'on' : 'off'}` }),
+        el('span', { textContent: ready ? 'Ready' : modelStatus?.state === 'downloading' ? 'Downloading' : modelStatus?.state === 'verifying' ? 'Verifying' : 'Optional model not installed' }),
+        el('span', { className: 'muted', textContent: ready
+          ? modelStatus?.source === 'custom' ? 'Using your model file' : modelStatus?.source === 'bundled' ? 'Using the model included by an earlier build' : 'Downloaded local model'
+          : modelStatus?.error ?? '' }),
       ]);
+
+      const modelControl = el('div', { className: 'local-model-settings' });
+      if (modelStatus?.state === 'downloading' || modelStatus?.state === 'verifying') {
+        const percent = Math.min(100, Math.floor(modelStatus.downloadedBytes / modelStatus.totalBytes * 100));
+        modelControl.append(el('progress', { max: 100, value: modelStatus.state === 'verifying' ? 100 : percent }));
+        modelControl.append(el('span', { className: 'hint', textContent: modelStatus.state === 'verifying' ? 'Verifying the pinned SHA-256 checksum…' : `${percent}% of ${(modelStatus.totalBytes / 1_000_000_000).toFixed(1)} GB` }));
+        const cancel = el('button', { className: 'ghost', textContent: 'Cancel download' });
+        cancel.addEventListener('click', () => window.nabsun.localModel.cancel());
+        modelControl.append(cancel);
+      } else if (!ready) {
+        const download = el('button', { className: 'primary', textContent: modelStatus?.downloadedBytes ? 'Resume local AI download' : 'Download local AI (1.3 GB)' });
+        download.addEventListener('click', () => {
+          download.disabled = true;
+          void window.nabsun.localModel.download().then(() => this.render()).catch(() => { download.disabled = false; });
+        });
+        modelControl.append(download);
+      } else if (modelStatus?.source === 'managed') {
+        const remove = el('button', { className: 'ghost', textContent: 'Remove downloaded model' });
+        let confirmed = false;
+        remove.addEventListener('click', () => {
+          if (!confirmed) { confirmed = true; remove.textContent = 'Remove 1.3 GB model?'; return; }
+          remove.disabled = true;
+          void window.nabsun.localModel.remove().then(() => this.render()).catch(() => {
+            remove.disabled = false;
+            this.saveError = 'Could not remove the local model. Close any local AI task and try again.';
+            this.paint();
+          });
+        });
+        modelControl.append(remove);
+      }
 
       const localInput = (
         key: 'serverPath' | 'modelPath',
@@ -320,34 +364,35 @@ export class SettingsView {
         field(
           'Status',
           status,
-          current.hasCredentials
+          ready
             // Scoped to inference on purpose. The browser still browses:
             // navigation, search, fetch_url and any enabled integration all
             // reach the network, and claiming otherwise here would be read as a
             // guarantee about the whole application.
             ? 'Answers are generated on your computer. Your questions and included page text are not sent to an online AI service. Browsing websites still uses the internet.'
-            : 'The built-in assistant files could not be found. Reinstall Nabsun from the official release, or choose another assistant above. If you built Nabsun from source, see the setup instructions in the README.',
+            : 'The local assistant is optional. Download the tested model here, choose a model file below, or use another assistant. Nabsun never switches to an online AI without your choice.',
         ),
+        field('Local model', modelControl, 'The native engine is included with Nabsun. Model weights are downloaded only when you ask and are verified before use.'),
         field(
           'When to switch',
           el('div', {
             className: 'hint',
             textContent:
-              'The built-in assistant is best for short, simple tasks. For longer research or more demanding questions, choose a more capable assistant above — your settings for it are kept.',
+              'Local AI is best for short, simple tasks. For longer research or more demanding questions, choose a more capable assistant above — your settings for it are kept.',
           }),
         ),
       );
       const advanced = el('details', { className: 'settings-advanced' });
-      advanced.append(el('summary', { textContent: 'Advanced settings for the built-in assistant' }));
+      advanced.append(el('summary', { textContent: 'Advanced settings for Local AI' }));
       advanced.append(
         field(
           'Model file',
-          localInput('modelPath', 'Leave blank to use the bundled model'),
+          localInput('modelPath', 'Leave blank to use the downloaded model'),
           'Any GGUF llama.cpp can load. A larger model is slower but more capable.',
         ),
         field(
           'Engine path',
-          localInput('serverPath', 'Leave blank to use the bundled llama-server'),
+          localInput('serverPath', 'Leave blank to use the included llama-server'),
           'Only needed to run your own build of llama.cpp.',
         ),
         field(
@@ -896,7 +941,7 @@ export class SettingsView {
       checkbox(
         'Only share it with models on this machine',
         s.personalContextLocalOnly,
-        'The built-in model and a local Ollama server see it. Cloud providers and signed-in CLIs do not.',
+        'Local AI and a local Ollama server see it. Cloud providers and signed-in CLIs do not.',
         (v) => void this.patch({ personalContextLocalOnly: v }),
       ),
     );

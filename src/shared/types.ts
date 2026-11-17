@@ -183,8 +183,8 @@ export interface AgentQuestion {
 /* -------------------------------------------------------------- settings -- */
 
 /**
- * `local` is the default: weights bundled with the app, run by an embedded
- * llama.cpp, no account and no network. `claude-cli` and `codex-cli` delegate
+ * `local` is the default: optional managed/custom weights run by the included
+ * llama.cpp engine, with no account or inference network. `claude-cli` and `codex-cli` delegate
  * the whole turn to a locally installed agent CLI, reusing the login you
  * already have there — the same arrangement as the Claude and Codex extensions
  * in VS Code. The others call an API directly.
@@ -199,7 +199,7 @@ export const KEYLESS_PROVIDERS: ProviderId[] = ['local', 'ollama'];
 /**
  * Does this backend run on the user's own hardware?
  *
- * The built-in model always does. Ollama usually does, but its base URL is
+ * The local model always does. Ollama usually does, but its base URL is
  * editable — someone pointing it at a box in a datacentre is sending their
  * prompts over the network, and a feature that promises "this never leaves your
  * machine" has to notice that rather than trusting the provider name.
@@ -239,11 +239,11 @@ export interface Settings {
   baseUrls: { openai: string; ollama: string; anthropic: string };
   /** Optional explicit paths to the agent CLIs, when they are not on PATH. */
   cliPaths: Record<'claude-cli' | 'codex-cli', string>;
-  /** The built-in model. Empty paths mean "use the bundled engine and weights". */
+  /** Local AI. Empty paths use the included engine and verified managed weights. */
   localModel: {
-    /** Path to a llama-server executable, to override the bundled one. */
+    /** Path to a llama-server executable, to override the included one. */
     serverPath: string;
-    /** Path to a .gguf file, to run a different model than the bundled one. */
+    /** Path to a .gguf file, to override the downloaded/default model. */
     modelPath: string;
     /** Context window in tokens. Bigger costs RAM. */
     contextSize: number;
@@ -302,7 +302,7 @@ export interface Settings {
    * Withhold `soul.md` from any model that is not running on this machine.
    *
    * On by default. The file is the most personal thing in the profile, so the
-   * safe default is the one that cannot surprise anyone: the built-in model and
+   * safe default is the one that cannot surprise anyone: the local model and
    * a loopback Ollama see it, a cloud provider or a signed-in CLI does not until
    * the user says otherwise.
    */

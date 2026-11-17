@@ -145,7 +145,9 @@ jobs:
       - name: Verify CI configuration and artifacts
         run: node --test scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs scripts/verify-windows-signing.cjs scripts/verify-signpath.cjs scripts/verify-macos-signing.cjs
       - name: Verify engine payload validation
-        run: npm run verify:payload
+        run: |
+          npm run verify:payload
+          npm run verify:model-download
       - name: Build
         run: ./scripts/ci-run.ps1 build
       - name: Verify CLI launching
@@ -194,7 +196,7 @@ jobs:
         with:
           path: vendor/models/*.gguf
           key: ${{ steps.model-cache.outputs.cache-primary-key }}
-      - name: Verify bundled model inference
+      - name: Verify pinned model inference
         timeout-minutes: 20
         env:
           NABSUN_REQUIRE_LOCAL: '1'
@@ -227,6 +229,7 @@ jobs:
       - run: npm run setup
       - run: npm run typecheck
       - run: npm run verify:payload
+      - run: npm run verify:model-download
       - run: npm run build
       - name: Verify Unix CLI launching with Node and Electron
         run: |
@@ -283,7 +286,7 @@ jobs:
   # Builds what Mac users actually download. `verify-macos` only proves the app
   # runs there; this produces the artifact and hands it to `package`, which owns
   # the release. Apple silicon only, and zip rather than dmg: arm64 covers every
-  # Mac sold since 2020, and a zip skips the disk-image mount for a 1.3 GB file.
+  # Mac sold since 2020, and a zip is simpler to verify and move to Applications.
   # Add `--x64` and a dmg target here if Intel users ask.
   package-macos:
     if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
@@ -548,8 +551,8 @@ jobs:
       # cut from a branch through this default path. Explicit branch prereleases
       # use the separate manually opted-in path at the end of this job.
       #
-      # The installers are ~1.3 GB each and are uploaded from the runner that
-      # built them, so the bytes never travel from a developer's machine.
+      # Installers are uploaded from the runner that built them, so the bytes
+      # never travel from a developer's machine.
       - name: Is this a version that has not shipped?
         id: gate
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -591,7 +594,7 @@ jobs:
             | `Nabsun-${{ steps.installers.outputs.version }}-arm64.zip` | macOS, Apple silicon. Unzip and move to Applications. |
             | `SHA256SUMS.txt` | Checksums for all three. |
 
-            All include the built-in model, so they work offline with no account and no API key. That is why each is around 1.3 GB.
+            Installers include the native Local AI engine but omit the optional 1.3 GB model weights. On first launch, choose whether to download the pinned, SHA-256-verified model, connect another assistant, or just browse. Existing custom and earlier bundled models remain supported.
 
             **Nothing here is code-signed.**
 
@@ -674,7 +677,7 @@ jobs:
           key: model-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('scripts/fetch-local-model.mjs') }}
           restore-keys: |
             model-${{ runner.os }}-${{ runner.arch }}-v1-
-      - name: Fetch and verify bundled model and engine
+      - name: Fetch and verify pinned model and engine
         run: |
           npm.cmd run fetch:model
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -16,6 +16,7 @@ async function main() {
           await new Promise(r => setTimeout(r, 10));
           return settings = { ...settings, ...patch };
         } },
+        localModel: { onStatus: () => () => {} },
         config: { paths: async () => ({ userData: '/fixture', soulFile: '/fixture/soul.md' }) }
       };
       const view = new SettingsModule.SettingsView(() => {});

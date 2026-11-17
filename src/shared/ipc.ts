@@ -1,5 +1,6 @@
 import type {DatasetSummary,Workflow,RecordedTask,Batch,BatchReport} from './workflows';
 import type { UpdateStatus } from './updates';
+import type { LocalModelStatus } from './localModel';
 import type {LocalFolder} from './localFiles';
 import type {VoiceAvailability,VoiceEvent} from './voice';
 import type {
@@ -137,6 +138,11 @@ export const CH = {
   // settings + credentials
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
+  localModelStatus: 'local-model:status',
+  localModelDownload: 'local-model:download',
+  localModelCancel: 'local-model:cancel',
+  localModelRemove: 'local-model:remove',
+  localModelChanged: 'local-model:changed',
   settingsChanged: 'settings:changed', // main -> renderer push
   credsStatus: 'creds:status',
   credsSet: 'creds:set',
@@ -369,6 +375,14 @@ export interface ShellApi {
     credentialStatus(): Promise<ProviderStatus[]>;
     setCredential(provider: ProviderId, key: string): Promise<CredentialSaveResult>;
     clearCredential(provider: ProviderId): Promise<void>;
+  };
+
+  localModel: {
+    status(): Promise<LocalModelStatus>;
+    download(): Promise<LocalModelStatus>;
+    cancel(): void;
+    remove(): Promise<LocalModelStatus>;
+    onStatus(cb: (status: LocalModelStatus) => void): () => void;
   };
 
   config: {

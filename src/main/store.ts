@@ -81,8 +81,8 @@ export class JsonStore<T extends object> {
 
 export const DEFAULT_SETTINGS: Settings = {
   onboardingCompleted: false,
-  // The bundled model: works on first launch with no account, no key and no
-  // network, and costs nothing per action. Everything else is one setting away.
+  // Local AI remains the default choice, but its weights are an explicit
+  // first-run download. Existing bundled/custom models remain compatible.
   provider: 'local',
   models: {
     local: 'Qwen3-1.7B-Q4_K_M',
@@ -99,8 +99,8 @@ export const DEFAULT_SETTINGS: Settings = {
     ollama: 'http://127.0.0.1:11434',
   },
   cliPaths: { 'claude-cli': '', 'codex-cli': '' },
-  // Blank paths mean the bundled engine and weights; 8k holds a page snapshot
-  // plus a few turns without asking a low-spec machine for too much RAM.
+  // Blank paths mean the included engine and managed/legacy weights; 8k holds
+  // a page snapshot plus a few turns without asking a low-spec machine for too much RAM.
   localModel: { serverPath: '', modelPath: '', contextSize: 8192, threads: 0 },
   homepage: 'nabsun://home',
   browserNetwork:{mode:'system',pacUrl:'',proxy:'',integratedDomains:''},
@@ -262,7 +262,7 @@ export function secureStorageUsable(): boolean {
 }
 
 const ENV_KEYS: Record<ProviderId, string[]> = {
-  // Runs on this machine against bundled weights: there is nothing to authenticate.
+  // Runs on this machine against managed/custom weights: there is nothing to authenticate.
   local: [],
   anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
   openai: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
