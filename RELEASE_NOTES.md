@@ -13,6 +13,32 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.5 - Prepared for release
+
+Ships the optional Local AI experience and installer improvements prepared
+since 1.0.2. The macOS download is Developer ID signed and Apple notarized.
+Windows downloads remain unsigned in this release while Microsoft Artifact
+Signing Public Trust validation is pending.
+
+- Keep the native local-inference engine in each app while omitting the optional
+  1.28 GB model weights from the distributables.
+- Offer a calm first-launch choice to download Local AI, connect another
+  assistant, or continue browsing without choosing either.
+- Pin the Qwen3 1.7B model revision and verify its exact size and SHA-256 before
+  use. Downloads can be cancelled, resumed, retried, and removed from Settings.
+- Preserve custom model paths and model files included by earlier releases,
+  giving them priority over the new app-managed download.
+- Verify the macOS archive's Developer ID identity, hardened runtime, Apple
+  notarization ticket, Gatekeeper assessment, packaged resources, and isolated
+  startup before publication.
+- Keep the protected Microsoft Artifact Signing path ready for a later signed
+  Windows release without delaying these product changes.
+
+Publish only after the protected macOS workflow passes on the exact merged
+commit and its verified notarized archive replaces the unsigned staging archive.
+The Windows installer and portable download must be described as unsigned; users
+may see Microsoft Defender SmartScreen's unknown-publisher warning.
+
 ## 1.0.4 - Prepared for release
 
 Makes Local AI an explicit choice while keeping existing installations and

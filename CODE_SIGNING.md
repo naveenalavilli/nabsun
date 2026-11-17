@@ -1,13 +1,15 @@
 # Code signing policy
 
-Updated November 14, 2026.
+Updated November 16, 2026.
 
 ## Current status
 
-Nabsun has applied for free Windows signing through SignPath Foundation. The
-application is pending. Existing public Windows releases are unsigned. macOS
-builds use ad-hoc signing and are not notarized. A prepared workflow or successful
-application submission is not evidence that a download has been signed.
+Nabsun's SignPath Foundation application was not approved. Existing public
+Windows releases are unsigned. Version 1.0.5 is being prepared with a Microsoft
+Artifact Signing Public Trust profile. The protected macOS candidate workflow
+uses Developer ID signing and Apple notarization. A configured workflow, cloud
+account, draft release, or version number is not evidence that a download was
+signed.
 
 Only a release explicitly identifying its verified signing status should be
 treated as signed. Verify the downloaded file's signature and checksums. Windows
@@ -18,38 +20,38 @@ SmartScreen and managed-device policies can still warn about a signed download.
 - Author and reviewer: [Naveen Alavilli](https://github.com/naveenalavilli).
 - Release/signing approver: Naveen Alavilli.
 
-Nabsun currently has one maintainer. SignPath must confirm acceptance of this role
-arrangement. Maintainer accounts involved in signing must use MFA. Main updates
+Nabsun currently has one maintainer. Maintainer accounts involved in signing
+must use MFA. Main updates
 go through pull requests and required checks; signing permission must be limited
 to reviewed source and protected CI environments. Signing requests require manual
 release approval. Secrets and signing credentials must not appear in source,
 logs, artifacts or contributor pull-request environments.
 
-## Proposed Windows signing scope
+## Windows signing scope
 
-The prepared SignPath candidate submits only Nabsun's generated setup and
-portable installer files. It neither re-signs Electron/Chromium/llama.cpp binaries
-nor claims that the application or uninstaller inside these files has been
-signed. This scope itself requires SignPath approval before it can be used.
+The Microsoft Artifact Signing candidate builds and signs the application,
+generated setup and portable executables, and packaged DLLs through
+electron-builder. The Azure signer receives only digests; its certificate and
+private key are not exported to the build runner. Upstream signatures must be
+preserved and must not be represented as Nabsun's own code.
 
-Signed candidates must pass regression checks, artifact-origin checks, publisher
-and timestamp verification, and a comparison proving that signing changed only
-the outer PE signature/checksum fields and appended certificate data. Checksums
-are calculated after signing. The signed output is kept separate from unsigned
-builds. Candidate workflows cannot publish a production release automatically.
+Signed candidates must pass regression checks, packaged-resource checks, exact
+publisher and timestamp verification, and Authenticode checks for the expected
+application and installer files. Checksums are calculated after signing. The
+signed output is kept separate from unsigned builds. Candidate workflows cannot
+publish a production release automatically.
 
-Full application/uninstaller signing and clean-machine install/upgrade testing
-remain prerequisites for a production signing claim. Approved upstream signatures
-must be preserved; upstream files must not be represented as our own code.
+Clean-machine install, upgrade, portable launch and uninstall testing remain
+prerequisites for a production signing claim.
 
-## Attribution after acceptance
+## Signing identity
 
-If SignPath accepts Nabsun and signs a release, its signing notice will include:
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by
-[SignPath Foundation](https://signpath.org/).
-
-This is planned attribution, not a claim of current sponsorship or signed builds.
-The Foundation's certificate publisher is distinct from the Nabsun product name.
+The Windows workflow uses a dedicated Microsoft Entra application with a GitHub
+OIDC federated credential restricted to the repository's protected
+`windows-signing` environment. Its Azure role is limited to **Artifact Signing
+Certificate Profile Signer** on the intended profile or account. The exact
+certificate subject is checked in CI and will be listed in the release notes
+only after a real candidate passes.
 
 ## Privacy and reporting
 
