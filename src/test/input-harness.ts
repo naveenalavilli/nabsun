@@ -57,12 +57,6 @@ async function main() {
       `http://127.0.0.1:${(server.address() as { port: number }).port}`,
     );
     await tabs.waitForSettled(tab, 5000);
-    // Xvfb can preserve showInactive() across navigation, so a trusted CDP
-    // mouse click never gives the field DOM focus. Production windows are
-    // already active when browser input runs; make that precondition explicit
-    // for this harness instead of depending on the runner's window manager.
-    window.focus();
-    tab.wc.focus();
     await delay(100);
     const refs = async () => {
       const snapshot = await tabs.callBridge<PageSnapshot>(

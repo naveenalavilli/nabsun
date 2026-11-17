@@ -69,6 +69,13 @@ jobs:
       - name: Input, frames, files, approvals, and durable workflows
         run: |
           foreach ($harness in @('input', 'frame', 'file', 'local-files-agent', 'delegation', 'approval', 'site-permission', 'network-auth', 'network-config', 'plugin-isolation', 'workflow')) {
+            # xvfb-run has no window manager, so Chromium drops trusted keyboard
+            # events for an inactive native window. Exercise this native-input
+            # harness on the supported Windows/macOS platforms instead.
+            if ($IsLinux -and $harness -eq 'input') {
+              Write-Host 'Skipping native trusted-input harness on headless Linux.'
+              continue
+            }
             if ($IsLinux) {
               xvfb-run -a node scripts/electron-run.mjs "dist/test/$harness-harness.js" --no-sandbox
             } else {
