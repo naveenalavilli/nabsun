@@ -15,23 +15,29 @@ No additional changes yet.
 
 ## 1.0.5 - Prepared for release
 
-Carries forward the prepared 1.0.4 optional Local AI experience and moves the
-Windows release candidate to Microsoft Artifact Signing after the SignPath
-application was not approved.
+Ships the optional Local AI experience and installer improvements prepared
+since 1.0.2. The macOS download is Developer ID signed and Apple notarized.
+Windows downloads remain unsigned in this release while Microsoft Artifact
+Signing Public Trust validation is pending.
 
-- Make Microsoft Artifact Signing the default protected Windows signing path.
-- Use GitHub OIDC and a narrowly scoped Azure signer identity, without storing a
-  signing certificate or long-lived Azure client secret in GitHub.
-- Require Authenticode publisher, timestamp, embedded executable/DLL, packaged
-  resource, and final checksum checks before a Windows candidate can be used.
-- Keep Developer ID signing, Apple notarization, Gatekeeper, packaged-resource,
-  and isolated-startup checks on the macOS candidate.
-- Keep signed candidates separate from ordinary packaging; publication remains
-  a deliberate promotion of artifacts built from the exact merged commit.
+- Keep the native local-inference engine in each app while omitting the optional
+  1.28 GB model weights from the distributables.
+- Offer a calm first-launch choice to download Local AI, connect another
+  assistant, or continue browsing without choosing either.
+- Pin the Qwen3 1.7B model revision and verify its exact size and SHA-256 before
+  use. Downloads can be cancelled, resumed, retried, and removed from Settings.
+- Preserve custom model paths and model files included by earlier releases,
+  giving them priority over the new app-managed download.
+- Verify the macOS archive's Developer ID identity, hardened runtime, Apple
+  notarization ticket, Gatekeeper assessment, packaged resources, and isolated
+  startup before publication.
+- Keep the protected Microsoft Artifact Signing path ready for a later signed
+  Windows release without delaying these product changes.
 
-This version must not be published until the Azure identity validation and
-Public Trust profile are complete and both protected platform workflows pass on
-the exact merged commit.
+Publish only after the protected macOS workflow passes on the exact merged
+commit and its verified notarized archive replaces the unsigned staging archive.
+The Windows installer and portable download must be described as unsigned; users
+may see Microsoft Defender SmartScreen's unknown-publisher warning.
 
 ## 1.0.4 - Prepared for release
 
