@@ -13,6 +13,26 @@ are marked accordingly, and their behavior may differ from the current product.
 
 No additional changes yet.
 
+## 1.0.5 - Prepared for release
+
+Carries forward the prepared 1.0.4 optional Local AI experience and moves the
+Windows release candidate to Microsoft Artifact Signing after the SignPath
+application was not approved.
+
+- Make Microsoft Artifact Signing the default protected Windows signing path.
+- Use GitHub OIDC and a narrowly scoped Azure signer identity, without storing a
+  signing certificate or long-lived Azure client secret in GitHub.
+- Require Authenticode publisher, timestamp, embedded executable/DLL, packaged
+  resource, and final checksum checks before a Windows candidate can be used.
+- Keep Developer ID signing, Apple notarization, Gatekeeper, packaged-resource,
+  and isolated-startup checks on the macOS candidate.
+- Keep signed candidates separate from ordinary packaging; publication remains
+  a deliberate promotion of artifacts built from the exact merged commit.
+
+This version must not be published until the Azure identity validation and
+Public Trust profile are complete and both protected platform workflows pass on
+the exact merged commit.
+
 ## 1.0.4 - Prepared for release
 
 Makes Local AI an explicit choice while keeping existing installations and

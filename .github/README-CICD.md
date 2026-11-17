@@ -38,11 +38,13 @@ seven days. Failed uploads fail the package job.
 
 These artifacts are separate from public GitHub Releases.
 
-The manually dispatched **Windows signed candidate** workflow offers `signpath`
-(installer envelopes only, pending Foundation scope approval) and `azure`
-(Microsoft Artifact Signing) paths. Each requires a protected environment and
-configured credentials. Neither publishes releases or changes normal unsigned
-packaging. See [Windows signing](../docs/windows-signing.md) for setup and release checks.
+The manually dispatched **Windows signed candidate** workflow defaults to
+`azure` (Microsoft Artifact Signing). It uses a protected environment, GitHub
+OIDC, and short-lived Azure credentials; no certificate or client secret is
+stored in GitHub. The rejected SignPath route remains available only for
+historical/reapplication testing and is not a release path. Neither route
+publishes releases or changes normal unsigned packaging. See
+[Windows signing](../docs/windows-signing.md) for setup and release checks.
 
 ### macOS signed candidates
 

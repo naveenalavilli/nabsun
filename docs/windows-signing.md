@@ -1,56 +1,55 @@
 # Windows signing
 
-SignPath application submitted November 14, 2026; approval is pending. Existing
-public Windows builds are unsigned. See the [code signing policy](../CODE_SIGNING.md)
+The SignPath Foundation application was not approved. Existing public Windows
+builds remain unsigned until an exact release candidate completes the Microsoft
+Artifact Signing path below. See the [code signing policy](../CODE_SIGNING.md)
 and [privacy notice](../PRIVACY.md).
 
-## SignPath setup after approval
+## Microsoft Artifact Signing setup
 
-1. Confirm the Foundation accepts the proposed installer-only scope and the
-   one-maintainer role arrangement. Enable MFA and link its GitHub integration.
-2. Review `build/signpath/installers.xml` with SignPath. It selects only the setup
-   and portable EXEs, with exact product/version restrictions. Configure a signing
-   policy requiring manual approval and verified GitHub-hosted build origin.
-3. Create the GitHub environment `signpath`, restrict its allowed branches, and
-   configure required reviewers. Add `SIGNPATH_API_TOKEN` as an environment secret.
-4. Add the environment variables below using the approved account values.
+1. Create the Artifact Signing account in a supported region, complete Public
+   Trust identity validation, and create a Public Trust certificate profile.
+2. Create a dedicated Microsoft Entra application and a GitHub federated
+   credential with subject
+   `repo:naveenalavilli@11617914/nabsun@1363438512:environment:windows-signing`.
+   The immutable owner and repository IDs prevent a renamed or transferred
+   repository from inheriting this signing trust.
+3. Grant that service principal **Artifact Signing Certificate Profile Signer**
+   on only the intended certificate profile (or account when profile scope is
+   unavailable). Do not create a client secret.
+4. Create the protected GitHub environment `windows-signing`, restrict it to
+   `main`, and require maintainer approval. Configure these environment variables:
 
 | Variable | Value |
 | --- | --- |
-| `SIGNPATH_ORGANIZATION_ID` | Organization UUID |
-| `SIGNPATH_PROJECT` | Project slug |
-| `SIGNPATH_POLICY` | Signing policy slug |
-| `SIGNPATH_CONFIGURATION` | Reviewed artifact-configuration slug |
-| `SIGNPATH_PUBLISHER` | Exact certificate publisher name |
-| `SIGNPATH_APPROVED_SCOPE` | `installer-envelopes-only`, after scope approval |
+| `AZURE_CLIENT_ID` | Dedicated Entra application's client ID |
+| `AZURE_TENANT_ID` | Azure tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Subscription containing the signing account |
+| `WINDOWS_SIGNING_ENDPOINT` | Regional `https://*.codesigning.azure.net` endpoint |
+| `WINDOWS_SIGNING_ACCOUNT` | Artifact Signing account name |
+| `WINDOWS_SIGNING_PROFILE` | Public Trust certificate profile name |
+| `WINDOWS_SIGNING_PUBLISHER` | Exact certificate subject/publisher returned by Azure |
 
-After the workflow is reviewed and merged, dispatch **Windows signed candidate**
-on a reviewed ref with `signpath` selected. It runs Windows regression checks,
-uploads the unsigned inputs, requests signing and waits up to 30 minutes.
+Dispatch **Windows signed candidate** on the reviewed commit with `azure`
+selected. Verification completes before the protected signing job asks for
+environment approval. GitHub OIDC provides a short-lived token, and
+electron-builder signs the generated application, setup, portable executable,
+and packaged DLLs without exporting a private key.
 
-The returned files are verified for Authenticode validity, publisher, timestamp
-and unchanged installer payloads. Final checksums and `SIGNING-REPORT.json` go
-into a separate candidate artifact. No release is published automatically.
+CI rejects a candidate unless the expected files have a valid Authenticode
+signature, the exact publisher, and a trusted timestamp. It also checks packaged
+resources before hashing the final signed bytes. The candidate is uploaded as a
+separate, seven-day artifact; no release is published automatically.
 
-This signs installer envelopes only. It does not sign the embedded application,
-uninstaller or upstream binaries. Full application signing needs an approved
-build sequence; do not present this candidate as a fully signed product.
-
-## Optional Azure path
-
-The `azure` workflow selection uses `electron-builder.windows-signed.cjs` and the
-protected `windows-signing` environment. It requires a validated Microsoft Public
-Trust profile and OIDC identity. Configure `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
-`AZURE_SUBSCRIPTION_ID`, `WINDOWS_SIGNING_ENDPOINT`, `WINDOWS_SIGNING_ACCOUNT`,
-`WINDOWS_SIGNING_PROFILE` and the exact `WINDOWS_SIGNING_PUBLISHER` as environment
-variables. Its signing scope includes packaged EXEs/DLLs and differs from SignPath.
+The historical SignPath option is retained only for a future approved
+reapplication. It is not an active production route.
 
 ## Verification before production
 
 Run the local packaging checks:
 
 ```powershell
-node --test scripts/verify-windows-signing.cjs scripts/verify-signpath.cjs scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
+node --test scripts/verify-windows-signing.cjs scripts/verify-ci-publishing.cjs scripts/verify-ci-artifacts.cjs
 ```
 
 Artifact checks require PowerShell 7. Synthetic signature tests do not establish
@@ -66,5 +65,5 @@ public certificate trust. Complete these checks in a disposable Windows VM:
 - Record OS version, source commit, package hashes and failures. Update public
   signing claims only after a real approved signing run and these checks pass.
 
-References: [SignPath GitHub integration](https://docs.signpath.io/trusted-build-systems/github)
-and [Microsoft Artifact Signing setup](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart).
+References: [Microsoft Artifact Signing setup](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart)
+and [Artifact Signing roles](https://learn.microsoft.com/en-us/azure/artifact-signing/concept-resources-roles).
