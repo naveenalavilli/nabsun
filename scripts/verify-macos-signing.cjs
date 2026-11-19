@@ -36,23 +36,48 @@ test('macOS signed configuration overrides the ad-hoc identity and requires nota
   const development=await getConfig(path.resolve(__dirname,'..'),'electron-builder.ci.yml',null);
   assert.equal(development.mac.identity,'-');
 });
-test('signed macOS job is manual, protected and distinct from ordinary macOS release artifacts', () => {
+test('production releases and manual candidates use the protected signed macOS job', () => {
   const fs = require('node:fs'), path = require('node:path'), yaml = require('js-yaml');
   const workflow = yaml.load(fs.readFileSync(path.join(__dirname,'../.github/workflows/verify.yml'),'utf8'));
   const job = workflow.jobs['package-macos-signed'];
   assert.match(job.if,/workflow_dispatch/); assert.match(job.if,/MAC_SIGNING_ENABLED/);
   assert.match(job.if,/inputs.mac_signed_candidate/);
+  assert.match(job.if,/release-status\.outputs\.production-release/);
   assert.match(workflow.jobs.package.if,/!inputs.mac_signed_candidate/);
+  assert.match(workflow.jobs.package.if,/package-macos-signed\.result == 'success'/);
   assert.match(workflow.jobs['package-macos'].if,/!inputs.mac_signed_candidate/);
+  assert.match(workflow.jobs['package-macos'].if,/production-release != 'true'/);
   assert.equal(job.environment,'mac-signing');
-  assert(job.needs.includes('verify-macos') && job.needs.includes('verify-action-workflows'));
+  assert(job.needs.includes('release-status') && job.needs.includes('verify-macos') && job.needs.includes('verify-action-workflows'));
   const verify=job.steps.findIndex(step=>step.name==='Verify distributed notarized archive');
-  const upload=job.steps.findIndex(step=>step.name==='Upload verified notarized macOS candidate');
-  assert(verify>=0 && verify<upload);
+  const releaseUpload=job.steps.findIndex(step=>step.name==='Upload verified notarized macOS release archive');
+  const candidateUpload=job.steps.findIndex(step=>step.name==='Upload verified notarized macOS candidate');
+  assert(verify>=0 && verify<releaseUpload && releaseUpload<candidateUpload);
   assert.match(job.steps[verify].run,/ditto -x -k/);
   assert.match(job.steps[verify].run,/verify-macos-signatures.sh/);
   assert.match(job.steps[verify].run,/smoke-macos-app.sh/);
-  assert.match(job.steps[upload].with.name,/^nabsun-notarized-macos-/);
+  assert.match(job.steps[verify].run,/MACOS-SIGNING\.txt/);
+  assert.match(job.steps[releaseUpload].if,/production-release == 'true'/);
+  assert.match(job.steps[releaseUpload].with.name,/^nabsun-macos-/);
+  assert.match(job.steps[candidateUpload].if,/inputs.mac_signed_candidate/);
+  assert.match(job.steps[candidateUpload].with.name,/^nabsun-notarized-macos-/);
   assert(!job.steps.some(step=>step.uses?.includes('action-gh-release')));
   assert(job.steps.some(step=>step.if==='always()' && step.run.includes('nabsun-notarization.p8')));
+});
+
+test('a new main version requires Mac signing before the release job can publish', () => {
+  const fs = require('node:fs'), path = require('node:path'), yaml = require('js-yaml');
+  const workflow = yaml.load(fs.readFileSync(path.join(__dirname,'../.github/workflows/verify.yml'),'utf8'));
+  const status = workflow.jobs['release-status'];
+  assert.equal(status.outputs['production-release'],'${{ steps.release.outputs.production-release }}');
+  const gate = status.steps.find(step=>step.id==='release');
+  assert.match(gate.run,/refs\/heads\/main/);
+  assert.match(gate.run,/git ls-remote --tags/);
+  assert.match(gate.run,/requires MAC_SIGNING_ENABLED=true/);
+  const installers = workflow.jobs.package.steps.find(step=>step.id==='installers');
+  assert.equal(installers.env.PRODUCTION_RELEASE,'${{ needs.release-status.outputs.production-release }}');
+  assert.match(installers.run,/Production release is missing the verified macOS signing marker/);
+  const publish = workflow.jobs.package.steps.find(step=>step.name==='Publish the release');
+  assert.match(publish.with.body,/macOS is Developer ID signed and Apple-notarized/);
+  assert.doesNotMatch(publish.with.body,/xattr|Nothing here is code-signed/);
 });

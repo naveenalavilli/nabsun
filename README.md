@@ -42,8 +42,9 @@ offer an exception; ask your administrator rather than disabling protection.
    you trust the official download, use **System Settings > Privacy & Security >
    Open Anyway**, then confirm the opening.
 
-Mac builds are ad-hoc signed, without an Apple Developer ID signature or
-notarization. A damage or malware warning needs investigation; do not treat it
+The public v1.0.6 Mac build is ad-hoc signed, without an Apple Developer ID
+signature or notarization. New production versions require Developer ID signing
+and Apple notarization in protected CI. A damage or malware warning needs investigation; do not treat it
 as an ordinary publisher warning. See the [illustrated installation steps](https://nabsun.com/#download).
 
 ### Local AI and download checks
@@ -55,7 +56,8 @@ use. Existing bundled and custom model files continue to work. After the model
 is installed, local inference works offline; downloading it, accessing websites,
 and using cloud assistants require internet access.
 
-Windows builds are unsigned; Mac builds use ad-hoc signing without notarization.
+Windows v1.0.6 builds are unsigned, and its Mac build uses ad-hoc signing without
+notarization. New production Mac versions are blocked unless signing and notarization pass.
 Compare your download with the release's `SHA256SUMS.txt`, for example:
 
 ```powershell
@@ -313,7 +315,7 @@ private browsing mode. The small local model can struggle with long tasks, and
 website compatibility varies. Review actions before approving them.
 Prompt injection remains a risk. Plugins and MCP servers are trusted native
 code, not a complete OS sandbox. Trusted publisher signing and Apple
-notarization remain unfinished; see [Security](SECURITY.md).
+Windows production signing remains unfinished; see [Security](SECURITY.md).
 
 [Architecture](ARCHITECTURE.md) · [MIT license](LICENSE) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
