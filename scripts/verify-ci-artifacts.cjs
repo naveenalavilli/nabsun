@@ -35,8 +35,9 @@ function fixture(t) {
 
 function runStep(dir, step, env = {}) {
   const script = path.join(dir, 'step.ps1');
-  fs.writeFileSync(script, "$ErrorActionPreference = 'Stop'\n" + step.run);
-  return spawnSync(process.env.NABSUN_TEST_PWSH || 'pwsh', ['-NoProfile', '-File', script], {
+  fs.writeFileSync(script, "$ErrorActionPreference = 'Stop'\n$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'\n" + step.run);
+  const shell = process.env.NABSUN_TEST_PWSH || (process.env.CI ? 'pwsh' : 'powershell.exe');
+  return spawnSync(shell, ['-NoProfile', '-File', script], {
     cwd: dir, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, ...env, GITHUB_OUTPUT: path.join(dir, 'outputs.txt'), GITHUB_STEP_SUMMARY: path.join(dir, 'summary.md') },
   });
@@ -108,6 +109,18 @@ test('a missing macOS archive fails the release, like a missing installer', t =>
   assert.equal(result.status, 1, String(result.error));
   assert.match(result.stderr, /Expected installer missing/);
   assert.match(result.stderr, /arm64\.zip/);
+});
+
+test('a production release requires the marker created after notarization verification', t => {
+  const dir = fixture(t);
+  for (const name of ARTIFACTS) fs.writeFileSync(path.join(dir, 'release', name), name);
+  const missing = runStep(dir, installers, { PRODUCTION_RELEASE: 'true' });
+  assert.equal(missing.status, 1, missing.stderr || String(missing.error));
+  assert.match(missing.stderr, /missing the verified macOS signing marker/);
+  fs.writeFileSync(path.join(dir, 'release/MACOS-SIGNING.txt'), 'verified');
+  const present = runStep(dir, installers, { PRODUCTION_RELEASE: 'true' });
+  assert.equal(present.status, 0, present.stderr || String(present.error));
+  assert.match(fs.readFileSync(path.join(dir, 'outputs.txt'), 'utf8'), /mac-signed=true/);
 });
 
 test('the summary links successful uploads and reports failed uploads honestly', t => {

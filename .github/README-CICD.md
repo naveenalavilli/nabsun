@@ -11,8 +11,10 @@
 | `verify-connections` | CLI installation, authentication interface, cleanup, and UI checks on Windows, macOS, and Linux |
 | `verify` | Windows build, type checking, regression checks, and local inference |
 | `verify-macos` | macOS verification, local inference, and packaged application checks |
-| `package-macos` | Apple silicon ZIP; requires macOS and connection checks |
-| `package` | Windows setup/portable builds and combined artifacts; requires Windows, macOS, Mac packaging, and connection checks |
+| `release-status` | Detects a new version on `main` and blocks production release unless Mac signing is enabled |
+| `package-macos` | Ad-hoc Apple silicon ZIP for pull requests, existing-version pushes, and preview verification |
+| `package-macos-signed` | Protected Developer ID-signed and Apple-notarized ZIP for new production versions or an explicit candidate run |
+| `package` | Windows setup/portable builds and combined artifacts; selects the correct verified Mac package for the release type |
 
 The native connection checks run official installers but do not initiate OAuth
 or sign out. They do not prove account consent or a live cloud model response.
@@ -46,24 +48,27 @@ historical/reapplication testing and is not a release path. Neither route
 publishes releases or changes normal unsigned packaging. See
 [Windows signing](../docs/windows-signing.md) for setup and release checks.
 
-### macOS signed candidates
+### macOS signing
 
 Manual runs of `verify.yml` with `mac_signed_candidate=true` build a Developer
 ID-signed, Apple-notarized arm64 ZIP when `MAC_SIGNING_ENABLED=true`. This mode
 skips ordinary unsigned packaging. It requires native verification and the protected `mac-signing`
-environment. The normal ad-hoc macOS package/release path is unchanged.
+environment. A new production version on `main` also uses this protected job;
+the ordinary ad-hoc package remains available only for non-production checks.
 
 Environment variables: `APPLE_TEAM_ID`, `MAC_SIGNING_IDENTITY`, `APPLE_API_KEY_ID`,
 `APPLE_API_ISSUER`. Environment secrets: `CSC_LINK` (base64 encrypted P12),
 `CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8` (dedicated team API key). Tokens/private keys
 must never be committed. The temporary notarization key is removed after the job.
 
-The candidate is built using `electron-builder.macos-signed.cjs`. Before upload,
+The signed archive is built using `electron-builder.macos-signed.cjs`. Before upload,
 CI extracts the distributed ZIP and checks Developer ID/team identity, hardened
 runtime, native inference binaries, stapled notarization ticket, Gatekeeper
-assessment, packaged resources and isolated-profile app/helper startup. Its `nabsun-notarized-macos-*` artifact is
-separate from ordinary ad-hoc archives. It does not publish a release automatically;
-verify the actual artifact and clean-Mac launch before attaching it to a release.
+assessment, packaged resources and isolated-profile app/helper startup. Manual
+candidate runs keep a separate `nabsun-notarized-macos-*` artifact and do not
+publish it. For a new production version, the protected job emits the
+`nabsun-macos-*` artifact used by the draft release. The release job rejects a
+new version unless the notarization verification marker is present.
 
 ## Release behavior
 
@@ -75,7 +80,9 @@ After successful packaging, a push to `main` whose package version has no
 existing tag prepares a **draft GitHub release** with the artifacts and verified
 commit as its target. A draft is not a public release, and its version tag may
 not exist until publication. A maintainer verifies the assets/checksums and
-publishes the draft. Pull requests, ordinary tag-triggered runs,
+publishes the draft. The production Mac archive must come from the protected
+Developer ID signing and notarization job; an unsigned Mac archive cannot reach
+the draft-release step. Pull requests, ordinary tag-triggered runs,
 and ordinary manual workflow runs do not take this release path.
 
 `main` updates require a PR, the existing `verify` status, and resolved review

@@ -32,7 +32,7 @@ test('the actual workflow publishes only the verified commit and keeps prereleas
   assert.equal(publish.with.make_latest,false);
   assert.equal(publish.with.target_commitish,'${{ github.sha }}');
   assert.match(publish.if,/branch_release.outputs.tag/);
-  assert.deepEqual(workflow.jobs.package.needs,['verify','verify-macos','package-macos','verify-connections','verify-action-workflows']);
+  assert.deepEqual(workflow.jobs.package.needs,['release-status','verify','verify-macos','package-macos','package-macos-signed','verify-connections','verify-action-workflows']);
 });
 
 test('Windows-only test release has one installer plus checksum and does not claim Mac assets',()=>{

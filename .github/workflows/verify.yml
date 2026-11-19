@@ -35,6 +35,33 @@ env:
   CI: 'true'
 
 jobs:
+  release-status:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
+    runs-on: ubuntu-latest
+    outputs:
+      production-release: ${{ steps.release.outputs.production-release }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decide whether this commit can create a production release
+        id: release
+        env:
+          MAC_SIGNING_ENABLED: ${{ vars.MAC_SIGNING_ENABLED }}
+        run: |
+          $isRelease = 'false'
+          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -eq 'refs/heads/main') {
+            $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            $tag = "v$version"
+            $existing = git ls-remote --tags origin "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not verify the production release tag.' }
+            if (-not $existing) {
+              if ($env:MAC_SIGNING_ENABLED -ne 'true') {
+                throw 'A new production version requires MAC_SIGNING_ENABLED=true. Refusing an unsigned Mac release.'
+              }
+              $isRelease = 'true'
+            }
+          }
+          "production-release=$isRelease" >> $env:GITHUB_OUTPUT
+
   verify-action-workflows:
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer
     strategy:
@@ -296,9 +323,9 @@ jobs:
   # Mac sold since 2020, and a zip is simpler to verify and move to Applications.
   # Add `--x64` and a dmg target here if Intel users ask.
   package-macos:
-    if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
+    if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate && needs.release-status.outputs.production-release != 'true'
     runs-on: macos-latest
-    needs: [verify-macos, verify-connections]
+    needs: [release-status, verify-macos, verify-connections]
     timeout-minutes: 60
     defaults:
       run:
@@ -358,8 +385,8 @@ jobs:
           retention-days: 7
 
   package-macos-signed:
-    if: github.event_name == 'workflow_dispatch' && inputs.mac_signed_candidate && !inputs.windows_test_installer && vars.MAC_SIGNING_ENABLED == 'true'
-    needs: [verify-macos, verify-connections, verify-action-workflows]
+    if: (github.event_name == 'workflow_dispatch' && inputs.mac_signed_candidate && !inputs.windows_test_installer && vars.MAC_SIGNING_ENABLED == 'true') || (needs.release-status.outputs.production-release == 'true' && vars.MAC_SIGNING_ENABLED == 'true')
+    needs: [release-status, verify-macos, verify-connections, verify-action-workflows]
     runs-on: macos-latest
     timeout-minutes: 90
     environment: mac-signing
@@ -405,6 +432,7 @@ jobs:
           export APPLE_API_KEY="$RUNNER_TEMP/nabsun-notarization.p8"
           npx electron-builder --mac zip --arm64 --config electron-builder.macos-signed.cjs --publish never
       - name: Verify distributed notarized archive
+        id: mac
         run: |
           version=$(node -p "require('./package.json').version")
           archive="release/Nabsun-$version-arm64.zip"
@@ -415,13 +443,30 @@ jobs:
           node scripts/check-release-payload.mjs --resources "$check_dir/Nabsun.app/Contents/Resources"
           bash scripts/smoke-macos-app.sh "$check_dir/Nabsun.app"
           (cd release && shasum -a 256 "Nabsun-$version-arm64.zip" > SHA256SUMS-MACOS.txt)
+          printf 'Developer ID signed, Apple-notarized, stapled and verified in CI.\n' > release/MACOS-SIGNING.txt
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - name: Upload verified notarized macOS release archive
+        if: needs.release-status.outputs.production-release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nabsun-macos-${{ steps.mac.outputs.version }}-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.mac.outputs.archive }}
+            release/SHA256SUMS-MACOS.txt
+            release/MACOS-SIGNING.txt
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload verified notarized macOS candidate
+        if: github.event_name == 'workflow_dispatch' && inputs.mac_signed_candidate
         uses: actions/upload-artifact@v4
         with:
           name: nabsun-notarized-macos-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             release/Nabsun-*-arm64.zip
             release/SHA256SUMS-MACOS.txt
+            release/MACOS-SIGNING.txt
           compression-level: 0
           if-no-files-found: error
           retention-days: 7
@@ -439,9 +484,9 @@ jobs:
           retention-days: 7
 
   package:
-    if: (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate
+    if: always() && (github.event_name != 'workflow_dispatch' || !inputs.windows_test_installer) && !inputs.mac_signed_candidate && needs.release-status.result == 'success' && needs.verify.result == 'success' && needs.verify-macos.result == 'success' && needs.verify-connections.result == 'success' && needs.verify-action-workflows.result == 'success' && ((needs.release-status.outputs.production-release == 'true' && needs.package-macos-signed.result == 'success') || (needs.release-status.outputs.production-release != 'true' && needs.package-macos.result == 'success'))
     runs-on: windows-2022
-    needs: [verify, verify-macos, package-macos, verify-connections, verify-action-workflows]
+    needs: [release-status, verify, verify-macos, package-macos, package-macos-signed, verify-connections, verify-action-workflows]
     timeout-minutes: 60
     # Only this job may write, and only the release step below uses it. The
     # workflow default stays `contents: read`.
@@ -484,6 +529,8 @@ jobs:
 
       - name: Check installers and generate checksums
         id: installers
+        env:
+          PRODUCTION_RELEASE: ${{ needs.release-status.outputs.production-release }}
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $installers = @(
@@ -502,7 +549,12 @@ jobs:
             "$hash  $(Split-Path -Leaf $installer)"
           }
           $checksums | Set-Content -LiteralPath release/SHA256SUMS.txt -Encoding ascii
+          $macSigned = Test-Path -LiteralPath release/MACOS-SIGNING.txt -PathType Leaf
+          if ($env:PRODUCTION_RELEASE -eq 'true' -and -not $macSigned) {
+            throw 'Production release is missing the verified macOS signing marker.'
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
+          "mac-signed=$($macSigned.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
       - name: Upload failure diagnostics
         if: failure()
         continue-on-error: true
@@ -603,13 +655,12 @@ jobs:
 
             Installers include the native Local AI engine but omit the optional 1.3 GB model weights. On first launch, choose whether to download the pinned, SHA-256-verified model, connect another assistant, or just browse. Existing custom and earlier bundled models remain supported.
 
-            **Nothing here is code-signed.**
+            **macOS is Developer ID signed and Apple-notarized. Windows remains unsigned.**
 
             - **Windows:** SmartScreen warns with "Windows protected your PC" - choose
               **More info -> Run anyway**.
-            - **macOS:** Gatekeeper says Apple cannot verify the app. Either right-click
-              the app and choose **Open**, or run
-              `xattr -dr com.apple.quarantine /Applications/Nabsun.app`
+            - **macOS:** The workflow verifies the Developer ID team, hardened runtime,
+              notarization ticket, Gatekeeper assessment and stapled ticket before release.
 
             Verify a download first if you prefer: `Get-FileHash <file> -Algorithm SHA256`
             on Windows, `shasum -a 256 <file>` on macOS.
